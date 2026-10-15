@@ -1,5 +1,6 @@
 /*
- * Load the sample portfolio (same data the web app shows in preview) into MongoDB.
+ * Load the sample portfolio (same data the web app shows in preview) into MongoDB. Development and tests only —
+ * refused when NODE_ENV=production.
  *   npm run seed              replace all TruSpace collections with the sample data
  *   npm run seed -- --if-empty   only seed when the database has no properties yet
  */
@@ -26,6 +27,8 @@ function seedAccounts(data) {
 }
 
 export async function seed({ ifEmpty = false } = {}) {
+  // Seeding wipes every collection and creates accounts with a known password — never on a live server.
+  if (env.nodeEnv === 'production') throw new Error('Sample data is for development only and cannot be loaded when NODE_ENV=production. Create the first administrator with `npm run create-admin`.')
   const data = JSON.parse(await fs.readFile(new URL('./sample-data.json', import.meta.url), 'utf8'))
   if (ifEmpty && await models.properties.estimatedDocumentCount()) return { skipped: true }
   const counts = {}

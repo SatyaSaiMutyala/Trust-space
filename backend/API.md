@@ -1,6 +1,6 @@
 # TruSpace API
 
-Node 20 + Express 5 + MongoDB (Mongoose). Base URL: `http://localhost:5000/api`
+Node 20 + Express 5 + MongoDB (Mongoose). Base URL: `http://localhost:5001/api`
 
 ## Run
 

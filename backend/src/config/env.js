@@ -3,7 +3,7 @@ import 'dotenv/config'
 import path from 'node:path'
 
 export const env = {
-  port: Number(process.env.PORT) || 5000,
+  port: Number(process.env.PORT) || 5001, // not 5000: macOS AirPlay Receiver listens there
   mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/truspace',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   nodeEnv: process.env.NODE_ENV || 'development',

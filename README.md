@@ -5,7 +5,7 @@ Facilities and lease management for TrustLab Diagnostics — premises, leases, r
 | Folder | Stack | Dev URL |
 | --- | --- | --- |
 | `web/` | React 19 + Vite + MUI, Redux Toolkit (RTK Query) | http://localhost:5173 |
-| `backend/` | Node 20 + Express 5 + MongoDB (Mongoose), files in AWS S3 | http://localhost:5000/api |
+| `backend/` | Node 20 + Express 5 + MongoDB (Mongoose), files in AWS S3 | http://localhost:5001/api |
 | `reference/` | The original single-file prototype the web app was ported from | — |
 
 ## Run locally
@@ -19,7 +19,7 @@ npm run dev
 #    …or without MongoDB: an in-memory database with the sample data (lost when stopped)
 npm run dev:memory    # set STORAGE_DRIVER=local in .env if S3 keys are not set yet
 
-# 2. Web — in a second terminal (Vite proxies /api to http://localhost:5000)
+# 2. Web — in a second terminal (Vite proxies /api to http://localhost:5001)
 cd web && npm install && npm run dev
 ```
 
@@ -34,7 +34,7 @@ Sign in with `admin@trustlab.example` / `Trust@1234` (also `facilities@trustlab.
 - **Records for calculations:** after sign-in, every record the user may see is loaded (the API limits it by role) for the overview figures, rent roll, ledgers and statuses. Edits go through `save()` / `remove()` (`store/store.js`) → RTK Query → API.
 - **Files:** uploads go to `/api/assets` → S3. Images and videos load through `/api/assets/:id/file?t=<media token>`.
 
-API reference: [backend/API.md](backend/API.md) · Porting notes: [web/PORTING.md](web/PORTING.md)
+Deploying to a server (EC2 + local MongoDB, no sample data): [DEPLOY.md](DEPLOY.md) · API reference: [backend/API.md](backend/API.md) · Porting notes: [web/PORTING.md](web/PORTING.md)
 
 ## Tests
 
