@@ -1,0 +1,10 @@
+<!doctype html>
+<!-- Dev-only: renders the app at an exact device width for screenshots. /frame.html?w=375&h=812&q=<url-encoded query for the app> -->
+<html><head><meta charset="utf-8"><style>body{margin:0;background:#888}iframe{border:0;display:block;background:#fff}</style></head>
+<body><script>
+const q = new URLSearchParams(location.search)
+const f = document.createElement('iframe')
+f.width = q.get('w') || 375; f.height = q.get('h') || 812
+f.src = '/?' + (q.get('q') || '')
+document.body.appendChild(f)
+</script></body></html>
