@@ -9,6 +9,16 @@ let inspT = null
 /** A record starts as "Not started" (date left blank — entered by hand) and becomes "In progress" once the date is entered or anything is recorded. */
 export const INSP_OPEN = ['Not started', 'In progress']
 export const inspOpen = I => !!I && INSP_OPEN.includes(I.status)
+/** Display label / chip kind per state ("Signed" reads as "Completed"). */
+export const INSP_LABEL = { 'Not started': 'Not started', 'In progress': 'In progress', 'Awaiting owner sign-off': 'Awaiting owner sign-off', Disputed: 'Disputed', Signed: 'Completed', Skipped: 'Skipped' }
+export const INSP_K = { 'Not started': 'idle', 'In progress': 'info', 'Awaiting owner sign-off': 'warn', Disputed: 'bad', Signed: 'ok', Skipped: 'idle' }
+/** State of one inspection kind on a lease: { st, I, sk, can } — can = this kind may be started now (handover only after notice). */
+export function inspKindState(L, kind) {
+  const I = inspOf(L.id, kind); const sk = L[skipKey(kind)]
+  const can = kind === 'Move-in' || !!(L.exit && L.exit.noticeDate)
+  if (sk && (!I || inspOpen(I))) return { st: 'Skipped', I, sk, can }
+  return { st: I ? I.status : 'Not started', I, sk: null, can }
+}
 const inspStarted = I => (I.items || []).some(it => it.cond || String(it.val ?? '').trim() || (it.photos || []).length) || (I.roomPhotos || []).length || !!I.tdplVideo
 export function saveInsp(I, now) { clearTimeout(inspT); if (I.status === 'Not started' && (I.date || inspStarted(I))) { I.status = 'In progress'; I.log = (I.log || []).concat({ at: nowISO(), by: actor(), text: `${IN_KIND[I.kind]} started` }) } I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
 /** Skipped inspections (no record exists — premises taken over / handed back before TruSpace): L.takeoverSkip / L.handoverSkip. */

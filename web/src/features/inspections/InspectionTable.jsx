@@ -10,6 +10,7 @@ import TableCell from '@mui/material/TableCell'
 import { S, prop, useStore } from '../../store/store'
 import { inspSummary } from '../../domain/inspection'
 import { IN_KIND, inspStatusK } from '../../domain/constants'
+import { INSP_LABEL } from '../../domain/inspection'
 import { by, fmtD, inr } from '../../domain/utils'
 import { openInsp } from '../../store/actions'
 import { TableCard, ClickRow, Empty } from '../../components/ui/Layout'
@@ -37,7 +38,7 @@ export default function InspectionTable({ list, pid, server }) {
               <TableCell>{flagged.length}</TableCell>
               <TableCell className="num">{I.kind === 'Move-out' ? inr(ded) : '—'}</TableCell>
               <TableCell className="small" sx={{ fontSize: 12.5 }}>{I.tdplSign ? 'TrustLab ✓' : 'TrustLab —'}<br />{I.ownerSign ? 'Owner ✓' : 'Owner —'}</TableCell>
-              <TableCell><StatusChip label={I.status} k={inspStatusK(I.status)} /></TableCell>
+              <TableCell><StatusChip label={INSP_LABEL[I.status] || I.status} k={inspStatusK(I.status)} /></TableCell>
             </ClickRow>
           )
         })}

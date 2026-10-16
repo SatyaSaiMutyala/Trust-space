@@ -15,8 +15,7 @@ import { SampleBanner } from '../../components/app/Banners'
 import { useServerList } from '../../components/list/useServerList'
 import { ListToolbar, ListFilter, Pager } from '../../components/list/ListControls'
 import InspectionTable from './InspectionTable'
-import InspectionActions from './InspectionActions'
-import { inspActions } from './inspButtons'
+import { InspKindCell } from './LeaseInspections'
 
 const STATUS = ['Not started', 'In progress', 'Awaiting owner sign-off', 'Disputed', 'Signed']
 
@@ -31,14 +30,15 @@ export default function InspectionsPage() {
       <SampleBanner />
       <Panel title="By lease" body={false}>
         <TableCard panel={false}>
-          <TableHead><TableRow><TableCell>Property</TableCell><TableCell>Lease</TableCell><TableCell>Status</TableCell><TableCell>Inspections</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Property</TableCell><TableCell>Lease</TableCell><TableCell>Lease status</TableCell><TableCell>Take-over inspection</TableCell><TableCell>Handover inspection</TableCell></TableRow></TableHead>
           <TableBody>
             {leases.map(L => (
               <TableRow key={L.id}>
                 <TableCell>{prop(L.propertyId)?.name || ''}<div className="code">{prop(L.propertyId)?.code || ''}</div></TableCell>
                 <TableCell className="small" sx={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{L.ref}<br />{fmtD(L.start)}</TableCell>
                 <TableCell><StatusChip label={leaseState(L)} /></TableCell>
-                <TableCell><div className="actions">{inspActions(L).length ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></TableCell>
+                <TableCell sx={{ verticalAlign: 'top' }}><InspKindCell L={L} kind="Move-in" /></TableCell>
+                <TableCell sx={{ verticalAlign: 'top' }}><InspKindCell L={L} kind="Move-out" /></TableCell>
               </TableRow>
             ))}
           </TableBody>
