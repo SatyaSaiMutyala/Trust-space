@@ -8,9 +8,8 @@ import TableBody from '@mui/material/TableBody'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { S, prop, useStore } from '../../store/store'
-import { inspSummary } from '../../domain/inspection'
+import { inspSummary, inspOpen, skipKey, INSP_LABEL } from '../../domain/inspection'
 import { IN_KIND, inspStatusK } from '../../domain/constants'
-import { INSP_LABEL } from '../../domain/inspection'
 import { by, fmtD, inr } from '../../domain/utils'
 import { openInsp } from '../../store/actions'
 import { TableCard, ClickRow, Empty } from '../../components/ui/Layout'
@@ -19,7 +18,9 @@ import { TableSkeleton, Refreshing } from '../../components/ui/Skeletons'
 
 export default function InspectionTable({ list, pid, server }) {
   useStore()
-  const rows = server ? server.rows : [...list].sort(by('date', -1))
+  // A record that was never finished and whose inspection was then skipped stays hidden behind the "Skipped" state.
+  const hidden = I => { const L = S.leases.find(l => l.id === I.leaseId); return !!(L && L[skipKey(I.kind)] && inspOpen(I)) }
+  const rows = (server ? server.rows : [...list].sort(by('date', -1))).filter(I => !hidden(I))
   if (!rows.length && server?.isFetching) return <TableSkeleton rows={6} cols={pid ? 6 : 7} />
   if (!rows.length) return <Empty panel>{server ? server.message || 'No inspections found.' : 'No inspections recorded.'}</Empty>
   return (
