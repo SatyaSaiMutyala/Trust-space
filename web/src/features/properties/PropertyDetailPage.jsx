@@ -2,10 +2,10 @@
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
-import { useStore, S, UI, isOwner, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
+import { useStore, S, UI, isOwner, role, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
-import { fmtD } from '../../domain/utils'
-import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti } from '../../domain/lease'
+import { fmtD, pctLabel } from '../../domain/utils'
+import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
@@ -25,9 +25,42 @@ import PropertiesPage from './PropertiesPage'
 
 const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['contracts', 'Contracts'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
 
+/** One owner's contact, tax and bank facts (prototype's owner card on the property summary). */
+function ownerFacts(O, withName) {
+  const bs = bankState(O)
+  return [
+    ...(withName ? [['Name', O.name], ['Type', O.kind]] : []), ['Mobile', O.phone || '—'],
+    ['Emergency', [O.emergency?.name, O.emergency?.phone].filter(Boolean).join(' · ') || '—'],
+    ['Email', O.email || '—'], ['Notices to', noticeAddrOf(O) || '—'],
+    ['PAN', <span key="p" className="mono">{O.pan || '—'}</span>], ['GSTIN', <span key="g" className="mono">{O.gstin || 'Unregistered'}</span>],
+    ['Bank', <>{O.bankName || O.bank || '—'} <span className="mono">{maskAcct(O.acctNo)}</span> <StatusChip label={bs[0]} k={bs[1]} /></>],
+  ]
+}
+
+/** Co-owners: one card each — name, type, share of the rent, then the same facts as a sole owner. */
+function CoOwnerCards({ L }) {
+  const me = isOwner() ? role().ownerId : null
+  return (
+    <Box sx={{ display: 'grid', gap: 1.5 }}>
+      {leaseOwners(L).map(x => {
+        const O = owner(x.ownerId); if (!O) return null
+        return (
+          <Box key={x.ownerId} sx={{ border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, px: 1.5, py: 1, bgcolor: 'var(--sunk)', borderBottom: '1px solid var(--line)' }}>
+              <b>{O.name}</b><span className="small muted">{O.kind}</span>
+              <StatusChip label={`${pctLabel(x.rent)} of rent`} k="info" />{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}
+            </Box>
+            <Box sx={{ p: 1.5 }}><Facts items={ownerFacts(O, false)} /></Box>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
 function Summary({ P }) {
   const O = owner(P.ownerId); const o = isOwner(); const fv = frontOf(P); const L = leaseOf(P.id)
-  const bs = O ? bankState(O) : null
+  const multi = !!(L && isMulti(L))
   return (
     <>
       <Cols n={2}>
@@ -43,17 +76,11 @@ function Summary({ P }) {
             ]} />
           </Box>
         </Panel>
-        <Panel title={L && isMulti(L) ? 'Owners' : 'Owner'} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}>
-          {O ? <Facts items={[
-            ['Name', O.name], ['Type', O.kind], ['Mobile', O.phone],
-            ['Emergency', [O.emergency?.name, O.emergency?.phone].filter(Boolean).join(' · ') || '—'],
-            ['Email', O.email], ['Notices to', noticeAddrOf(O) || '—'],
-            ['PAN', <span key="p" className="mono">{O.pan || '—'}</span>], ['GSTIN', <span key="g" className="mono">{O.gstin || 'Unregistered'}</span>],
-            ['Bank', <>{O.bankName || O.bank || '—'} <span className="mono">{maskAcct(O.acctNo)}</span> <StatusChip label={bs[0]} k={bs[1]} /></>],
-          ]} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
+        <Panel title={multi ? `Owners · ${leaseOwners(L).length} co-owners` : 'Owner'} sub={multi ? 'Each co-owner invoices and is paid separately — shares are in Co-owners & shares below' : null} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}>
+          {multi ? <CoOwnerCards L={L} /> : O ? <Facts items={ownerFacts(O, true)} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
         </Panel>
       </Cols>
-      {L && isMulti(L) ? <Panel title="Co-owners & shares"><OwnersBlock L={L} /></Panel> : null}
+      {L && isMulti(L) ? <Panel title="Co-owners & shares"><OwnersBlock L={L} heading={false} /></Panel> : null}
       <Panel title="Upcoming dates"><CriticalDates days={365} pid={P.id} /></Panel>
     </>
   )

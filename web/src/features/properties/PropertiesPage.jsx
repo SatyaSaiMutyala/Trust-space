@@ -20,7 +20,7 @@ const STATUSES = ['Pipeline', 'Under fit-out', 'Active', 'Notice served', 'Vacat
 
 export default function PropertiesPage() {
   useStore()
-  const L = useServerList('properties', 'properties', { defaults: { limit: 12 } })
+  const L = useServerList('properties', 'properties', { defaults: { limit: 12, filters: { status: 'Active' } } }) // opens on the live premises; "Any status" shows pipeline and vacated too
   const o = isOwner()
   const cities = [...new Set(S.properties.map(p => (p.city || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   return (

@@ -13,12 +13,12 @@ import { BankChip } from '../owners/OwnerProfile'
 const G = { Forward: 'GST on invoice', RCM: 'RCM (TrustLab pays)', None: 'No GST' }
 const SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head': { fontSize: 11 } }
 
-export default function OwnersBlock({ L }) {
+export default function OwnersBlock({ L, heading = true }) {
   useStore()
   const sc = schedule(L); const me = isOwner() ? role().ownerId : null
   return (
     <div>
-      <div className="eyebrow" style={{ marginBottom: 6 }}>Owners &amp; share of payments</div>
+      {heading ? <div className="eyebrow" style={{ marginBottom: 6 }}>Owners &amp; share of payments</div> : null}
       <div className="tbl-wrap">
         <Table size="small" className="otable" sx={SX}>
           <TableHead><TableRow>

@@ -14,7 +14,7 @@ import { depAgree, depDecline, depCancel } from './actions'
 const K = { Agreed: 'ok', Proposed: 'warn', Declined: 'bad', Cancelled: 'idle' }
 const SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head': { fontSize: 11 } }
 
-export default function DepAdjTable({ L }) {
+export default function DepAdjTable({ L, heading = true }) {
   useStore()
   const me = isOwner() ? role().ownerId : null
   const rows = depAdjs(L, me, true).concat((L.depAdj || []).filter(a => ['Declined', 'Cancelled'].includes(a.status) && (!me || a.ownerId === me))).sort((a, b) => a.period.localeCompare(b.period))
@@ -23,7 +23,7 @@ export default function DepAdjTable({ L }) {
   return (
     <div>
       <div className="filters" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-        <div className="eyebrow">Security deposit adjusted against rent</div>
+        {heading ? <div className="eyebrow">Security deposit adjusted against rent</div> : <span />}
         <span className="small">Held now {me ? inr(depHeld(L, me)) : inr(depHeld(L))} of {me ? inr(depShareAmt(L, me)) : inr(L.deposit)}</span>
       </div>
       <div className="tbl-wrap">

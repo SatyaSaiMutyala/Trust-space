@@ -11,7 +11,7 @@ import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
 import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld, tdsRate, panValid } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
-import { Btn, Panel, Facts, Kpis, Kpi, Banner } from '../../components/ui/Layout'
+import { Btn, Panel, Facts, Kpis, Kpi, Banner, Section } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import InspectionActions from '../inspections/InspectionActions'
@@ -185,20 +185,23 @@ export function ScheduleTable({ sc, L, mode }) {
   )
 }
 
-/** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). */
-export function SchedulePanel({ L }) {
+/** One-line description of the schedule: term, escalation, payment timing. */
+const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}`
+
+/** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). headerless: the caller shows the title. */
+export function SchedulePanel({ L, headerless }) {
   useStore()
   const sc = schedule(L); if (!sc.rows.length) return null
   const mode = UI.schedMode || 'month'
   return (
     <div>
-      <div className="filters" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+      {headerless ? null : <div className="filters" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
         <div>
           <div className="eyebrow">Rent schedule — full term</div>
-          <span className="small muted">{fmtD(L.start)} to {fmtD(sc.end)}{sc.end !== L.end ? ' (exit date)' : ''} · {L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · {L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}</span>
+          <span className="small muted">{schedSub(L, sc)}</span>
         </div>
         <Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>
-      </div>
+      </div>}
       <SchedTotals sc={sc} L={L} />
       {/* The view switch only changes the month-by-month table below, so it sits right above it — not above the totals and owner split. */}
       <div className="filters" style={{ justifyContent: 'space-between', margin: '14px 0 8px' }}>
@@ -215,7 +218,7 @@ const GST_TXT = { Forward: '18% charged by owner (forward charge)', RCM: '18% pa
 export default function LeaseDetail({ L }) {
   useStore()
   const st = leaseState(L); const le = lockEnd(L); const ne = nextEsc(L); const o = isOwner()
-  const hasInspBtn = inspOf(L.id, 'Move-in') || !o || inspOf(L.id, 'Move-out')
+  const hasInspBtn = inspOf(L.id, 'Move-in') || !o || inspOf(L.id, 'Move-out'); const sc = schedule(L)
   return (
     <Panel
       title={<h2>{L.ref}</h2>}
@@ -227,8 +230,8 @@ export default function LeaseDetail({ L }) {
         {['Active', 'Renewal due', 'Expired', 'Notice period'].includes(st) && +L.deposit ? <Btn sm onClick={() => depAdjOpen(L.id)}>Adjust deposit against rent</Btn> : null}
       </>}</div>}
     >
-      <Box sx={{ display: 'grid', gap: '18px', gridTemplateColumns: 'minmax(0,1fr)' }}>
-        <Facts items={[
+      <Box sx={{ display: 'grid', gap: '14px', gridTemplateColumns: 'minmax(0,1fr)' }}>
+        <Section title="Lease terms"><Facts items={[
           ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span>/mo</>],
           ['Base rent', <span key="b" className="mono">{inr(L.rent)}</span>],
           ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None'],
@@ -240,21 +243,21 @@ export default function LeaseDetail({ L }) {
           ['Rent-free period', (L.fitout || 0) + ' days · rent from ' + fmtD(rentStartOf(L))],
           ['Advance rent', +L.advanceRent ? `${inr(L.advanceRent)} · adjusted over ${L.advanceMonths || 1} month${(L.advanceMonths || 1) > 1 ? 's' : ''}` : 'None'],
           ['Escalation basis', `${L.escType === 'Simple' ? 'Simple (on base rent)' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}`],
-        ]} />
-        <Facts items={[
+        ]} /></Section>
+        <Section title="Charges, tax & registration"><Facts items={[
           ['Maintenance', `${L.maintType}${L.maint ? ' · ' + inr(L.maint) + '/mo' : ''}`],
           ['Electricity', L.elec],
           ['GST on rent', isMulti(L) ? 'Per owner — see owners' : GST_TXT[L.gstMode]],
           ['TDS on rent', L.tds ? (isMulti(L) ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month — 20% for a co-owner without a valid PAN' + (tdsPerOwner(L) ? ' · tested on each co-owner’s share' : '') : !panValid(owner(L.ownerId)) ? <span key="t" style={{ color: 'var(--bad)' }}>20% — owner has no valid PAN (s.393, formerly 194-I; 10% once a valid PAN is on file)</span> : `${tdsRate(L.ownerId, CUR + '-01')}% (s.393, formerly 194-I) when rent exceeds ₹50,000/month`) : 'Not deducted'],
           ['Registration', L.registered ? 'Registered' : 'Unregistered'],
           ['Stamp duty', L.stamp ? inr(L.stamp) : '—'],
-        ]} />
-        {isMulti(L) ? <OwnersBlock L={L} /> : null}
-        {depAdjs(L, null, true).length ? <DepAdjTable L={L} /> : null}
-        <div><div className="eyebrow" style={{ marginBottom: 6 }}>Key clauses</div><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></div>
-        <div><div className="eyebrow" style={{ marginBottom: 6 }}>Joint inspections</div><div className="actions">{hasInspBtn ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></div>
-        <div><div className="eyebrow" style={{ marginBottom: 6 }}>Signed agreement &amp; annexures</div>{(L.docs || []).length ? <FileLinks files={L.docs} /> : <span className="muted small">No documents uploaded.</span>}</div>
-        <SchedulePanel L={L} />
+        ]} /></Section>
+        {isMulti(L) ? <Section title="Owners & share of payments"><OwnersBlock L={L} heading={false} /></Section> : null}
+        {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}
+        <Section title="Key clauses"><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></Section>
+        <Section title="Joint inspections"><div className="actions">{hasInspBtn ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></Section>
+        <Section title="Signed agreement & annexures">{(L.docs || []).length ? <FileLinks files={L.docs} /> : <span className="muted small">No documents uploaded.</span>}</Section>
+        {sc.rows.length ? <Section title="Rent schedule — full term" sub={schedSub(L, sc)} actions={<Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>}><SchedulePanel L={L} headerless /></Section> : null}
       </Box>
     </Panel>
   )

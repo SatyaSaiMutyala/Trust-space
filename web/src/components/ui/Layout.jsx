@@ -58,6 +58,19 @@ export function Banner({ children, tone, sx, ...rest }) {
 }
 
 /** Centred empty-state message, optionally inside a panel. */
+/** A titled sub-section inside a page or panel: bordered card with a tinted header strip and a coloured title. */
+export function Section({ title, sub, actions, children, sx }) {
+  return (
+    <Box sx={[{ border: '1px solid var(--line)', borderRadius: 'var(--r)', bgcolor: 'var(--surface)', minWidth: 0, overflow: 'hidden' }, ...(Array.isArray(sx) ? sx : [sx])]}>
+      <Box component="header" sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 2, py: 1.25, borderBottom: '1px solid var(--line)', borderLeft: '4px solid var(--accent)', bgcolor: 'color-mix(in srgb, var(--accent) 9%, var(--surface))', '@media (max-width:760px)': { px: 1.5, py: 1 } }}>
+        <div><div className="eyebrow" style={{ color: 'var(--accent)', fontSize: 12 }}>{title}</div>{sub ? <div className="small muted" style={{ marginTop: 2 }}>{sub}</div> : null}</div>
+        {actions}
+      </Box>
+      <Box sx={{ p: 2, '@media (max-width:760px)': { p: 1.5 } }}>{children}</Box>
+    </Box>
+  )
+}
+
 export function Empty({ children, panel }) {
   return panel ? <Panel body={false}><div className="empty">{children}</div></Panel> : <div className="empty">{children}</div>
 }
