@@ -3,7 +3,7 @@
 import { S, UI, prop, owner, save, toast, emit, openDrawer, actor, side } from '../../store/store'
 import { newInsp, settleWithDeposit } from '../../store/actions'
 import { addDays, addMonths, num, inr, perLabel, newId, nowISO, TODAY } from '../../domain/utils'
-import { rentFor, scheduleCsv, leaseOwners, isMulti, depHeld, depAdjs } from '../../domain/lease'
+import { rentFor, scheduleCsv, leaseOwners, isMulti, depHeld, depAdjs, splitAmt } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
 import { uploadFiles, offerDownload } from '../../services/files'
 
@@ -22,17 +22,55 @@ export function schedMode(m) { UI.schedMode = m; emit() }
 
 export function schedCsv(id) { const L = S.leases.find(l => l.id === id); offerDownload(`${L.ref}-rent-schedule.csv`, scheduleCsv(L)) }
 
-/** Co-owner rows of the lease form (prototype readOwnerRows). Each row's fields share the names o-id, o-rent, o-maint, o-dep, o-adv, o-gst. */
-export function readOwnerRows(f) {
+/*
+ * Co-owner shares are ENTERED as ₹ amounts per column (rent, maintenance, deposit, advance) but STORED as % shares on the
+ * lease (`owners[].rent/maint/dep/adv`), which the schedule, invoices and the API work with. The form's column totals are
+ * the lease's own monthly rent, maintenance, security deposit and advance rent.
+ */
+export const SHARE_KEYS = ['rent', 'maint', 'dep', 'adv']
+const TOTAL_FIELD = { rent: 'rent', maint: 'maint', dep: 'deposit', adv: 'advanceRent' }
+export const SHARE_LABEL = { rent: 'Rent', maint: 'Maintenance', dep: 'Deposit', adv: 'Advance' }
+const pct4 = v => Math.round(v * 10000) / 10000
+
+/** The lease's own totals the owners' amounts must add up to. */
+export function formTotals(f) { const o = {}; SHARE_KEYS.forEach(k => { o[k] = num(f.elements[TOTAL_FIELD[k]]?.value) }); return o }
+/** Field name of each total (rent → "rent", dep → "deposit"…). */
+export const totalFieldOf = k => TOTAL_FIELD[k]
+
+/** Owner rows as entered: [{ ownerId, rent, maint, dep, adv (₹), gst }]. Each row's fields share the names o-id, o-rent, o-maint, o-dep, o-adv, o-gst. */
+export function readOwnerAmounts(f) {
   const fd = new FormData(f); const g = k => fd.getAll(k)
   const ids = g('o-id'), rent = g('o-rent'), maint = g('o-maint'), dep = g('o-dep'), adv = g('o-adv'), gst = g('o-gst')
   return ids.map((id, i) => ({ ownerId: id, rent: num(rent[i]), maint: num(maint[i]), dep: num(dep[i]), adv: num(adv[i]), gst: gst[i] })).filter(o => o.ownerId || o.rent)
 }
 
-/** Column totals under the co-owner table (prototype ownerSums): { rent|maint|dep|adv: { text, color } }. */
+/** % shares from amounts in one column; the last owner takes the rounding so the column is exactly 100. A column with no total follows the rent split. */
+function sharesOf(rows, k, total, fallback) {
+  if (!(total > 0)) return fallback || rows.map(() => pct4(100 / rows.length))
+  const out = rows.map(o => pct4((+o[k] || 0) / total * 100))
+  const sum = rows.reduce((a, o) => a + (+o[k] || 0), 0)
+  if (Math.abs(sum - total) < 0.5 && out.length) out[out.length - 1] = pct4(100 - out.slice(0, -1).reduce((a, x) => a + x, 0))
+  return out
+}
+
+/** Co-owner rows as stored on the lease (prototype readOwnerRows): amounts turned into % shares of the form's totals. */
+export function readOwnerRows(f) {
+  const rows = readOwnerAmounts(f); if (!rows.length) return rows
+  const T = formTotals(f); const rentP = sharesOf(rows, 'rent', T.rent)
+  const P = { rent: rentP }; ['maint', 'dep', 'adv'].forEach(k => { P[k] = sharesOf(rows, k, T[k], rentP) })
+  return rows.map((o, i) => ({ ownerId: o.ownerId, rent: P.rent[i], maint: P.maint[i], dep: P.dep[i], adv: P.adv[i], gst: o.gst }))
+}
+
+/** ₹ amounts for each owner from % shares (existing lease → form). */
+export function amountsFromShares(owners, T) {
+  const per = {}; SHARE_KEYS.forEach(k => { per[k] = splitAmt(Math.round(T[k] || 0), owners, k) })
+  return owners.map((o, i) => ({ ...o, rent: per.rent[i], maint: per.maint[i], dep: per.dep[i], adv: per.adv[i] }))
+}
+
+/** Column totals under the co-owner table (prototype ownerSums): { rent|maint|dep|adv: { text, color } } — "₹x of ₹y", red when they differ. */
 export function ownerSums(f) {
-  const rows = readOwnerRows(f); const out = {}
-  ;['rent', 'maint', 'dep', 'adv'].forEach(k => { const t = rows.reduce((a, o) => a + (+o[k] || 0), 0); out[k] = { text: rows.length > 1 ? (Math.round(t * 100) / 100) + '%' : '', color: rows.length > 1 && Math.abs(t - 100) > 0.01 ? 'var(--bad)' : 'var(--muted)' } })
+  const rows = readOwnerAmounts(f); const T = formTotals(f); const out = {}
+  SHARE_KEYS.forEach(k => { const t = rows.reduce((a, o) => a + (+o[k] || 0), 0); const off = Math.abs(t - T[k]) >= 1; out[k] = { text: rows.length > 1 ? `${inr(t)} of ${inr(T[k])}` : '', color: rows.length > 1 && off ? 'var(--bad)' : 'var(--muted)' } })
   return out
 }
 
@@ -51,7 +89,8 @@ export async function submitLease(f, fd, id) {
   if (L.end <= L.start) { toast('End date must be after the start date.', 'warning'); return }
   if (L.owners) {
     const ids = L.owners.map(o => o.ownerId); if (ids.some(x => !x)) { toast('Choose an owner on every co-owner row.', 'warning'); return } if (new Set(ids).size !== ids.length) { toast('The same owner is listed twice.', 'warning'); return }
-    for (const [k, lbl, need] of [['rent', 'Rent', true], ['maint', 'Maintenance', +L.maint > 0], ['dep', 'Deposit', +L.deposit > 0], ['adv', 'Advance', +L.advanceRent > 0]]) { const t = L.owners.reduce((a, o) => a + (+o[k] || 0), 0); if (need && Math.abs(t - 100) > 0.01) { toast(`${lbl} shares add up to ${Math.round(t * 100) / 100}% — they must total 100%.`, 'warning'); return } }
+    const A = readOwnerAmounts(f); const T = formTotals(f)
+    for (const [k, need] of [['rent', true], ['maint', +L.maint > 0], ['dep', +L.deposit > 0], ['adv', +L.advanceRent > 0]]) { const t = A.reduce((a, o) => a + (+o[k] || 0), 0); if (need && Math.abs(t - T[k]) >= 1) { toast(`${SHARE_LABEL[k]} amounts add up to ${inr(t)} — they must total ${inr(T[k])}.`, 'warning'); return } }
   }
   if (addDays(L.start, L.fitout) > L.end) { toast('Rent-free period runs past the end of the lease.', 'warning'); return }
   await save('leases', L); openDrawer({ kind: 'leaseView', id: L.id })

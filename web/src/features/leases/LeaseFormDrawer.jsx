@@ -3,15 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, isFranchisee, closeDrawer, remove, prop, owner, toast } from '../../store/store'
-import { TODAY, addDays, addMonths, dayCount, fmtD } from '../../domain/utils'
-import { rentStartOf, schedule, clearSchedCache } from '../../domain/lease'
+import { TODAY, addDays, addMonths, dayCount, fmtD, num } from '../../domain/utils'
+import { rentStartOf, schedule, clearSchedCache, splitAmt } from '../../domain/lease'
 import { Btn } from '../../components/ui/Layout'
 import { ConfirmButton } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import { FormGrid, Cell, SectionTitle, FieldBox, TextInput, SelectInput, CheckField, FileInput } from '../../components/form/Fields'
 import { SchedTotals, ScheduleTable } from './LeaseDetail'
 import RentByYear from './RentByYear'
-import { leaseFromForm, submitLease, ownerSums } from './actions'
+import { leaseFromForm, submitLease, ownerSums, readOwnerAmounts, formTotals, amountsFromShares, totalFieldOf, SHARE_KEYS } from './actions'
 import OwnerRows from './OwnerRows'
 
 let SEQ = 0 // keys for co-owner rows
@@ -27,13 +27,19 @@ export default function LeaseFormDrawer({ d }) {
   const [busy, setBusy] = useState(false)
   const [pv, setPv] = useState(null)
   const [sums, setSums] = useState({})
-  const [rows, setRows] = useState(() => (L && L.owners && L.owners.length ? L.owners : [{ ownerId: (L && (L.ownerId || prop(L.propertyId)?.ownerId)) || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]).map(o => ({ key: ++SEQ, o })))
-  const [same] = useState(() => rows.every(({ o }) => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
+  // Owner shares are entered as ₹ amounts: start from the lease's % shares applied to its own totals.
+  const [rows, setRows] = useState(() => {
+    const owners = L && L.owners && L.owners.length ? L.owners : [{ ownerId: (L && (L.ownerId || prop(L.propertyId)?.ownerId)) || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]
+    return amountsFromShares(owners, L ? { rent: +L.rent || 0, maint: +L.maint || 0, dep: +L.deposit || 0, adv: +L.advanceRent || 0 } : {}).map(o => ({ key: ++SEQ, o }))
+  })
+  const [same] = useState(() => !(L && L.owners && L.owners.length) || L.owners.every(o => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
+  const lastTotals = useRef(null) // totals the owners' amounts were last split from — to rescale them when a total changes
 
   const upd = () => {
     const f = formRef.current; if (!f) return
     const x = leaseFromForm(f, { id: '_preview' }); clearSchedCache('_preview'); const sc = schedule(x)
     setPv({ x, sc }); setSums(ownerSums(f))
+    if (!lastTotals.current) lastTotals.current = formTotals(f)
   }
   useEffect(upd, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!L) return <DrawerLayout title="Lease">Not found</DrawerLayout>
@@ -43,25 +49,48 @@ export default function LeaseFormDrawer({ d }) {
   const orows = () => [...formRef.current.querySelectorAll('.orow')]
   const fld = (tr, k) => tr.querySelector(`[name="o-${k}"]`)
   const sameOn = () => !!formRef.current.querySelector('#ls-same')?.checked
+  /** Even split of every total over n owners (₹, rounding to the last owner). */
+  const evenSplit = n => { const T = formTotals(formRef.current); const eq = Array.from({ length: n }, () => ({ p: 100 / n })); const per = {}; SHARE_KEYS.forEach(k => { per[k] = splitAmt(Math.round(T[k]), eq, 'p') }); return per }
+  /** Write amounts into every row: per[k][i] = ₹ for row i. */
+  const writeAll = per => orows().forEach((tr, i) => SHARE_KEYS.forEach(k => { if (per[k] && per[k][i] !== undefined) fld(tr, k).value = per[k][i] }))
   const addOwner = () => {
-    const all = orows(); const n = all.length + 1; const even = Math.floor(10000 / n) / 100
-    const lastShare = Math.round((100 - even * (n - 1)) * 100) / 100; const v = sameOn() ? lastShare : even
-    if (sameOn()) all.forEach(tr => ['rent', 'maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = even }))
+    const all = orows(); const n = all.length + 1; const per = evenSplit(n)
+    if (sameOn()) writeAll(per)
     if (n === 2) { const g = fld(all[0], 'gst'); const O = owner(fld(all[0], 'id').value); if (O && !g.value) g.value = O.gstin ? 'Forward' : 'RCM' }
-    setRows(r => r.concat({ key: ++SEQ, o: { ownerId: '', rent: v, maint: v, dep: v, adv: v, gst: '' } }))
+    setRows(r => r.concat({ key: ++SEQ, o: { ownerId: '', rent: per.rent[n - 1], maint: per.maint[n - 1], dep: per.dep[n - 1], adv: per.adv[n - 1], gst: '' } }))
   }
   const delOwner = key => {
     if (rows.length <= 1) { toast('A lease needs at least one owner.', 'warning'); return }
     const rest = rows.filter(r => r.key !== key)
-    if (rest.length === 1) { const tr = orows().find(t => t.dataset.key === String(rest[0].key)); ['rent', 'maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = 100 }) }
+    if (rest.length === 1) { const tr = orows().find(t => t.dataset.key === String(rest[0].key)); const T = formTotals(formRef.current); SHARE_KEYS.forEach(k => { fld(tr, k).value = T[k] }) }
     setRows(rest)
+  }
+  /** "Same split for every charge": maintenance, deposit and advance follow each owner's share of the rent.
+      While the rent column doesn't add up yet, only the edited row follows; once it does, every row is rebalanced exactly. */
+  const followRent = tr => {
+    const A = readOwnerAmounts(formRef.current); const T = formTotals(formRef.current); if (!(T.rent > 0) || A.length !== orows().length) return
+    const rentSum = A.reduce((a, o) => a + o.rent, 0)
+    if (Math.abs(rentSum - T.rent) >= 1) { if (tr) { const r = num(fld(tr, 'rent').value) / T.rent; ['maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = Math.round(r * T[k]) }) } return }
+    const sh = A.map(o => ({ p: o.rent / T.rent * 100 })); const per = {}; ['maint', 'dep', 'adv'].forEach(k => { per[k] = splitAmt(Math.round(T[k]), sh, 'p') }); writeAll(per)
+  }
+  /** A total changed (rent, maintenance, deposit, advance): keep each owner's share and rescale their amounts; a sole owner takes it all. */
+  const rescale = k => {
+    const f = formRef.current; const T = formTotals(f); const prev = lastTotals.current?.[k]; const trs = orows()
+    if (trs.length === 1) { fld(trs[0], k).value = T[k]; return }
+    const A = readOwnerAmounts(f); if (A.length !== trs.length) return
+    const base = prev > 0 ? A.map(o => ({ p: o[k] / prev * 100 })) : T.rent > 0 && k !== 'rent' ? A.map(o => ({ p: o.rent / T.rent * 100 })) : A.map(() => ({ p: 100 / A.length }))
+    const amt = splitAmt(Math.round(T[k]), base, 'p'); trs.forEach((tr, i) => { fld(tr, k).value = amt[i] })
   }
 
   const onInput = e => {
     const f = formRef.current; const t = e.target
-    if (t.id === 'ls-term' && +t.value > 0) f.elements.end.value = addDays(addMonths(f.elements.start.value, +t.value), -1)
-    if (t.id === 'ls-depx' && +t.value > 0) f.elements.deposit.value = Math.round(+t.value * (+f.elements.rent.value || 0))
-    const tr = t.closest('.orow'); if (tr && t.name === 'o-rent' && sameOn()) ['maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = t.value })
+    // Term: start date + term (months) set the end date; typing an end date sets the term.
+    if ((t.id === 'ls-term' || t.id === 'ls-st') && +f.elements.termMonths.value > 0 && f.elements.start.value) f.elements.end.value = addDays(addMonths(f.elements.start.value, +f.elements.termMonths.value), -1)
+    if (t.id === 'ls-en' && f.elements.start.value && t.value > f.elements.start.value) f.elements.termMonths.value = Math.round(dayCount(f.elements.start.value, t.value) / 30.44)
+    if (t.id === 'ls-depx' && +t.value > 0) { f.elements.deposit.value = Math.round(+t.value * (+f.elements.rent.value || 0)); rescale('dep') }
+    const k = SHARE_KEYS.find(x => totalFieldOf(x) === t.name); if (k) { rescale(k); if (k === 'rent' && sameOn() && orows().length > 1) followRent() }
+    if (t.closest('.orow') && t.name === 'o-rent' && sameOn()) followRent(t.closest('.orow'))
+    lastTotals.current = formTotals(f)
     upd()
   }
   const onChange = e => {

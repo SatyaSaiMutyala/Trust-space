@@ -18,6 +18,8 @@ export const nowISO = () => new Date().toISOString()
 export const by = (k, dir = 1) => (a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * dir
 export const num = v => v === '' || v == null ? 0 : +v
 export const dayCount = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5) + 1
+/** A co-owner's % share for display, at most 2 decimals: 58.8235 → "58.82%", 60 → "60%". */
+export const pctLabel = v => (Math.round((+v || 0) * 100) / 100) + '%'
 export const ordinal = n => n + ['th', 'st', 'nd', 'rd'][n % 10 > 3 || [11, 12, 13].includes(n) ? 0 : n % 10]
 /** Rows → CSV text, every cell quoted (same format as the prototype's downloads). */
 export const toCsv = rows => rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')

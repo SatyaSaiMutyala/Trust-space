@@ -9,7 +9,7 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '../invoices/TableCell'
 import { S, prop, useStore } from '../../store/store'
 import { newOwner, editOwner, viewOwnerProfile } from '../../store/actions'
-import { inr, CUR } from '../../domain/utils'
+import { inr, CUR, pctLabel } from '../../domain/utils'
 import { leaseOf, leaseState, rentFor, maskAcct, leasesOfOwner, isMulti, ownerShare } from '../../domain/lease'
 import { PageHead, Btn, TableCard, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
@@ -68,7 +68,7 @@ export default function OwnersPage() {
                   <TableCell className="small" sx={{ minWidth: 120 }}>{o.emergency?.phone ? <>{o.emergency.name || ''}{o.emergency.rel ? ' (' + o.emergency.rel + ')' : ''}<br /><span style={NW}>{o.emergency.phone}</span></> : <span className="muted">Not set</span>}</TableCell>
                   <TableCell className="mono small">{o.pan || '—'}<br />{o.gstin || 'GST unregistered'}</TableCell>
                   <TableCell className="small">{o.bankName || o.bank || ''} <span className="mono" style={NW}>{maskAcct(o.acctNo)}</span><br /><BankChip O={o} /></TableCell>
-                  <TableCell className="small">{ps.length ? ps.map((p, i) => { const Lp = leaseOf(p.id); return <span key={p.id}>{i ? <br /> : null}{p.name}{Lp && isMulti(Lp) ? <> <span className="muted">({+ownerShare(Lp, o.id, 'rent') * 100}%)</span></> : null}</span> }) : '—'}</TableCell>
+                  <TableCell className="small">{ps.length ? ps.map((p, i) => { const Lp = leaseOf(p.id); return <span key={p.id}>{i ? <br /> : null}{p.name}{Lp && isMulti(Lp) ? <> <span className="muted">({pctLabel(ownerShare(Lp, o.id, 'rent') * 100)})</span></> : null}</span> }) : '—'}</TableCell>
                   <TableCell className="num">{inr(rent)}</TableCell>
                   <TableCell><Portal accounts={U.rows.filter(u => u.ownerId === o.id)} /></TableCell>
                   <TableCell sx={STICKY}><div className="actions"><Btn sm onClick={() => viewOwnerProfile(o.id)}>Details</Btn><Btn sm onClick={() => editOwner(o.id)}>Edit</Btn></div></TableCell>

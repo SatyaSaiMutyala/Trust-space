@@ -1,7 +1,7 @@
 /* Generate / upload / record an owner invoice (prototype DRAWERS.invoice + calcBox + P_meter + SUBMIT.invoice). */
 import { useRef, useState } from 'react'
 import { S, ALL, isOwner, role, prop, owner, scopeProps, closeDrawer, useStore } from '../../store/store'
-import { inr, fy, perLabel, TODAY, CUR } from '../../domain/utils'
+import { inr, fy, perLabel, TODAY, CUR, pctLabel } from '../../domain/utils'
 import { leaseOf, schedRow, rentFor, calc, leaseOwners, isMulti, ownerShare, TDS_BASE, TDS_NOPAN } from '../../domain/lease'
 import { INV_TYPES } from '../../domain/constants'
 import DrawerLayout from '../../components/app/DrawerLayout'
@@ -87,8 +87,8 @@ export default function InvoiceFormDrawer({ d }) {
             <SelectInput id="iv-mode" name="mode" label="How" defaultValue={mode} options={[['generate', 'Generate in TruSpace'], ['upload', 'Upload my own invoice']]} />
             <SelectInput id="iv-prop" name="propertyId" label="Property" defaultValue={pid} options={props.map(x => [x.id, `${x.name} (${x.code})`])} />
             {!o && isMulti(L)
-              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${+x.rent}%`])} hint="Each co-owner raises their own invoice for their share" />
-              : o && isMulti(L) ? <Cell full><Banner>You own {+ownerShare(L, oid, 'rent') * 100}% of the rent and {+ownerShare(L, oid, 'maint') * 100}% of maintenance. Invoice your share only.</Banner></Cell> : null}
+              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${pctLabel(x.rent)}`])} hint="Each co-owner raises their own invoice for their share" />
+              : o && isMulti(L) ? <Cell full><Banner>You own {pctLabel(ownerShare(L, oid, 'rent') * 100)} of the rent and {pctLabel(ownerShare(L, oid, 'maint') * 100)} of maintenance. Invoice your share only.</Banner></Cell> : null}
             <SelectInput id="iv-type" name="type" label="Invoice for" defaultValue={type} options={INV_TYPES} />
             <TextInput id="iv-per" name="period" label="Billing month" type="month" defaultValue={period} required />
             <TextInput id="iv-no" name="number" label="Invoice number" defaultValue={number} required />

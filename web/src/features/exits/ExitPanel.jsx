@@ -9,7 +9,7 @@ import { S, isOwner, owner, useStore } from '../../store/store'
 import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
 import { lockEnd, depHeld, depAdjusted, isMulti, leaseOwners, splitAmt, ownerShare, obOutstanding } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
-import { TODAY, daysTo, fmtD, inr } from '../../domain/utils'
+import { TODAY, daysTo, fmtD, inr, pctLabel } from '../../domain/utils'
 import { Btn, Panel, Banner, Facts, TableCard } from '../../components/ui/Layout'
 import { Steps } from '../../components/ui/Status'
 import { PhotoStrip } from '../../components/ui/Media'
@@ -125,7 +125,7 @@ export default function ExitPanel({ L }) {
             <TableHead><TableRow><TableCell>Owner</TableCell><TableCell className="num" align="right">Deposit held</TableCell><TableCell className="num" align="right">Share of deductions</TableCell><TableCell className="num" align="right">Refund due</TableCell><TableCell>Received</TableCell></TableRow></TableHead>
             <TableBody>{refundRows.map(r => (
               <TableRow key={r.ownerId}>
-                <TableCell>{owner(r.ownerId)?.name || ''} <span className="small muted">{+ownerShare(L, r.ownerId, 'dep') * 100}%</span></TableCell>
+                <TableCell>{owner(r.ownerId)?.name || ''} <span className="small muted">{pctLabel(ownerShare(L, r.ownerId, 'dep') * 100)}</span></TableCell>
                 <TableCell className="num" align="right">{inr(r.dep)}</TableCell>
                 <TableCell className="num" align="right">{r.ded ? '−' + inr(r.ded) : '—'}</TableCell>
                 <TableCell className="num" align="right"><b>{inr(r.due)}</b></TableCell>

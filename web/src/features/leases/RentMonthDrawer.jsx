@@ -6,7 +6,7 @@ import TableCell from '@mui/material/TableCell'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, prop, owner } from '../../store/store'
 import { openInv, newInvoice } from '../../store/actions'
-import { TODAY, fmtD, inr, perLabel } from '../../domain/utils'
+import { TODAY, fmtD, inr, perLabel, pctLabel } from '../../domain/utils'
 import { schedRow, ownerShare, invState } from '../../domain/lease'
 import { Btn, TableCard } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
@@ -29,7 +29,7 @@ export default function RentMonthDrawer({ d }) {
             return (
               <TableRow key={x.ownerId}>
                 <TableCell><b>{owner(x.ownerId)?.name || '—'}</b></TableCell>
-                <TableCell className="num">{+ownerShare(L, x.ownerId, 'rent') * 100}%</TableCell>
+                <TableCell className="num">{pctLabel(ownerShare(L, x.ownerId, 'rent') * 100)}</TableCell>
                 <TableCell className="num">{inr(rr)}{x.adj ? <div className="small muted">after advance {inr(x.adj)}</div> : null}</TableCell>
                 <TableCell className="num small">{x.mode === 'Forward' ? inr(Math.round(rr * 0.18)) : x.mode === 'RCM' ? 'RCM ' + inr(Math.round(rr * 0.18)) : '—'}</TableCell>
                 <TableCell className="num">{x.tdsOn ? '−' + inr(Math.round(rr * x.tdsRate / 100)) : '—'}</TableCell>

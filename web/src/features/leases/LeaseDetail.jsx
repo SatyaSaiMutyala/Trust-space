@@ -8,7 +8,7 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
-import { CUR, fmtD, inr, perLabel, ordinal } from '../../domain/utils'
+import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
 import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
 import { Btn, Panel, Facts, Kpis, Kpi, Banner } from '../../components/ui/Layout'
@@ -34,7 +34,7 @@ export function OwnerSplitTable({ sc }) {
         <TableBody>
           {os.map(x => (
             <TableRow key={x.ownerId} className={me === x.ownerId ? 'youRow' : undefined}>
-              <TableCell><b>{owner(x.ownerId)?.name || '—'}</b> <span className="small muted">{+x.share.rent}%</span></TableCell>
+              <TableCell><b>{owner(x.ownerId)?.name || '—'}</b> <span className="small muted">{pctLabel(x.share.rent)}</span></TableCell>
               <TableCell className="num">{inr(x.rent)}</TableCell>
               <TableCell className="num">{x.adj ? '−' + inr(x.adj) : '—'}</TableCell>
               <TableCell className="num">{inr(x.maint)}</TableCell>
@@ -125,7 +125,7 @@ function ScheduleByOwner({ sc }) {
       <Table size="small" sx={SCHED_SX}>
         <TableHead><TableRow>
           <TableCell>Month</TableCell>
-          {os.map(x => <TableCell key={x.ownerId} className="num">{owner(x.ownerId)?.name || '—'}<div className="small muted" style={{ textTransform: 'none', letterSpacing: 0 }}>{+x.share.rent}% · net</div></TableCell>)}
+          {os.map(x => <TableCell key={x.ownerId} className="num">{owner(x.ownerId)?.name || '—'}<div className="small muted" style={{ textTransform: 'none', letterSpacing: 0 }}>{pctLabel(x.share.rent)} · net</div></TableCell>)}
           <TableCell className="num">Total net</TableCell><TableCell>Due by</TableCell>
         </TableRow></TableHead>
         <TableBody>

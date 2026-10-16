@@ -6,7 +6,7 @@ import TableCell from '../invoices/TableCell'
 import TableFooter from '@mui/material/TableFooter'
 import { S, UI, prop, owner, role, isOwner, scopeProps, emit, useStore } from '../../store/store'
 import { openInv, obPay } from '../../store/actions'
-import { inr, fmtD, perLabel, fy, by, TODAY, CUR } from '../../domain/utils'
+import { inr, fmtD, perLabel, fy, by, TODAY, CUR, pctLabel } from '../../domain/utils'
 import { schedule, invState, ledTypes, fyStart, fyList, ledgerEntries, ledgerCsv, leaseOwners, isMulti, splitAmt, depAdjs, depHeld, openingEntries, depAdjEntries, obMe } from '../../domain/lease'
 import { LED_TABS } from '../../domain/constants'
 import { offerDownload } from '../../services/files'
@@ -105,7 +105,7 @@ function DepositTable({ leases }) {
   leases.forEach(L => {
     const P = prop(L.propertyId); const sc = schedule(L); const x = L.exit || {}; const multi = isMulti(L); const ded = (x.deductions || []).reduce((a, dd) => a + (+dd.amount || 0), 0); const dedSplit = splitAmt(ded, leaseOwners(L), 'dep')
     ;(sc.owners || []).forEach((o, i) => {
-      if (me && o.ownerId !== me) return; if (fo && o.ownerId !== fo) return; const who = multi && !me ? ` — ${owner(o.ownerId)?.name || ''} (${+o.share.dep}%)` : ''
+      if (me && o.ownerId !== me) return; if (fo && o.ownerId !== fo) return; const who = multi && !me ? ` — ${owner(o.ownerId)?.name || ''} (${pctLabel(o.share.dep)})` : ''
       if (o.deposit) rows.push({ d: L.start, p: P, t: 'Security deposit received from TrustLab' + who, a: o.deposit, s: L.depositPaid ? 'Received' : 'Pending', n: 'Refundable at the end of the lease' })
       depAdjs(L, o.ownerId, true).forEach(a => rows.push({ d: a.period + '-01', p: P, t: `Security deposit adjusted against rent for ${perLabel(a.period)}` + who, a: -(+a.amount || 0), s: a.status === 'Agreed' ? 'Adjusted' : 'Proposed', n: a.status === 'Agreed' ? `Agreed ${fmtD(a.consent?.on)}${a.consent?.ref ? ' · ' + a.consent.ref : ''}` : 'Awaiting owner’s agreement' }))
       if (depAdjs(L, o.ownerId).length) rows.push({ d: TODAY, p: P, t: 'Security deposit still held' + who, a: depHeld(L, o.ownerId), s: 'Held', n: 'After rent adjustments' })
