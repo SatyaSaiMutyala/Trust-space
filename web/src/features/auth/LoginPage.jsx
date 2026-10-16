@@ -13,6 +13,7 @@ import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import { signIn, forgotPassword, resetPassword, passwordProblem, DEMO_ACCOUNTS, DEMO_PASSWORD } from '../../services/auth'
 import { toast } from '../../store/store'
+import BrandMark from '../../components/app/BrandMark'
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }
 const Icon = {
@@ -29,7 +30,7 @@ const Icon = {
 
 function Mark({ size = 44 }) {
   return (
-    <Box aria-hidden="true" sx={{ width: size, height: size, borderRadius: `${size * 0.24}px`, bgcolor: 'var(--accent)', display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', font: `700 ${size * 0.52}px var(--f-display)`, position: 'relative', flex: 'none', boxShadow: '0 6px 18px rgb(0 0 0 / .18)', '&::after': { content: '""', position: 'absolute', right: -size * 0.08, bottom: -size * 0.08, width: size * 0.32, height: size * 0.32, borderRadius: `${size * 0.09}px`, bgcolor: 'var(--sun)' } }}>T</Box>
+    <BrandMark size={size} sx={{ filter: 'drop-shadow(0 6px 12px rgb(0 0 0 / .18))' }} />
   )
 }
 

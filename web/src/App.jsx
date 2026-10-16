@@ -11,13 +11,14 @@ import { dispatch } from './app/store'
 import { loadPortfolio } from './app/bootstrap'
 import { signOut } from './services/auth'
 import { AppSkeleton } from './components/ui/Skeletons'
+import BrandMark from './components/app/BrandMark'
 
 /** Full-screen state while signing in / loading, or when loading failed. */
 function Splash({ text, error }) {
   return (
     <Box sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', p: 3, bgcolor: 'var(--bg)' }}>
       <Box sx={{ textAlign: 'center', display: 'grid', gap: 2, justifyItems: 'center', maxWidth: 420 }}>
-        <Box aria-hidden="true" sx={{ width: 52, height: 52, borderRadius: '12px', bgcolor: 'var(--accent)', display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', font: '700 26px var(--f-display)' }}>T</Box>
+        <BrandMark size={52} />
         {error ? (
           <>
             <Box sx={{ fontWeight: 600 }}>Your portfolio could not be loaded</Box>

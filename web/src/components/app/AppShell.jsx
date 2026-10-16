@@ -9,6 +9,7 @@ import { UI, APP, emit, role, isOwner, frFull, go, toast, useStore } from '../..
 import { navItems, navCounts, normalizeRoute } from '../../store/nav'
 import { Badge } from '../ui/Status'
 import { signOut } from '../../services/auth'
+import BrandMark from './BrandMark'
 
 const ROLE_LABEL = { admin: 'Administrator', staff: 'TrustLab staff', owner: 'Property owner', franchisee: 'Franchise partner' }
 const initialsOf = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
@@ -54,7 +55,7 @@ function NavList({ grid }) {
 function Brand() {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 0.75 }}>
-      <Box aria-hidden="true" sx={{ width: 34, height: 34, borderRadius: '8px', bgcolor: 'var(--accent)', display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', font: '700 18px var(--f-display)', position: 'relative', '&::after': { content: '""', position: 'absolute', right: -3, bottom: -3, width: 11, height: 11, borderRadius: '3px', bgcolor: 'var(--sun)' }, '@media (max-width:760px)': { width: 30, height: 30, fontSize: 16 } }}>T</Box>
+      <BrandMark size={36} sx={{ '@media (max-width:760px)': { width: 32, height: 32 } }} />
       <div>
         <Box component="b" sx={{ font: '700 17px var(--f-display)', display: 'block', lineHeight: 1, '@media (max-width:760px)': { fontSize: 16 } }}>TruSpace</Box>
         <Box component="span" sx={{ fontSize: 11, color: 'var(--muted)' }}>TrustLab Facilities &amp; Leases</Box>
