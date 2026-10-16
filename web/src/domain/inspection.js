@@ -1,12 +1,16 @@
 /* Joint inspections (take-over / handover) — ported verbatim from reference/TruSpace.html. */
 import { S, owner, prop, actor, save } from '../store/store'
 import { CHECK, FIX_SEC, BADC, IN_KIND } from './constants'
-import { TODAY, by, nowISO, fmtD, fmtDT, inr, esc, daysTo } from './utils'
+import { by, nowISO, fmtD, fmtDT, inr, esc, daysTo } from './utils'
 import { leaseState } from './lease'
 import { fileUrl } from '../services/files'
 
 let inspT = null
-export function saveInsp(I, now) { clearTimeout(inspT); I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
+/** A record starts as "Not started" (date left blank — entered by hand) and becomes "In progress" once anything is recorded. */
+export const INSP_OPEN = ['Not started', 'In progress']
+export const inspOpen = I => !!I && INSP_OPEN.includes(I.status)
+const inspStarted = I => (I.items || []).some(it => it.cond || String(it.val ?? '').trim() || (it.photos || []).length) || (I.roomPhotos || []).length || !!I.tdplVideo
+export function saveInsp(I, now) { clearTimeout(inspT); if (I.status === 'Not started' && inspStarted(I)) { I.status = 'In progress'; I.log = (I.log || []).concat({ at: nowISO(), by: actor(), text: `${IN_KIND[I.kind]} started` }) } I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
 /** Skipped inspections (no record exists — premises taken over / handed back before TruSpace): L.takeoverSkip / L.handoverSkip. */
 export const skipKey = kind => kind === 'Move-out' ? 'handoverSkip' : 'takeoverSkip'
 export const SKIP_NOTE_MIN = 30
@@ -17,11 +21,12 @@ export function buildInspection(L, kind) {
   const items = []
   CHECK.forEach(sec => sec.items.forEach(([k, label, type, req]) => { const p = pm[k]; items.push({ k, sec: sec.s, label, type, req: !!req, cond: '', val: '', remark: '', photos: [], prev: p ? { cond: p.cond, val: p.val, remark: p.remark, photos: (p.photos || []).slice(0, 3) } : null }) }))
   ;(prev?.items || []).filter(it => it.type === 'fixture').forEach(p => items.push({ k: p.k, sec: FIX_SEC, label: p.label, type: 'fixture', req: false, qty: p.qty, cond: '', remark: '', photos: [], prev: { cond: p.cond, val: p.qty, remark: p.remark, photos: (p.photos || []).slice(0, 3) } }))
-  return { kind, propertyId: L.propertyId, leaseId: L.id, ownerId: L.ownerId, date: TODAY, inspector: '', ownerRep: owner(L.ownerId)?.name || '', items, roomPhotos: [], status: 'In progress', log: [{ at: nowISO(), by: actor(), text: `${IN_KIND[kind]} started` }] }
+  return { kind, propertyId: L.propertyId, leaseId: L.id, ownerId: L.ownerId, date: '', inspector: '', ownerRep: owner(L.ownerId)?.name || '', items, roomPhotos: [], status: 'Not started', log: [{ at: nowISO(), by: actor(), text: `${IN_KIND[kind]} record created` }] }
 }
 /** Everything still missing before the TrustLab side can sign: [anchorKey, message][] */
 export function inspProblems(I) {
   const out = []
+  if (!I.date) out.push(['__head', 'Inspection date'])
   if (!(I.inspector || '').trim()) out.push(['__head', (prop(I.propertyId)?.managedBy === 'franchise' ? 'Franchise partner' : 'TrustLab') + ' inspector name'])
   if (!(I.ownerRep || '').trim()) out.push(['__head', 'Owner / representative name'])
   for (const it of I.items) {

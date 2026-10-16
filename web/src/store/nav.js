@@ -21,6 +21,6 @@ export function navCounts() {
     invoices: r.kind === 'owner' ? 0 : S.invoices.filter(i => ['Submitted', 'Verified', 'Approved'].includes(i.status)).length,
     exits: S.leases.filter(l => l.exit && l.exit.noticeDate && l.exit.stage < 5).length,
     sites: S.sites.filter(st => (!fs || fs.has(st.reqId)) && ['Scrutiny', 'Negotiation', 'Acceptance', 'Approved'].includes(siteStage(st))).length,
-    inspections: S.inspections.filter(i => inScope(i) && (r.kind === 'owner' ? i.status === 'Awaiting owner sign-off' : ['In progress', 'Disputed'].includes(i.status))).length,
+    inspections: S.inspections.filter(i => inScope(i) && (r.kind === 'owner' ? i.status === 'Awaiting owner sign-off' : ['Not started', 'In progress', 'Disputed'].includes(i.status))).length,
   }
 }

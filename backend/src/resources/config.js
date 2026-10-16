@@ -120,7 +120,7 @@ export const RESOURCES = [
     sort: { date: -1 },
     required: [['kind', 'Inspection type'], ['propertyId', 'Property'], ['leaseId', 'Lease']],
     labels: { kind: 'Inspection type', status: 'Inspection status' },
-    enums: { kind: ['Move-in', 'Move-out'], status: ['In progress', 'Awaiting owner sign-off', 'Disputed', 'Signed'] },
+    enums: { kind: ['Move-in', 'Move-out'], status: ['Not started', 'In progress', 'Awaiting owner sign-off', 'Disputed', 'Signed'] },
     refs: { propertyId: 'properties', leaseId: 'leases', ownerId: 'owners' },
   },
   {

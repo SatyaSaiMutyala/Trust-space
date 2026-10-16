@@ -1,7 +1,7 @@
 /* Confirmation video slot for one side of the inspection (prototype videoSlot + the data-ivideo change listener). */
 import { useState } from 'react'
 import { prop, isOwner, tenantOf } from '../../store/store'
-import { inspLocked } from '../../domain/inspection'
+import { inspLocked, inspOpen } from '../../domain/inspection'
 import { fmtD, fmtDT } from '../../domain/utils'
 import { fileUrl } from '../../services/files'
 import { Btn } from '../../components/ui/Layout'
@@ -30,7 +30,7 @@ export default function VideoSlot({ I, who }) {
           {busy ? 'Uploading video…' : v ? 'Record again' : 'Record video'}
           <input type="file" accept="video/*" capture={who === 'owner' ? 'user' : 'environment'} hidden onChange={onChange} />
         </Btn>
-      ) : (!v && who === 'owner' && I.status === 'In progress' ? <span className="small muted">Recorded at sign-off, after {tn} submits the inspection.</span> : null)}
+      ) : (!v && who === 'owner' && inspOpen(I) ? <span className="small muted">Recorded at sign-off, after {tn} submits the inspection.</span> : null)}
     </div>
   )
 }

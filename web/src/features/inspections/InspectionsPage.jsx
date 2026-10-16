@@ -18,7 +18,7 @@ import InspectionTable from './InspectionTable'
 import InspectionActions from './InspectionActions'
 import { inspActions } from './inspButtons'
 
-const STATUS = ['In progress', 'Awaiting owner sign-off', 'Disputed', 'Signed']
+const STATUS = ['Not started', 'In progress', 'Awaiting owner sign-off', 'Disputed', 'Signed']
 
 export default function InspectionsPage() {
   useStore()

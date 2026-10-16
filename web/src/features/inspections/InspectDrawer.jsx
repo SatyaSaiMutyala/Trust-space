@@ -2,7 +2,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import Box from '@mui/material/Box'
 import { S, prop, owner, useStore, isOwner, tenantOf, closeDrawer } from '../../store/store'
-import { inspProblems, inspLocked, inspSummary } from '../../domain/inspection'
+import { inspProblems, inspLocked, inspSummary, inspOpen } from '../../domain/inspection'
 import { CHECK, FIX_SEC, IN_KIND, inspStatusK } from '../../domain/constants'
 import { fmtD, fmtDT, inr } from '../../domain/utils'
 import DrawerLayout from '../../components/app/DrawerLayout'
@@ -47,7 +47,7 @@ export default function InspectDrawer({ d }) {
   const P = prop(I.propertyId)
   const footer = <>
     <Btn onClick={() => dlInsp(I.id)}>Download report</Btn>
-    {!isOwner() && I.status === 'In progress' ? <ConfirmButton onConfirm={() => delInsp(I.id)} /> : null}
+    {!isOwner() && inspOpen(I) ? <ConfirmButton onConfirm={() => delInsp(I.id)} /> : null}
     <Btn onClick={closeDrawer}>Close</Btn>
   </>
   return (
@@ -70,7 +70,7 @@ function InspBody({ I, P }) {
     : (
       <Box id="it-__head" sx={{ scrollMarginTop: '90px' }}>
         <FormGrid>
-          <TextInput id="ih-d" type="date" label="Inspection date" defaultValue={I.date} onChange={ih('date')} />
+          <TextInput id="ih-d" type="date" label="Inspection date" defaultValue={I.date} onChange={ih('date')} required hint={I.date ? undefined : 'Enter the date the joint inspection is held'} />
           <TextInput id="ih-i" label={(P?.managedBy === 'franchise' ? 'Inspector for ' + tenantOf(P) : 'TrustLab inspector') + ' (name & designation)'} defaultValue={I.inspector} placeholder="e.g. R. Kumar, Facilities Executive" onChange={ih('inspector')} />
           <TextInput id="ih-o" label="Owner / authorised representative" defaultValue={I.ownerRep} onChange={ih('ownerRep')} />
           <TextInput id="ih-w" label="Present at inspection" defaultValue={I.present || ''} placeholder="Others present (optional)" onChange={ih('present')} />

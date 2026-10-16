@@ -48,7 +48,7 @@ export const CONDS = ['Good', 'Minor issue', 'Damaged', 'Missing', 'N/A']
 export const BADC = c => ['Minor issue', 'Damaged', 'Missing'].includes(c)
 export const IN_KIND = { 'Move-in': 'Take-over inspection', 'Move-out': 'Handover inspection' }
 export const condK = c => ({ Good: 'ok', 'Minor issue': 'warn', Damaged: 'bad', Missing: 'bad', 'N/A': 'idle' }[c] || 'idle')
-export const inspStatusK = s => ({ Signed: 'ok', 'Awaiting owner sign-off': 'warn', Disputed: 'bad' }[s] || 'info')
+export const inspStatusK = s => ({ Signed: 'ok', 'Awaiting owner sign-off': 'warn', Disputed: 'bad', 'Not started': 'idle' }[s] || 'info')
 
 /* Site scouting — [key, label, critical, photo required] */
 export const SITE_CHECK = [

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { S, prop, closeDrawer, useStore, save, remove, toast, actor } from '../../store/store'
 import { TODAY, fmtD } from '../../domain/utils'
-import { inspOf, skipKey, SKIP_NOTE_MIN } from '../../domain/inspection'
+import { inspOf, inspOpen, skipKey, SKIP_NOTE_MIN } from '../../domain/inspection'
 import { IN_KIND } from '../../domain/constants'
 import { Btn, Banner, Empty, Facts } from '../../components/ui/Layout'
 import { FormGrid, TextInput, SelectInput } from '../../components/form/Fields'
@@ -23,7 +23,7 @@ export default function SkipInspectionDrawer({ d }) {
   const name = IN_KIND[kind].toLowerCase() // "take-over inspection" / "handover inspection"
   if (!L) return <DrawerLayout title={`Skip ${name}`}><Empty>Removed.</Empty></DrawerLayout>
   const key = skipKey(kind); const sk = L[key]
-  const ex = inspOf(L.id, kind); const stray = ex && ex.status === 'In progress' ? ex : null // started by mistake — discarded on skip
+  const ex = inspOf(L.id, kind); const stray = inspOpen(ex) ? ex : null // started by mistake — discarded on skip
   const onSubmit = async e => {
     e.preventDefault(); if (busy) return
     const fd = new FormData(e.currentTarget); const note = (fd.get('note') || '').trim()
@@ -36,6 +36,7 @@ export default function SkipInspectionDrawer({ d }) {
       await save('leases', L, true); closeDrawer(); toast(`${IN_KIND[kind]} skipped for ${L.ref}`, 'success')
     } finally { setBusy(false) }
   }
+  const discard = async () => { if (busy || !stray) return; setBusy(true); try { await remove('inspections', stray.id) } finally { setBusy(false) } }
   const undo = async () => {
     if (busy) return; setBusy(true)
     try { delete L[key]; if (kind === 'Move-out' && L.exit && L.exit.stage === 2 && !L.exit.inspectionId) { L.exit.stage = 1; delete L.exit.inspectionDate; delete L.exit.inspectionNotes } await save('leases', L, true); closeDrawer(); toast(`${IN_KIND[kind]} is due again for ${L.ref}`) } finally { setBusy(false) }
@@ -48,7 +49,7 @@ export default function SkipInspectionDrawer({ d }) {
       {sk ? (
         <>
           <Facts items={[['Skipped on', fmtD(sk.on)], ['By', sk.by], ['Reason', sk.reason], ['Note', sk.note]]} />
-          {stray ? <Banner tone="warn">A {name} started on <b>{fmtD(stray.date)}</b> is still in progress. Once it is submitted and signed it replaces this skip; until then the lease shows as skipped.</Banner> : null}
+          {stray ? <Banner tone="warn" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', justifyContent: 'space-between' }}><span>A {name} started on <b>{fmtD(stray.date)}</b> is still in progress (not submitted). It is hidden while the lease is skipped.</span><Btn sm danger disabled={busy} onClick={discard}>Discard that record</Btn></Banner> : null}
           <p className="small muted">{kind === 'Move-in' ? 'You can still record a take-over inspection any time from Take-over & handover; the handover inspection at exit will then have a baseline to compare against.' : 'You can still record a handover inspection from Take-over & handover; its findings will then flow into the deposit settlement.'}</p>
         </>
       ) : (

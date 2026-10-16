@@ -8,7 +8,7 @@ import TableCell from '@mui/material/TableCell'
 import { S, isOwner, owner, useStore, openDrawer } from '../../store/store'
 import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
 import { lockEnd, depHeld, depAdjusted, isMulti, leaseOwners, splitAmt, ownerShare, obOutstanding } from '../../domain/lease'
-import { inspOf } from '../../domain/inspection'
+import { inspOf, inspOpen } from '../../domain/inspection'
 import { TODAY, daysTo, fmtD, inr, pctLabel } from '../../domain/utils'
 import { Btn, Panel, Banner, Facts, TableCard } from '../../components/ui/Layout'
 import { Steps } from '../../components/ui/Status'
@@ -51,7 +51,7 @@ export default function ExitPanel({ L }) {
       form = (
         <Banner sx={bannerSx} key="s1">
           <span><b>Next: joint handover inspection with the owner.</b> Every item is checked against the take-over record and photographed; agreed damages flow into the deposit settlement.</span>
-          <span className="actions">{mo ? <Btn primary onClick={() => openInsp(mo.id)}>Continue inspection · {mo.status}</Btn> : <Btn primary onClick={() => newInsp(L.id, 'Move-out')}>Start handover inspection</Btn>}{!mo || mo.status === 'In progress' ? <Btn onClick={() => openDrawer({ kind: 'skipInsp', id: L.id, insp: 'Move-out' })}>Skip — no handover record</Btn> : null}</span>
+          <span className="actions">{mo ? <Btn primary onClick={() => openInsp(mo.id)}>Continue inspection · {mo.status}</Btn> : <Btn primary onClick={() => newInsp(L.id, 'Move-out')}>Start handover inspection</Btn>}{!mo || inspOpen(mo) ? <Btn onClick={() => openDrawer({ kind: 'skipInsp', id: L.id, insp: 'Move-out' })}>Skip — no handover record</Btn> : null}</span>
         </Banner>
       )
     }
