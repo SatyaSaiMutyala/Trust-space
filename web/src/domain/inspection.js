@@ -9,6 +9,8 @@ let inspT = null
 /** A record starts as "Not started" (date left blank — entered by hand) and becomes "In progress" once the date is entered or anything is recorded. */
 export const INSP_OPEN = ['Not started', 'In progress']
 export const inspOpen = I => !!I && INSP_OPEN.includes(I.status)
+/** A record never finished whose inspection was then skipped: stays hidden behind the "Skipped" state everywhere. */
+export const inspHidden = I => { const L = S.leases.find(l => l.id === I.leaseId); return !!(L && L[skipKey(I.kind)] && inspOpen(I)) }
 /** Display label / chip kind per state ("Signed" reads as "Completed"). */
 export const INSP_LABEL = { 'Not started': 'Not started', 'In progress': 'In progress', 'Awaiting owner sign-off': 'Awaiting owner sign-off', Disputed: 'Disputed', Signed: 'Completed', Skipped: 'Skipped' }
 export const INSP_K = { 'Not started': 'idle', 'In progress': 'info', 'Awaiting owner sign-off': 'warn', Disputed: 'bad', Signed: 'ok', Skipped: 'idle' }
