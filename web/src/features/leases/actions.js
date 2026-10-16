@@ -5,7 +5,7 @@ import { newInsp, settleWithDeposit } from '../../store/actions'
 import { addDays, addMonths, num, inr, perLabel, newId, nowISO, TODAY } from '../../domain/utils'
 import { rentFor, scheduleCsv, leaseOwners, isMulti, depHeld, depAdjs, splitAmt } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
-import { uploadFiles, offerDownload } from '../../services/files'
+import { offerDownload } from '../../services/files'
 
 export function renewLease(id) {
   const L = S.leases.find(l => l.id === id); const start = addDays(L.end, 1)
@@ -84,8 +84,7 @@ export function leaseFromForm(f, base) {
 export async function submitLease(f, fd, id) {
   const old = id ? S.leases.find(l => l.id === id) : {}
   const P = prop(fd.get('propertyId'))
-  const docs = (old.docs || []).concat(await uploadFiles(fd.getAll('files').filter(x => x.size)))
-  const L = leaseFromForm(f, Object.assign({}, old, { ownerId: P?.ownerId || old.ownerId, docs }))
+  const L = leaseFromForm(f, Object.assign({}, old, { ownerId: P?.ownerId || old.ownerId })) // agreement documents are no longer attached to the lease form
   if (L.end <= L.start) { toast('End date must be after the start date.', 'warning'); return }
   if (L.owners) {
     const ids = L.owners.map(o => o.ownerId); if (ids.some(x => !x)) { toast('Choose an owner on every co-owner row.', 'warning'); return } if (new Set(ids).size !== ids.length) { toast('The same owner is listed twice.', 'warning'); return }

@@ -10,11 +10,9 @@ import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
 import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld, tdsRate, panValid } from '../../domain/lease'
-import { inspOf } from '../../domain/inspection'
 import { Btn, Panel, FactGrid, Kpis, Kpi, Banner, Section } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
-import { FileLinks } from '../../components/ui/Media'
-import InspectionActions from '../inspections/InspectionActions'
+import LeaseInspections from '../inspections/LeaseInspections'
 import { activateLease, renewLease, schedMode, schedCsv } from './actions'
 import OwnersBlock from './OwnersBlock'
 import DepAdjTable from './DepAdjTable'
@@ -218,7 +216,7 @@ const GST_TXT = { Forward: '18% charged by owner (forward charge)', RCM: '18% pa
 export default function LeaseDetail({ L }) {
   useStore()
   const st = leaseState(L); const le = lockEnd(L); const ne = nextEsc(L); const o = isOwner()
-  const hasInspBtn = inspOf(L.id, 'Move-in') || !o || inspOf(L.id, 'Move-out'); const sc = schedule(L)
+  const sc = schedule(L)
   return (
     <Panel
       title={<h2>{L.ref}</h2>}
@@ -252,8 +250,7 @@ export default function LeaseDetail({ L }) {
         {isMulti(L) ? <Section title="Owners & share of payments"><OwnersBlock L={L} heading={false} /></Section> : null}
         {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}
         <Section title="Key clauses"><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></Section>
-        <Section title="Joint inspections"><div className="actions">{hasInspBtn ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></Section>
-        <Section title="Signed agreement & annexures">{(L.docs || []).length ? <FileLinks files={L.docs} /> : <span className="muted small">No documents uploaded.</span>}</Section>
+        <Section title="Joint inspections"><LeaseInspections L={L} /></Section>
         {sc.rows.length ? <Section title="Rent schedule — full term" sub={schedSub(L, sc)} actions={<Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>}><SchedulePanel L={L} headerless /></Section> : null}
       </Box>
     </Panel>

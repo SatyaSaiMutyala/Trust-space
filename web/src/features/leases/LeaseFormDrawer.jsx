@@ -7,8 +7,7 @@ import { TODAY, addDays, addMonths, dayCount, fmtD, num } from '../../domain/uti
 import { rentStartOf, schedule, clearSchedCache, splitAmt } from '../../domain/lease'
 import { Btn } from '../../components/ui/Layout'
 import { ConfirmButton } from '../../components/ui/Status'
-import { FileLinks } from '../../components/ui/Media'
-import { FormGrid, Cell, SectionTitle, FieldBox, TextInput, SelectInput, CheckField, FileInput } from '../../components/form/Fields'
+import { FormGrid, Cell, SectionTitle, FieldBox, TextInput, SelectInput, CheckField } from '../../components/form/Fields'
 import { SchedTotals, ScheduleTable } from './LeaseDetail'
 import RentByYear from './RentByYear'
 import { leaseFromForm, submitLease, ownerSums, readOwnerAmounts, formTotals, amountsFromShares, totalFieldOf, SHARE_KEYS } from './actions'
@@ -165,11 +164,8 @@ export default function LeaseFormDrawer({ d }) {
             <CheckField grid={false} id="ls-tdm" name="tdsOnMaint" label="Also on maintenance paid to owner" defaultChecked={L.tdsOnMaint} />
           </FieldBox>
 
-          <SectionTitle>7 · Clauses &amp; documents</SectionTitle>
+          <SectionTitle>7 · Clauses</SectionTitle>
           <TextInput id="ls-cl" name="clauses" label="Key clauses & obligations" multiline full defaultValue={L.clauses || ''} placeholder="Repairs split, signage rights, restoration, subletting…" />
-          <FileInput id="ls-docs" name="files" label="Signed agreement, annexures, term sheet" accept="application/pdf,image/*" multiple>
-            {(L.docs || []).length ? <FileLinks files={L.docs} /> : 'No files yet'}
-          </FileInput>
           <Cell full>
             <Box sx={{ borderTop: '1px solid var(--line)', pt: 1.5, mt: 0.5 }}>
               <div className="eyebrow" style={{ marginBottom: 8 }}>Rent schedule preview — yearly</div>
