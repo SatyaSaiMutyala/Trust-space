@@ -1,18 +1,30 @@
 /* Property card — port of pcard + statusRows (reference/TruSpace.html). Props: { P } */
 import { useStore, owner, role, isOwner, openProp } from '../../store/store'
-import { CUR, inr } from '../../domain/utils'
-import { leaseOf, leaseState, rentFor, frontOf, occStatus, rentStatus, repairStatus, ownersLabel, ownerShare, isMulti } from '../../domain/lease'
+import { CUR, inr, fmtD, daysTo } from '../../domain/utils'
+import { leaseOf, leaseState, rentFor, frontOf, occStatus, rentStatus, repairStatus, ownersLabel, ownerShare, isMulti, noticeBy } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { StatusChip } from '../../components/ui/Status'
 import { Facade } from '../../components/ui/Media'
 
 function SRow({ l, x }) {
-  return <div className="srow"><span className="sl">{l}</span><span><StatusChip label={x.v} k={x.k} /></span>{x.note ? <span className={`sn ${x.warn ? 'w' : ''}`}>{x.note}</span> : null}</div>
+  return <div className="srow"><span className="sl">{l}</span><span><StatusChip label={x.v} k={x.k} className={x.cls || ''} /></span>{x.note ? <span className={`sn ${x.warn ? 'w' : ''}`}>{x.note}</span> : null}</div>
 }
 
-/** The three independent statuses of a property: occupancy, rent, repairs. */
+/** Notice-period status of the lease: days left to serve notice (red and blinking in the last week), served, or the deadline passed. */
+function noticeStatus(P) {
+  const L = leaseOf(P.id); if (!L || L.status === 'Draft' || ['Terminated', 'Expired'].includes(leaseState(L))) return null
+  if (L.exit?.noticeDate) return { v: `Served ${fmtD(L.exit.noticeDate)}`, k: 'info', note: `Vacate by ${fmtD(L.exit.effective)}` }
+  const by = noticeBy(L); const d = daysTo(by)
+  if (d < 0) return { v: 'Deadline passed', k: 'bad', note: `Was ${fmtD(by)} · lease runs to ${fmtD(L.end)}` }
+  if (d <= 7) return { v: d === 0 ? 'Serve today' : `${d} day${d > 1 ? 's' : ''} left`, k: 'bad', cls: 'blink', warn: true, note: `Serve notice by ${fmtD(by)}` }
+  const left = d >= 60 ? `${Math.round(d / 30.44)} months left` : `${d} days left` // far-off deadlines read better in months
+  return { v: left, k: d <= 30 ? 'warn' : 'ok', note: `Serve by ${fmtD(by)} · ${L.notice} months notice` }
+}
+
+/** The independent statuses of a property: occupancy, rent, repairs and the notice-period countdown. */
 export function StatusRows({ P }) {
-  return <div className="srows"><SRow l="Status" x={occStatus(P)} /><SRow l="Rent" x={rentStatus(P)} /><SRow l="Repairs & maintenance" x={repairStatus(P)} /></div>
+  const ns = noticeStatus(P)
+  return <div className="srows"><SRow l="Status" x={occStatus(P)} /><SRow l="Rent" x={rentStatus(P)} /><SRow l="Repairs & maintenance" x={repairStatus(P)} />{ns ? <SRow l="Notice period" x={ns} /> : null}</div>
 }
 
 export default function PropertyCard({ P }) {

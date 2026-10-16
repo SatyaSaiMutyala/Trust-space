@@ -118,6 +118,15 @@ table.ledger td{padding:8px 12px}
 .srow .sn{grid-column:2;font-size:12px;color:var(--muted);line-height:1.35}
 .srow .sn.w{color:var(--warn)}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 20px}
+.fgrid{display:grid;gap:10px}
+.fgrid .fg{min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.fgrid .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fgrid .v{font-size:15px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:24px}
+.fgrid .v .mono{font-weight:600}
+.fgrid .d{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;min-height:17px}
+@keyframes ts-blink{0%,100%{opacity:1}50%{opacity:.2}}
+.blink{animation:ts-blink 1.1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.blink{animation:none}}
 .fact .l{font-size:11.5px;color:var(--muted)}
 .fact .v{font-weight:500}
 .front{aspect-ratio:16/9;max-width:100%;border-radius:8px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}

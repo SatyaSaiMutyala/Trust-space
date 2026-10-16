@@ -6,11 +6,11 @@ import { leaseState } from './lease'
 import { fileUrl } from '../services/files'
 
 let inspT = null
-/** A record starts as "Not started" (date left blank — entered by hand) and becomes "In progress" once anything is recorded. */
+/** A record starts as "Not started" (date left blank — entered by hand) and becomes "In progress" once the date is entered or anything is recorded. */
 export const INSP_OPEN = ['Not started', 'In progress']
 export const inspOpen = I => !!I && INSP_OPEN.includes(I.status)
 const inspStarted = I => (I.items || []).some(it => it.cond || String(it.val ?? '').trim() || (it.photos || []).length) || (I.roomPhotos || []).length || !!I.tdplVideo
-export function saveInsp(I, now) { clearTimeout(inspT); if (I.status === 'Not started' && inspStarted(I)) { I.status = 'In progress'; I.log = (I.log || []).concat({ at: nowISO(), by: actor(), text: `${IN_KIND[I.kind]} started` }) } I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
+export function saveInsp(I, now) { clearTimeout(inspT); if (I.status === 'Not started' && (I.date || inspStarted(I))) { I.status = 'In progress'; I.log = (I.log || []).concat({ at: nowISO(), by: actor(), text: `${IN_KIND[I.kind]} started` }) } I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
 /** Skipped inspections (no record exists — premises taken over / handed back before TruSpace): L.takeoverSkip / L.handoverSkip. */
 export const skipKey = kind => kind === 'Move-out' ? 'handoverSkip' : 'takeoverSkip'
 export const SKIP_NOTE_MIN = 30

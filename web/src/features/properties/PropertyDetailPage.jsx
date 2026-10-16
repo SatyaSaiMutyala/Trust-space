@@ -4,8 +4,8 @@ import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import { useStore, S, UI, isOwner, role, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
-import { fmtD, pctLabel, daysTo } from '../../domain/utils'
-import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState } from '../../domain/lease'
+import { fmtD, pctLabel, daysTo, inr, CUR } from '../../domain/utils'
+import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState, rentFor } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
 import { StatusChip, Badge } from '../../components/ui/Status'
@@ -15,8 +15,7 @@ import CriticalDates from '../shared/CriticalDates'
 import LeaseDetail from '../leases/LeaseDetail'
 import LedgersBody from '../ledgers/LedgersBody'
 import TicketTable from '../tickets/TicketTable'
-import InspectionTable from '../inspections/InspectionTable'
-import InspectionActions from '../inspections/InspectionActions'
+import LeaseInspections from '../inspections/LeaseInspections'
 import ThreadPanel from '../messages/ThreadPanel'
 import ExitPanel from '../exits/ExitPanel'
 import OwnersBlock from '../leases/OwnersBlock'
@@ -79,7 +78,7 @@ function CoOwnerCards({ L }) {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, px: 1.5, py: 1, bgcolor: 'var(--sunk)', borderBottom: '1px solid var(--line)' }}>
               <Box aria-hidden="true" sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: 'var(--accent)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, flex: 'none' }}>{(O.name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}</Box>
               <b>{O.name}</b><span className="small muted">{O.kind}</span>
-              <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}><StatusChip label={`${pctLabel(x.rent)} of rent`} k="info" />{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}</Box>
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.75 }}><StatusChip label={`${inr(Math.round(rentFor(L, CUR) * x.rent / 100))}/mo`} k="info" /><span className="small muted">{pctLabel(x.rent)}</span>{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}</Box>
             </Box>
             <Box sx={{ p: 1.5, '& .facts': { gridTemplateColumns: 'repeat(2,minmax(0,1fr))' }, '@media (max-width:600px)': { '& .facts': { gridTemplateColumns: '1fr' } } }}><Facts items={ownerFacts(O, false)} /></Box>
           </Box>
@@ -135,7 +134,7 @@ export default function PropertyDetailPage() {
   if (tab === 'ledger') body = <LedgersBody fixedPid={P.id} />
   if (tab === 'tickets') body = <TicketTable list={S.tickets.filter(t => t.propertyId === P.id)} pid={P.id} />
   if (tab === 'messages') body = <ThreadPanel pid={P.id} />
-  if (tab === 'inspections') body = <><div className="actions">{L ? <InspectionActions L={L} /> : ''}</div><InspectionTable list={S.inspections.filter(i => i.propertyId === P.id)} pid={P.id} /></>
+  if (tab === 'inspections') body = L ? <LeaseInspections L={L} /> : <Empty panel>No lease — inspections are recorded against a lease.</Empty>
   if (tab === 'exit') body = L ? <ExitPanel L={L} /> : <Empty panel>No lease to exit.</Empty>
   return (
     <>

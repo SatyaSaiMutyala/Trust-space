@@ -11,7 +11,7 @@ import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
 import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld, tdsRate, panValid } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
-import { Btn, Panel, Facts, Kpis, Kpi, Banner, Section } from '../../components/ui/Layout'
+import { Btn, Panel, FactGrid, Kpis, Kpi, Banner, Section } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import InspectionActions from '../inspections/InspectionActions'
@@ -231,26 +231,23 @@ export default function LeaseDetail({ L }) {
       </>}</div>}
     >
       <Box sx={{ display: 'grid', gap: '14px', gridTemplateColumns: 'minmax(0,1fr)' }}>
-        <Section title="Lease terms"><Facts items={[
-          ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span>/mo</>],
-          ['Base rent', <span key="b" className="mono">{inr(L.rent)}</span>],
-          ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None'],
-          ['Next escalation', ne ? fmtD(ne) : '—'],
-          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span> {L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}{depAdjusted(L) ? <div className="small muted">{inr(depAdjusted(L))} adjusted against rent · <b>{inr(depHeld(L))}</b> held</div> : null}</>],
-          ['Lock-in', L.lockIn ? `${L.lockIn} months · ends ${fmtD(le)}` : 'None'],
-          ['Notice period', `${L.notice} months · serve by ${fmtD(noticeBy(L))}`],
-          ['Rent payment', `${L.payTiming === 'Arrears' ? 'In arrears' : 'In advance'} · by the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
-          ['Rent-free period', (L.fitout || 0) + ' days · rent from ' + fmtD(rentStartOf(L))],
-          ['Advance rent', +L.advanceRent ? `${inr(L.advanceRent)} · adjusted over ${L.advanceMonths || 1} month${(L.advanceMonths || 1) > 1 ? 's' : ''}` : 'None'],
-          ['Escalation basis', `${L.escType === 'Simple' ? 'Simple (on base rent)' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}`],
+        <Section title="Lease terms"><FactGrid items={[
+          ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span><span className="muted small">/mo</span></>, `Base rent ${inr(L.rent)}`],
+          ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None', L.escPct ? `${L.escType === 'Simple' ? 'Simple, on base rent' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}${ne ? ' · next ' + fmtD(ne) : ''}` : null],
+          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, depAdjusted(L) ? `${inr(depAdjusted(L))} adjusted against rent · ${inr(depHeld(L))} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'],
+          ['Lock-in', L.lockIn ? `${L.lockIn} months` : 'None', L.lockIn ? `Ends ${fmtD(le)}` : null],
+          ['Notice period', `${L.notice} months`, `Serve by ${fmtD(noticeBy(L))}`],
+          ['Rent payment', L.payTiming === 'Arrears' ? 'In arrears' : 'In advance', `By the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
+          ['Rent-free period', `${L.fitout || 0} days`, `Rent from ${fmtD(rentStartOf(L))}`],
+          ['Advance rent', +L.advanceRent ? inr(L.advanceRent) : 'None', +L.advanceRent ? `Adjusted over ${L.advanceMonths || 1} month${(L.advanceMonths || 1) > 1 ? 's' : ''}` : null],
         ]} /></Section>
-        <Section title="Charges, tax & registration"><Facts items={[
-          ['Maintenance', `${L.maintType}${L.maint ? ' · ' + inr(L.maint) + '/mo' : ''}`],
-          ['Electricity', L.elec],
-          ['GST on rent', isMulti(L) ? 'Per owner — see owners' : GST_TXT[L.gstMode]],
-          ['TDS on rent', L.tds ? (isMulti(L) ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month — 20% for a co-owner without a valid PAN' + (tdsPerOwner(L) ? ' · tested on each co-owner’s share' : '') : !panValid(owner(L.ownerId)) ? <span key="t" style={{ color: 'var(--bad)' }}>20% — owner has no valid PAN (s.393, formerly 194-I; 10% once a valid PAN is on file)</span> : `${tdsRate(L.ownerId, CUR + '-01')}% (s.393, formerly 194-I) when rent exceeds ₹50,000/month`) : 'Not deducted'],
-          ['Registration', L.registered ? 'Registered' : 'Unregistered'],
-          ['Stamp duty', L.stamp ? inr(L.stamp) : '—'],
+        <Section title="Charges, tax & registration"><FactGrid items={[
+          ['Maintenance', L.maintType, L.maint ? `${inr(L.maint)}/month${L.maintEsc ? ' · escalates with rent' : ''}` : null],
+          ['Electricity', L.elec, null],
+          ['GST on rent', isMulti(L) ? 'Per owner' : { Forward: '18% on invoice', RCM: '18% under RCM', None: 'Not applicable' }[L.gstMode] || L.gstMode, isMulti(L) ? 'See owners & share of payments' : GST_TXT[L.gstMode]],
+          ['TDS on rent', L.tds ? (isMulti(L) ? '10%' : !panValid(owner(L.ownerId)) ? <span key="t" style={{ color: 'var(--bad)' }}>20% — no valid PAN</span> : `${tdsRate(L.ownerId, CUR + '-01')}%`) : 'Not deducted',
+            L.tds ? `s.393 (formerly 194-I) · when rent exceeds ₹50,000/month${isMulti(L) ? ' · 20% for a co-owner without a valid PAN' : ''}${tdsPerOwner(L) ? ' · tested on each co-owner’s share' : ''}${!isMulti(L) && !panValid(owner(L.ownerId)) ? ' · 10% once a valid PAN is on file' : ''}` : null],
+          ['Registration', L.registered ? 'Registered' : 'Unregistered', L.stamp ? `Stamp duty & registration ${inr(L.stamp)}` : null],
         ]} /></Section>
         {isMulti(L) ? <Section title="Owners & share of payments"><OwnersBlock L={L} heading={false} /></Section> : null}
         {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}

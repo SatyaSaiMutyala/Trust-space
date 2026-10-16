@@ -86,6 +86,15 @@ export function Facts({ items }) {
   return <div className="facts">{items.filter(Boolean).map(([l, v], i) => <div className="fact" key={i}><div className="l">{l}</div><div className="v">{v ?? <span className="muted">—</span>}</div></div>)}</div>
 }
 
+/** Uniform key-fact tiles: label, a one-line value and an optional muted detail line. items = [[label, value, detail?]] */
+export function FactGrid({ items, min = 200 }) {
+  return (
+    <div className="fgrid" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${min}px, 1fr))` }}>
+      {items.filter(Boolean).map(([l, v, d], i) => <div className="fg" key={i}><div className="l">{l}</div><div className="v">{v ?? <span className="muted">—</span>}</div><div className="d">{d || '\u00a0'}</div></div>)}
+    </div>
+  )
+}
+
 /** Vertical stack with the standard 20px gap. */
 export function Stack({ gap = 2.5, children, sx }) { return <Box sx={[{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap, '&>*': { minWidth: 0 } }, ...(Array.isArray(sx) ? sx : [sx])]}>{children}</Box> }
 /** Two/three equal columns that collapse to one below 900px. */
