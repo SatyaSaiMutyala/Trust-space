@@ -7,7 +7,7 @@ import { S, prop, closeDrawer, useStore, save, remove, toast, actor } from '../.
 import { TODAY, fmtD } from '../../domain/utils'
 import { inspOf, skipKey, SKIP_NOTE_MIN } from '../../domain/inspection'
 import { IN_KIND } from '../../domain/constants'
-import { Btn, Banner, Empty } from '../../components/ui/Layout'
+import { Btn, Banner, Empty, Facts } from '../../components/ui/Layout'
 import { FormGrid, TextInput, SelectInput } from '../../components/form/Fields'
 
 const REASONS = {
@@ -47,7 +47,7 @@ export default function SkipInspectionDrawer({ d }) {
         : <><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-skip" disabled={busy}>Skip inspection</Btn></>}>
       {sk ? (
         <>
-          <Banner>Skipped on <b>{fmtD(sk.on)}</b> by {sk.by}.<br /><b>{sk.reason}</b><br />{sk.note}</Banner>
+          <Facts items={[['Skipped on', fmtD(sk.on)], ['By', sk.by], ['Reason', sk.reason], ['Note', sk.note]]} />
           <p className="small muted">{kind === 'Move-in' ? 'You can still record a take-over inspection any time from Take-over & handover; the handover inspection at exit will then have a baseline to compare against.' : 'You can still record a handover inspection from Take-over & handover; its findings will then flow into the deposit settlement.'}</p>
         </>
       ) : (
