@@ -33,7 +33,7 @@ export const loadPortfolio = createAsyncThunk('entities/loadPortfolio', async (_
 
 /* ---------- keeping the screen current: colleagues on other machines change records too ---------- */
 let refreshing = false, lastRefresh = 0
-const MIN_GAP = 2500 // ms between background refreshes (navigation can fire several in a row)
+const MIN_GAP = 10000 // ms between refreshes — quick clicks between pages don't each hit the API
 
 /** Re-fetch every collection in the background and swap it in — skipped while a drawer is open or a save is in flight,
  *  so nothing the user is editing gets replaced under them. Silent on failure (the next tick tries again). */
@@ -53,11 +53,10 @@ export async function refreshPortfolio() {
 }
 
 let started = false
-/** Refresh every minute while the tab is visible, and whenever the user comes back to it. Page navigation refreshes too (App.jsx). */
+/** No timer — the API is only asked again when the user comes back to the tab (page navigation refreshes too, see App.jsx). */
 export function startAutoRefresh() {
   if (started) return; started = true
-  const tick = () => { if (document.visibilityState === 'visible') refreshPortfolio() }
-  setInterval(tick, 60000)
-  document.addEventListener('visibilitychange', tick)
-  window.addEventListener('focus', tick)
+  const back = () => { if (document.visibilityState === 'visible') refreshPortfolio() }
+  document.addEventListener('visibilitychange', back)
+  window.addEventListener('focus', back)
 }

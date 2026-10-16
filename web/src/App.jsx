@@ -45,7 +45,7 @@ export default function App() {
   const auth = useSelector(s => s.auth.status)
   const data = useSelector(s => s.entities.status)
   const error = useSelector(s => s.entities.error)
-  // Keep records current across machines: refresh on every page change, plus the timer / focus refresh.
+  // Keep records current across machines: refresh when the user changes page or returns to the tab (no polling timer).
   useEffect(() => { startAutoRefresh() }, [])
   useEffect(() => { refreshPortfolio() }, [UI.route, UI.sel, UI.tab]) // eslint-disable-line react-hooks/exhaustive-deps
   let body
