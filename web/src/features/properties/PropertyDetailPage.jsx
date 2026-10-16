@@ -4,8 +4,8 @@ import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import { useStore, S, UI, isOwner, role, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
-import { fmtD, pctLabel } from '../../domain/utils'
-import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners } from '../../domain/lease'
+import { fmtD, pctLabel, daysTo } from '../../domain/utils'
+import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
@@ -24,6 +24,17 @@ import OwnerHomePage from '../ownerPortal/OwnerHomePage'
 import PropertiesPage from './PropertiesPage'
 
 const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['contracts', 'Contracts'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
+
+/** Time left on the lease (to the vacate date once notice is served) as a status chip: { v, k } or null without a live lease. */
+function leaseLeft(L) {
+  if (!L || L.status === 'Draft') return null
+  const st = leaseState(L); if (st === 'Terminated') return null
+  const end = L.exit?.effective || L.end; const d = daysTo(end)
+  if (d < 0) return { v: 'Expired', k: 'bad' }
+  const a = new Date(), b = new Date(end + 'T00:00:00'); let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); if (b.getDate() < a.getDate()) m--
+  const v = m >= 1 ? `${m} month${m > 1 ? 's' : ''} left` : `${d} day${d === 1 ? '' : 's'} left`
+  return { v: v + ' · ' + fmtD(end), k: m >= 6 ? 'ok' : m >= 3 ? 'warn' : 'bad' }
+}
 
 /** One owner's contact, tax and bank facts (prototype's owner card on the property summary). */
 function ownerFacts(O, withName) {
@@ -96,7 +107,7 @@ export default function PropertyDetailPage() {
   const P = prop(UI.sel)
   if (!P || !inScope({ propertyId: P.id })) { UI.route = isOwner() ? 'o-home' : 'properties'; return isOwner() ? <OwnerHomePage /> : <PropertiesPage /> }
   const L = leaseOf(P.id); const tab = UI.tab; const o = isOwner()
-  const occ = occStatus(P), rs = rentStatus(P), rp = repairStatus(P)
+  const occ = occStatus(P), rs = rentStatus(P), rp = repairStatus(P), ll = leaseLeft(L)
   let body = null
   if (tab === 'summary') body = <Summary P={P} />
   if (tab === 'lease') body = L ? <LeaseDetail L={L} /> : <Empty panel>No lease recorded. {o ? '' : <Btn primary onClick={() => newLease(P.id)}>Create lease</Btn>}</Empty>
@@ -111,7 +122,7 @@ export default function PropertyDetailPage() {
       <div><Btn ghost sm onClick={() => go(o ? 'o-home' : 'properties')}>← All properties</Btn></div>
       <PageHead
         title={P.name}
-        sub={<><span className="mono">{P.code}</span> · {P.city} · Status <StatusChip label={occ.v} k={occ.k} /> · Rent <StatusChip label={rs.v} k={rs.k} /> · Repairs <StatusChip label={rp.v} k={rp.k} /></>}
+        sub={<><span className="mono">{P.code}</span> · {P.city} · Status <StatusChip label={occ.v} k={occ.k} /> · Rent <StatusChip label={rs.v} k={rs.k} /> · Repairs <StatusChip label={rp.v} k={rp.k} />{ll ? <> · Lease <StatusChip label={ll.v} k={ll.k} /></> : null}</>}
         actions={o
           ? <><Btn onClick={() => newTicket(P.id)}>Report an issue</Btn><Btn primary onClick={() => newInvoice({ prop: P.id })}>Raise invoice</Btn></>
           : <><Btn onClick={() => newTicket(P.id)}>New ticket</Btn><Btn onClick={() => newInvoice({ prop: P.id })}>Record invoice</Btn></>}
