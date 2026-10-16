@@ -70,6 +70,7 @@ All data APIs (`/api/<resource>`, `/api/assets`, `/api/users`) need `Authorizati
 - **Passwords:** scrypt hashes; at least 8 characters with a letter and a number.
 - **Protection:** 5 wrong passwords lock the account for 15 minutes (`code: "account_locked"`, status `423`); max 30 sign-in requests per device per 15 minutes (`429`).
 - **Roles:** `admin`, `staff` (TrustLab), `owner` (linked `ownerId`), `franchisee` (linked `partnerId`).
+- **What each role sees:** admins and staff see TrustLab's premises and TDS; a franchise partner sees the premises it manages and its own TDS; an owner sees the premises they own **or co-own**, the leases, tickets, messages and inspections on them, **only their own invoices**, their own and their co-owners' owner records (they can change only their own), and TDS returns showing only their own Form 16A (read-only).
 - Example messages: “Welcome back, Srinivasa.”, “The email/mobile number or password is incorrect. 2 attempts left before the account is locked for 15 minutes.”, “Your session has expired. Please sign in again.”
 
 ## Accounts — `/api/users` (admins and TrustLab staff)
@@ -115,24 +116,30 @@ All resources share the same endpoints:
 | Resource | Search fields | Filters | Date field | Default sort |
 | --- | --- | --- | --- | --- |
 | `properties` | name, code, city, state, address, branch, type | status, type, city, state, ownerId, managedBy, partnerId, branch | — | name ↑ |
-| `owners` | name, phone, email, pan, gstin, addr.city, bankName | kind, partnerId, bankVerified (bool), bankPending (bool), prefContact | — | name ↑ |
-| `leases` | ref, clauses | propertyId, ownerId, status, gstMode, payTiming, registered (bool) | start | start ↓ |
-| `invoices` | number, desc, type, utr, period | propertyId, leaseId, ownerId, type, status, period, source | date | date ↓ |
+| `owners` | name, phone, email, pan, gstin, addr.city, bankName | kind, partnerId, bankVerified (bool), bankPending (bool), prefContact, panStatus | — | name ↑ |
+| `leases` | ref, clauses | propertyId, ownerId (also matches co-owners), status, gstMode, payTiming, registered (bool) | start | start ↓ |
+| `invoices` | number, desc, type, utr, period | propertyId, leaseId, ownerId, type, status, period, source, paidBy, open (bool), overdue (bool) | date | date ↓ |
 | `tickets` | no, title, category, assignee, raisedBy | propertyId, status, priority, responsibility, category | createdAt | createdAt ↓ |
 | `messages` | text, by, kind | propertyId, ownerId, from, kind | at | at ↓ |
 | `inspections` | inspector, ownerRep, kind, status | propertyId, leaseId, ownerId, kind, status | date | date ↓ |
 | `sites` | name, code, locality, city, address, ownerName, broker, scoutedBy | reqId, stage, purpose, city, propertyId, leaseId | scoutedOn | scoutedOn ↓ |
 | `reqs` (scouting requirements) | code, city, area, purpose, reason, raisedBy | city, state, purpose, priority, status, model, partnerId | raisedOn | raisedOn ↓ |
 | `partners` (franchise) | name, contact, city, email, phone, agreementRef | status, model, city, premisesMgmt (bool) | — | name ↑ |
+| `tds` (challans & returns) | bsr, challanNo, ack, month, fy, mode, filedBy | kind (`challan` / `return`), ws, month, fy, q | — | createdAt ↓ |
 | `people` (portal access) | label, uid | role, ownerId, partnerId | — | label ↑ |
 
 ### Rules checked on save
 
-- **Required:** properties (name, code, address, city) · owners (name) · leases (ref, propertyId, start, end, rent) · invoices (number, propertyId, leaseId, type, period, date, base) · tickets (no, propertyId, title, priority) · messages (propertyId, from, text) · inspections (kind, propertyId, leaseId) · sites (code, reqId) · reqs (code, city, area, purpose, reason) · partners (name) · people (uid, role)
+- **Required:** properties (name, code, address, city) · owners (name) · leases (ref, propertyId, start, end, rent) · invoices (number, propertyId, leaseId, type, period, date, base) · tickets (no, propertyId, title, priority) · messages (propertyId, from, text) · inspections (kind, propertyId, leaseId) · sites (code, reqId) · reqs (code, city, area, purpose, reason) · partners (name) · tds (kind) · people (uid, role)
 - **Allowed values** (statuses, types, priorities…) and **numbers** (rent, deposit, amounts…) are validated.
 - **Links must exist:** e.g. a lease's `propertyId`, an invoice's `leaseId`, a site's `reqId`.
 - **Unique:** property code, lease ref, ticket number, site code, requirement code, invoice number per owner, portal user uid.
-- **Delete protection:** a property with leases/tickets/invoices, an owner with properties/leases, a lease with invoices/inspections, a requirement with sites, a partner with requirements/premises.
+- **Delete protection:** a property with leases/tickets/invoices, an owner with properties/leases (including leases they co-own), a lease with invoices/inspections, a requirement with sites, a partner with requirements/premises.
+- **Co-owners** (`leases.owners`: `[{ ownerId, rent, maint, dep, adv, gst }]`, shares in %): every owner must exist and appear once; with more than one owner, rent shares must total 100%, and maintenance / deposit / advance shares too when that charge is set. `gst` per owner is `Forward`, `RCM`, `None` or empty (= the lease's `gstMode`). An invoice's `ownerId` must be an owner or co-owner of its lease.
+- **Deposit adjusted against rent** (`leases.depAdj`: `[{ id, period, ownerId, amount, tds, status, consent, note }]`): `status` is Proposed, Agreed, Declined or Cancelled; one live adjustment per month and owner; Proposed + Agreed amounts may not exceed that owner's share of the security deposit. Invoices settled this way have `paidBy: "Deposit"`.
+- **Opening balances** (`leases.opening`: `{ asOf, items: [{ id, period, type, ownerId, amount, paidAmount, tds, paidOn, utr, note }], confirmed, source }`): each month must be before `asOf`, for an owner on the lease, once per month/owner/type; paid + TDS may not exceed the amount due.
+- **Owner TDS settings:** `panStatus` (Valid, Inoperative, Not verified) and `tdsCert` `{ type: Lower | Nil, certNo, rate 0–10, limit, from, to, file }`.
+- **TDS records** (`tds`): `ws` is `tdpl` (TrustLab, the default) or a franchise partner id. A **challan** needs `month` (YYYY-MM), `amount`, `paidOn`, a 7-digit `bsr` and a 5-digit `challanNo`; a **return** needs `fy` (e.g. `26-27`) and `q` (1–4), plus a 15-digit `ack` once `filedOn` is set, and holds `f16a: { <ownerId>: { issuedOn, file } }`. One return per workspace, year and quarter.
 - Records keep the web app's ids (`p1`, `l3`, generated ids). `createdAt` is kept, `updatedAt` is set on every save.
 
 ## Files — `/api/assets` (stored in AWS S3, bucket `trust-space`)

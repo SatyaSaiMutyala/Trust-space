@@ -53,7 +53,7 @@ test('health reports database connected', async () => {
 })
 
 test('every resource lists with pagination and a message', async () => {
-  for (const p of ['properties', 'owners', 'leases', 'invoices', 'tickets', 'messages', 'inspections', 'sites', 'reqs', 'partners', 'people']) {
+  for (const p of ['properties', 'owners', 'leases', 'invoices', 'tickets', 'messages', 'inspections', 'sites', 'reqs', 'partners', 'tds', 'people']) {
     const r = await call('GET', `/${p}`)
     assert.equal(r.status, 200, p); assertEnvelope(r)
     assert.ok(Array.isArray(r.body.data))
@@ -65,12 +65,12 @@ test('pagination: page and limit', async () => {
   const r = await call('GET', '/invoices?page=2&limit=10')
   assert.equal(r.status, 200)
   assert.equal(r.body.data.length, 10)
-  assert.equal(r.body.pagination.total, 46)
-  assert.equal(r.body.pagination.totalPages, 5)
+  assert.equal(r.body.pagination.total, 60)
+  assert.equal(r.body.pagination.totalPages, 6)
   assert.equal(r.body.pagination.hasPrev, true)
-  assert.match(r.body.message, /46 invoices found · showing 11–20\./)
-  const last = await call('GET', '/invoices?page=5&limit=10')
-  assert.equal(last.body.data.length, 6)
+  assert.match(r.body.message, /60 invoices found · showing 11–20\./)
+  const last = await call('GET', '/invoices?page=6&limit=10')
+  assert.equal(last.body.data.length, 10)
   assert.equal(last.body.pagination.hasNext, false)
   const past = await call('GET', '/invoices?page=9&limit=10')
   assert.equal(past.body.data.length, 0)
@@ -344,7 +344,7 @@ test('change password keeps this session and ends others', async () => {
 test('user management: search/pagination, roles, temporary passwords, permissions', async () => {
   const list = await call('GET', '/users?search=example&role=owner&page=1&limit=3')
   assert.equal(list.status, 200); assert.equal(list.body.data.length, 3)
-  assert.match(list.body.message, /^7 accounts found for “example” · showing 1–3\.$/)
+  assert.match(list.body.message, /^8 accounts found for “example” · showing 1–3\.$/)
   assert.ok(list.body.data.every(u => u.passwordHash === undefined))
 
   const c = await call('POST', '/users', { name: 'Ravi Kumar', email: 'ravi@trustlab.example', role: 'staff' })
@@ -422,4 +422,65 @@ test('uploaded files open with a media token in the URL', async () => {
   assert.equal((await fetch(fileUrl + '?t=' + mediaToken)).status, 200)
   const bad = await (await fetch(fileUrl + '?t=junk')).json()
   assert.equal(bad.message, 'This file link has expired. Reload the page to open it again.')
+})
+
+test('co-owners see the shared premises and lease, but only their own invoices and owner record', async () => {
+  const { accessToken: t } = await tokenFor('sravani.pydi@example.com') // o8 co-owns l3 (p3) with o3, 60:40
+  assert.deepEqual((await call('GET', '/properties', undefined, t)).body.data.map(p => p.id), ['p3'])
+  assert.deepEqual((await call('GET', '/leases', undefined, t)).body.data.map(l => l.id), ['l3'])
+  const inv = await call('GET', '/invoices?limit=100', undefined, t)
+  assert.ok(inv.body.data.length > 0 && inv.body.data.every(i => i.ownerId === 'o8'))
+  assert.deepEqual((await call('GET', '/owners', undefined, t)).body.data.map(o => o.id).sort(), ['o3', 'o8'])
+  assert.equal((await call('PATCH', '/owners/o3', { callHours: '9 am – 5 pm' }, t)).status, 403)
+  assert.equal((await call('PATCH', '/owners/o8', { callHours: '9 am – 5 pm' }, t)).status, 200)
+  const forOther = await call('PUT', '/invoices/iv-x', { number: 'SVP/X/1', propertyId: 'p3', leaseId: 'l3', ownerId: 'o3', type: 'Rent', period: '2026-10', date: '2026-10-16', base: 1000 }, t)
+  assert.equal(forOther.status, 403)
+})
+
+test('leases: co-owner shares, deposit adjustments and opening balances are validated', async () => {
+  const L = (await call('GET', '/leases/l3')).body.data
+  assert.equal(L.owners.length, 2)
+  const put = body => call('PUT', '/leases/l3', { ...L, ...body })
+  const shares = await put({ owners: [{ ...L.owners[0] }, { ...L.owners[1], rent: 30 }] })
+  assert.equal(shares.status, 400); assert.equal(shares.body.message, 'Rent shares add up to 90% — they must total 100%.')
+  const twice = await put({ owners: [L.owners[0], { ...L.owners[1], ownerId: 'o3' }] })
+  assert.match(twice.body.message, /The same owner is listed twice/) // also flags o8's opening-balance rows, now orphaned
+  const tooMuch = await put({ depAdj: [{ id: 'dx', period: '2026-11', ownerId: 'o8', amount: 300000, status: 'Proposed' }] })
+  assert.equal(tooMuch.status, 400); assert.equal(tooMuch.body.message, 'Deposit adjustments for Sravani Pydi total ₹3,00,000, more than the security deposit of ₹2,04,000.')
+  const late = await put({ opening: { ...L.opening, items: [{ id: 'x', period: '2026-04', type: 'Rent', ownerId: 'o3', amount: 1000 }] } })
+  assert.equal(late.body.message, 'Apr 2026 is on or after 2026-04-01 — record it as an invoice instead.')
+  const overpaid = await put({ opening: { ...L.opening, items: [{ id: 'x', period: '2026-03', type: 'Rent', ownerId: 'o3', amount: 1000, paidAmount: 1200, paidOn: '2026-04-10' }] } })
+  assert.equal(overpaid.body.message, 'Rent for Mar 2026: paid ₹1,200 including TDS is more than the ₹1,000 due.')
+  const ok = await put({ depAdj: [{ id: 'd1', period: '2026-11', ownerId: 'o8', amount: 30000, tds: 0, status: 'Proposed' }] })
+  assert.equal(ok.status, 200)
+  assert.deepEqual((await call('GET', '/leases?ownerId=o8')).body.data.map(l => l.id), ['l3'])
+  const del = await call('DELETE', '/owners/o8')
+  assert.equal(del.status, 409); assert.equal(del.body.message, 'Owner “Sravani Pydi” can’t be deleted because it still has 1 lease. Delete or move those first.')
+  const notOnLease = await call('PUT', '/invoices/iv-bad', { number: 'SVP/26-27/099', propertyId: 'p1', leaseId: 'l1', ownerId: 'o8', type: 'Rent', period: '2026-10', date: '2026-10-16', base: 1000 })
+  assert.equal(notOnLease.status, 400); assert.equal(notOnLease.body.message, 'Owner “o8” is not an owner on lease TDPL-FAC-LSE-001, so this invoice can’t be raised in their name.')
+  const cert = await call('PATCH', '/owners/o2', { tdsCert: { type: 'Lower', rate: 15, from: '2026-04-01', to: '2027-03-31' } })
+  assert.equal(cert.status, 400); assert.equal(cert.body.message, 'Certificate TDS rate must be between 0% and 10%.')
+})
+
+test('TDS records: challans and returns per workspace; owners only read their own Form 16A', async () => {
+  assert.equal((await call('GET', '/tds?kind=challan')).body.pagination.total, 5)
+  const challan = { kind: 'challan', month: '2026-09', amount: 5000, paidOn: '2026-10-06', bsr: '051030', challanNo: '12345', mode: 'Net banking (e-Pay Tax)' }
+  const bad = await call('POST', '/tds', challan)
+  assert.equal(bad.status, 400); assert.equal(bad.body.message, 'BSR code should be 7 digits.')
+  const made = await call('POST', '/tds', { ...challan, bsr: '0510308' })
+  assert.equal(made.status, 201); assert.equal(made.body.data.ws, 'tdpl'); assert.equal(made.body.message, 'TDS record “TDS challan 0510308/12345” created.')
+  const dup = await call('POST', '/tds', { kind: 'return', fy: '26-27', q: 1 })
+  assert.equal(dup.status, 409)
+
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  const mine = await call('GET', '/tds', undefined, o1)
+  assert.ok(mine.body.data.length && mine.body.data.every(r => r.kind === 'return' && Object.keys(r.f16a).join() === 'o1'))
+  const ro = await call('POST', '/tds', { ...challan, bsr: '0510308', challanNo: '54321' }, o1)
+  assert.equal(ro.status, 403); assert.equal(ro.body.message, 'Property owners can view TDS records but can’t change them.')
+
+  const { accessToken: fr } = await tokenFor('medpoint@example.com')
+  assert.equal((await call('GET', '/tds', undefined, fr)).body.pagination.total, 0)
+  assert.equal((await call('POST', '/tds', { ...challan, bsr: '0510308', ws: 'tdpl' }, fr)).status, 403)
+  assert.equal((await call('POST', '/tds', { ...challan, bsr: '0510308', ws: 'pa2' }, fr)).status, 201)
+  assert.equal((await call('GET', '/tds?ws=pa2')).body.pagination.total, 0) // TrustLab does not see a partner's TDS
 })

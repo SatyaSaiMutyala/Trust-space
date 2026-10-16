@@ -11,6 +11,7 @@ const schemaFor = cfg => {
   const s = new mongoose.Schema({ _id: { type: String, default: newId } }, { strict: false, strictQuery: false, versionKey: false, minimize: false, collection: cfg.path })
   for (const [param, opts] of Object.entries(cfg.filters || {})) if (!opts.build) s.index({ [opts.field || param]: 1 })
   if (cfg.dateField) s.index({ [cfg.dateField]: -1 })
+  for (const f of cfg.indexes || []) s.index({ [f]: 1 })
   return s
 }
 

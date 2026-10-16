@@ -16,7 +16,11 @@
  *   numbers      fields that must be numeric when present
  *   refs         field → resource path the value must exist in (checked when present)
  *   unique       field groups that must be unique, e.g. [['code']] or [['ownerId', 'number']]
- *   dependents   [resource path, field, word] — blocks delete while dependent records exist
+ *   dependents   [resource path, field or [fields], word] — blocks delete while dependent records exist
+ *   writeRoles   roles allowed to create, change or delete (default: everyone who can see the record)
+ *   view         (record, user) → record as that user may see it
+ *   indexes      extra fields to index (filters with a computed `build` are not indexed automatically)
+ * More complex rules (co-owners, deposit adjustments, opening balances, TDS) live in resources/checks.js.
  */
 const DONE_INV = ['Paid', 'Rejected']
 const DONE_TKT = ['Resolved', 'Closed']
@@ -40,19 +44,19 @@ export const RESOURCES = [
     path: 'owners', model: 'Owner', singular: 'owner', plural: 'owners',
     label: r => r.name,
     search: ['name', 'phone', 'email', 'pan', 'gstin', 'addr.city', 'bankName'],
-    filters: { kind: {}, partnerId: {}, bankVerified: { type: 'bool' }, bankPending: { type: 'bool' }, prefContact: {} },
+    filters: { kind: {}, partnerId: {}, bankVerified: { type: 'bool' }, bankPending: { type: 'bool' }, prefContact: {}, panStatus: {} },
     sort: { name: 1 },
     required: [['name', 'Owner name']],
-    labels: { kind: 'Owner type' },
-    enums: { kind: ['Individual', 'HUF', 'Company', 'LLP', 'Firm', 'Trust'] },
+    labels: { kind: 'Owner type', panStatus: 'PAN status' },
+    enums: { kind: ['Individual', 'HUF', 'Company', 'LLP', 'Firm', 'Trust'], panStatus: ['Valid', 'Inoperative', 'Not verified', ''] },
     refs: { partnerId: 'partners' },
-    dependents: [['properties', 'ownerId', 'property'], ['leases', 'ownerId', 'lease']],
+    dependents: [['properties', 'ownerId', 'property'], ['leases', ['ownerId', 'owners.ownerId'], 'lease']], // incl. leases where they are a co-owner
   },
   {
     path: 'leases', model: 'Lease', singular: 'lease', plural: 'leases',
     label: r => r.ref,
     search: ['ref', 'clauses'],
-    filters: { propertyId: {}, ownerId: {}, status: {}, gstMode: {}, payTiming: {}, registered: { type: 'bool' } },
+    filters: { propertyId: {}, ownerId: { build: v => ({ $or: [{ ownerId: v }, { 'owners.ownerId': v }] }) }, status: {}, gstMode: {}, payTiming: {}, registered: { type: 'bool' } }, // ownerId also matches co-owners
     dateField: 'start',
     sort: { start: -1 },
     required: [['ref', 'Lease reference'], ['propertyId', 'Property'], ['start', 'Lease start date'], ['end', 'Lease end date'], ['rent', 'Monthly rent']],
@@ -61,6 +65,7 @@ export const RESOURCES = [
     numbers: ['rent', 'deposit', 'escPct', 'escEvery', 'lockIn', 'notice', 'fitout', 'maint', 'advanceRent', 'advanceMonths', 'brokerage', 'stamp', 'dueDay'],
     refs: { propertyId: 'properties', ownerId: 'owners' },
     unique: [['ref']],
+    indexes: ['ownerId', 'owners.ownerId'],
     dependents: [['invoices', 'leaseId', 'invoice'], ['inspections', 'leaseId', 'inspection']],
   },
   {
@@ -68,7 +73,7 @@ export const RESOURCES = [
     label: r => r.number,
     search: ['number', 'desc', 'type', 'utr', 'period'],
     filters: {
-      propertyId: {}, leaseId: {}, ownerId: {}, type: {}, status: {}, period: {}, source: {},
+      propertyId: {}, leaseId: {}, ownerId: {}, type: {}, status: {}, period: {}, source: {}, paidBy: {},
       open: { type: 'bool', build: v => ({ status: v ? { $nin: DONE_INV } : { $in: DONE_INV } }) }, // not yet paid / rejected
       overdue: { type: 'bool', build: v => v ? { status: { $nin: DONE_INV }, dueDate: { $lt: today() } } : { $or: [{ status: { $in: DONE_INV } }, { dueDate: { $gte: today() } }] } },
     },
@@ -76,7 +81,7 @@ export const RESOURCES = [
     sort: { date: -1 },
     required: [['number', 'Invoice number'], ['propertyId', 'Property'], ['leaseId', 'Lease'], ['type', 'Invoice type'], ['period', 'Billing month'], ['date', 'Invoice date'], ['base', 'Amount']],
     labels: { type: 'Invoice type', status: 'Invoice status' },
-    enums: { type: ['Rent', 'Electricity', 'Maintenance', 'Water', 'Other'], status: ['Submitted', 'Verified', 'Approved', 'Paid', 'Rejected'], source: ['Generated', 'Uploaded'] },
+    enums: { type: ['Rent', 'Electricity', 'Maintenance', 'Water', 'Other'], status: ['Submitted', 'Verified', 'Approved', 'Paid', 'Rejected'], source: ['Generated', 'Uploaded'], paidBy: ['Deposit', 'Bank', ''] },
     numbers: ['base', 'gst', 'rcm', 'tds', 'total', 'net', 'paidAmount', 'tdsDeducted'],
     refs: { propertyId: 'properties', leaseId: 'leases', ownerId: 'owners' },
     unique: [['ownerId', 'number']],
@@ -157,6 +162,22 @@ export const RESOURCES = [
     dependents: [['reqs', 'partnerId', 'requirement'], ['properties', 'partnerId', 'property']],
   },
   {
+    // TDS deposited (challans) and quarterly TDS returns with Form 16A issued per owner. ws = 'tdpl' for TrustLab,
+    // or the franchise partner's id for TDS a partner deducts on premises it manages.
+    path: 'tds', model: 'TdsRecord', singular: 'TDS record', plural: 'TDS records',
+    label: r => (r.kind === 'return' ? `TDS return Q${r.q} FY ${r.fy}` : `TDS challan ${r.bsr || ''}/${r.challanNo || ''}`),
+    search: ['bsr', 'challanNo', 'ack', 'month', 'fy', 'mode', 'filedBy'],
+    filters: { kind: {}, ws: {}, month: {}, fy: {}, q: { type: 'number' } },
+    sort: { createdAt: -1 },
+    required: [['kind', 'Record type']],
+    labels: { kind: 'Record type', ws: 'Workspace', fy: 'Financial year', q: 'Quarter', bsr: 'BSR code', challanNo: 'Challan no.', paidOn: 'Paid on', rtype: 'Return type' },
+    enums: { kind: ['challan', 'return'], rtype: ['Original', 'Correction', ''] },
+    numbers: ['amount', 'interest', 'q'],
+    unique: [['ws', 'bsr', 'paidOn', 'challanNo'], ['ws', 'kind', 'fy', 'q']],
+    writeRoles: ['admin', 'staff', 'franchisee'], // owners only read their own Form 16A
+    view: (r, user) => (user.role === 'owner' ? { ...r, f16a: r.f16a?.[user.ownerId] ? { [user.ownerId]: r.f16a[user.ownerId] } : {} } : r),
+  },
+  {
     path: 'people', model: 'Person', singular: 'portal user', plural: 'portal users',
     label: r => r.label || r.uid,
     search: ['label', 'uid'],
@@ -181,4 +202,6 @@ export const FIELD_LABELS = {
   base: 'Amount', gst: 'GST', rcm: 'GST under RCM', tds: 'TDS', total: 'Invoice total', net: 'Net payable', paidAmount: 'Amount paid', tdsDeducted: 'TDS deducted',
   cost: 'Repair cost', measuredArea: 'Measured area', frontage: 'Frontage', quotedRent: 'Quoted rent', quotedDeposit: 'Quoted deposit',
   areaMin: 'Minimum area', areaMax: 'Maximum area', rentMax: 'Rent budget', ownerId: 'Owner', partnerId: 'Franchise partner',
+  owners: 'Co-owners', depAdj: 'Deposit adjustments', opening: 'Opening balance', tdsCert: 'TDS certificate', paidBy: 'Paid by',
+  amount: 'Amount', interest: 'Interest', month: 'Month', f16a: 'Form 16A',
 }
