@@ -47,10 +47,11 @@ function CoOwnerCards({ L }) {
         return (
           <Box key={x.ownerId} sx={{ border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, px: 1.5, py: 1, bgcolor: 'var(--sunk)', borderBottom: '1px solid var(--line)' }}>
+              <Box aria-hidden="true" sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: 'var(--accent)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, flex: 'none' }}>{(O.name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}</Box>
               <b>{O.name}</b><span className="small muted">{O.kind}</span>
-              <StatusChip label={`${pctLabel(x.rent)} of rent`} k="info" />{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}
+              <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}><StatusChip label={`${pctLabel(x.rent)} of rent`} k="info" />{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}</Box>
             </Box>
-            <Box sx={{ p: 1.5 }}><Facts items={ownerFacts(O, false)} /></Box>
+            <Box sx={{ p: 1.5, '& .facts': { gridTemplateColumns: 'repeat(2,minmax(0,1fr))' }, '@media (max-width:600px)': { '& .facts': { gridTemplateColumns: '1fr' } } }}><Facts items={ownerFacts(O, false)} /></Box>
           </Box>
         )
       })}
@@ -76,8 +77,12 @@ function Summary({ P }) {
             ]} />
           </Box>
         </Panel>
-        <Panel title={multi ? `Owners · ${leaseOwners(L).length} co-owners` : 'Owner'} sub={multi ? 'Each co-owner invoices and is paid separately — shares are in Co-owners & shares below' : null} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}>
-          {multi ? <CoOwnerCards L={L} /> : O ? <Facts items={ownerFacts(O, true)} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
+        {/* Same height as the Premises card beside it: the panel takes the row height and its body scrolls when there are many co-owners. */}
+        <Panel title={multi ? `Owners · ${leaseOwners(L).length} co-owners` : 'Owner'} sub={multi ? 'Each co-owner invoices and is paid separately — shares are in Co-owners & shares below' : null} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}
+          body={false} sx={{ display: 'flex', flexDirection: 'column', height: 0, minHeight: '100%', '@media (max-width:900px)': { height: 'auto', minHeight: 0 } }}>
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, py: 1.75, '@media (max-width:760px)': { p: 1.5 } }}>
+            {multi ? <CoOwnerCards L={L} /> : O ? <Facts items={ownerFacts(O, true)} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
+          </Box>
         </Panel>
       </Cols>
       {L && isMulti(L) ? <Panel title="Co-owners & shares"><OwnersBlock L={L} heading={false} /></Panel> : null}
