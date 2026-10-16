@@ -60,7 +60,7 @@ export function inspAttention(items) {
   S.inspections.filter(i => i.status === 'Awaiting owner sign-off').forEach(I => items.push({ k: 'info', t: `${IN_KIND[I.kind]} awaiting owner signature`, s: `${prop(I.propertyId)?.name} · submitted ${fmtDT(I.tdplSign?.at)}`, a: { act: 'openInsp', id: I.id } }))
   S.leases.forEach(L => {
     const st = leaseState(L); if (['Terminated', 'Expired'].includes(st)) return
-    if (!inspOf(L.id, 'Move-in') && daysTo(L.start) >= -90) items.push({ k: 'warn', t: 'Take-over inspection not done', s: `${prop(L.propertyId)?.name} · possession ${fmtD(L.start)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-in' } })
+    if (!inspOf(L.id, 'Move-in') && !L.takeoverSkip && daysTo(L.start) >= -90) items.push({ k: 'warn', t: 'Take-over inspection not done', s: `${prop(L.propertyId)?.name} · possession ${fmtD(L.start)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-in' } })
     if (L.exit?.noticeDate && (L.exit.stage || 0) < 2 && !inspOf(L.id, 'Move-out')) items.push({ k: 'warn', t: 'Schedule handover inspection with owner', s: `${prop(L.propertyId)?.name} · vacate by ${fmtD(L.exit.effective)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-out' } })
   })
 }

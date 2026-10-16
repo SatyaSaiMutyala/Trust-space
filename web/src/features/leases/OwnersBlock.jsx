@@ -30,10 +30,10 @@ export default function OwnersBlock({ L }) {
               return (
                 <TableRow key={x.ownerId} className={me === x.ownerId ? 'youRow' : undefined}>
                   <TableCell><b>{O?.name || '—'}</b>{me === x.ownerId ? <> <StatusChip label="You" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
-                  <TableCell className="num">{pctLabel(sh.rent)}</TableCell>
-                  <TableCell className="num">{pctLabel(sh.maint)}</TableCell>
-                  <TableCell className="num">{pctLabel(sh.dep)}<div className="small muted">{inr(x.deposit)}{depAdjusted(L, x.ownerId) ? ` · held ${inr(depHeld(L, x.ownerId))}` : ''}</div></TableCell>
-                  <TableCell className="num">{pctLabel(sh.adv)}{x.adv ? <div className="small muted">{inr(x.adv)}</div> : null}</TableCell>
+                  <TableCell className="num">{inr(Math.round((+L.rent || 0) * sh.rent / 100))}<div className="small muted">{pctLabel(sh.rent)}</div></TableCell>
+                  <TableCell className="num">{inr(Math.round((+L.maint || 0) * sh.maint / 100))}<div className="small muted">{pctLabel(sh.maint)}</div></TableCell>
+                  <TableCell className="num">{inr(x.deposit)}<div className="small muted">{pctLabel(sh.dep)}{depAdjusted(L, x.ownerId) ? ` · held ${inr(depHeld(L, x.ownerId))}` : ''}</div></TableCell>
+                  <TableCell className="num">{x.adv ? inr(x.adv) : '—'}<div className="small muted">{pctLabel(sh.adv)}</div></TableCell>
                   <TableCell className="small">{G[x.mode] || x.mode}</TableCell>
                   <TableCell className="small">{x.tdsOn ? '10%' : 'Below threshold'}</TableCell>
                   <TableCell className="num">{inr(Math.round(rentFor(L, CUR) * sh.rent / 100))}</TableCell>

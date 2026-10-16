@@ -31,7 +31,7 @@ export default function OwnerRows({ rows, same, sums, onAdd, onDel }) {
             {rows.map(({ key, o }) => (
               <TableRow key={key} className="orow" data-key={key}>
                 <TableCell><SelectInput grid={false} name="o-id" aria-label="Owner" placeholder="— choose owner —" options={S.owners.map(x => [x.id, x.name + (x.pan ? ' · ' + x.pan : '')])} defaultValue={o.ownerId || ''} sx={SEL_SX} /></TableCell>
-                {KS.map(k => <TableCell key={k}><TextInput grid={false} type="number" name={`o-${k}`} min="0" step="1" defaultValue={o[k] ?? ''} readOnly={rows.length === 1} htmlInput={{ 'aria-label': `${LABEL[k]} amount (₹)` }} sx={NUM_SX} /></TableCell>)}
+                {KS.map(k => <TableCell key={k}><TextInput grid={false} type="number" name={`o-${k}`} min="0" step="1" defaultValue={o[k] ?? ''} htmlInput={{ 'aria-label': `${LABEL[k]} amount (₹)` }} sx={NUM_SX} /></TableCell>)}
                 <TableCell><SelectInput grid={false} name="o-gst" aria-label="GST" options={G} defaultValue={o.gst || ''} sx={SEL_SX} /></TableCell>
                 <TableCell><Btn sm ghost onClick={() => onDel(key)} aria-label="Remove owner">✕</Btn></TableCell>
               </TableRow>
@@ -48,7 +48,7 @@ export default function OwnerRows({ rows, same, sums, onAdd, onDel }) {
         <CheckField grid={false} id="ls-same" label="Same split for every charge" defaultChecked={same} />
         <CheckField grid={false} id="ls-tpo" name="tdsPerOwner" label="Test TDS threshold on each co-owner’s share" defaultChecked />
       </div>
-      <p className="hint small muted" style={{ margin: '4px 0 0' }}>Each owner invoices and is paid separately. Enter each owner’s amount; each column must add up to the lease’s monthly rent, maintenance, security deposit and advance rent (escalations are shared in the same proportion). Add co-owners in Owners first if they are not listed.</p>
+      <p className="hint small muted" style={{ margin: '4px 0 0' }}>Each owner invoices and is paid separately. Enter each owner’s amount; the lease’s monthly rent, maintenance, security deposit and advance rent (sections 3–5) are filled in as the sum of these, and escalations are shared in the same proportion. Add co-owners in Owners first if they are not listed.</p>
     </>
   )
 }

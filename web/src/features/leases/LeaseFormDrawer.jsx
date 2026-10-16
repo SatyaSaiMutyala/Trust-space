@@ -89,7 +89,9 @@ export default function LeaseFormDrawer({ d }) {
     if (t.id === 'ls-en' && f.elements.start.value && t.value > f.elements.start.value) f.elements.termMonths.value = Math.round(dayCount(f.elements.start.value, t.value) / 30.44)
     if (t.id === 'ls-depx' && +t.value > 0) { f.elements.deposit.value = Math.round(+t.value * (+f.elements.rent.value || 0)); rescale('dep') }
     const k = SHARE_KEYS.find(x => totalFieldOf(x) === t.name); if (k) { rescale(k); if (k === 'rent' && sameOn() && orows().length > 1) followRent() }
-    if (t.closest('.orow') && t.name === 'o-rent' && sameOn()) followRent(t.closest('.orow'))
+    // An owner's amount changed: the lease total (monthly rent, maintenance, deposit, advance) is the sum of the owners' amounts.
+    const ok = t.closest('.orow') && SHARE_KEYS.find(x => t.name === `o-${x}`)
+    if (ok) { f.elements[totalFieldOf(ok)].value = orows().reduce((a, tr) => a + num(fld(tr, ok).value), 0); if (ok === 'rent' && sameOn()) followRent(t.closest('.orow')) }
     lastTotals.current = formTotals(f)
     upd()
   }
