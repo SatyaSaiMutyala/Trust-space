@@ -4,8 +4,9 @@
  */
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { COLS } from '../domain/constants'
-import { callApi } from './store'
+import { callApi, dispatch, getState } from './store'
 import { loadStarted, loadFailed, collectionLoaded, loadFinished } from './slices'
+import { APP } from '../store/store'
 
 const PAGE = 100
 
@@ -24,8 +25,39 @@ export const loadPortfolio = createAsyncThunk('entities/loadPortfolio', async (_
   try {
     const results = await Promise.all(COLS.map(async col => [col, await fetchAll(col)]))
     for (const [col, rows] of results) dispatch(collectionLoaded({ col, rows }))
-    dispatch(loadFinished())
+    dispatch(loadFinished()); lastRefresh = Date.now()
   } catch (e) {
     dispatch(loadFailed(e.message))
   }
 })
+
+/* ---------- keeping the screen current: colleagues on other machines change records too ---------- */
+let refreshing = false, lastRefresh = 0
+const MIN_GAP = 2500 // ms between background refreshes (navigation can fire several in a row)
+
+/** Re-fetch every collection in the background and swap it in — skipped while a drawer is open or a save is in flight,
+ *  so nothing the user is editing gets replaced under them. Silent on failure (the next tick tries again). */
+export async function refreshPortfolio() {
+  const st = getState()
+  if (st.auth.status !== 'signedIn' || st.entities.status !== 'ready') return
+  if (refreshing || APP.drawer || APP.pending > 0 || Date.now() - lastRefresh < MIN_GAP) return
+  refreshing = true
+  try {
+    const results = await Promise.all(COLS.map(async col => [col, await fetchAll(col)]))
+    if (APP.pending > 0 || APP.drawer || getState().auth.status !== 'signedIn') return // something started meanwhile — keep local state
+    for (const [col, rows] of results) dispatch(collectionLoaded({ col, rows }))
+    lastRefresh = Date.now()
+  } catch (e) {
+    console.warn('Background refresh failed:', e.message)
+  } finally { refreshing = false }
+}
+
+let started = false
+/** Refresh every minute while the tab is visible, and whenever the user comes back to it. Page navigation refreshes too (App.jsx). */
+export function startAutoRefresh() {
+  if (started) return; started = true
+  const tick = () => { if (document.visibilityState === 'visible') refreshPortfolio() }
+  setInterval(tick, 60000)
+  document.addEventListener('visibilitychange', tick)
+  window.addEventListener('focus', tick)
+}

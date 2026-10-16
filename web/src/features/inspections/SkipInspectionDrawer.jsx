@@ -48,6 +48,7 @@ export default function SkipInspectionDrawer({ d }) {
       {sk ? (
         <>
           <Facts items={[['Skipped on', fmtD(sk.on)], ['By', sk.by], ['Reason', sk.reason], ['Note', sk.note]]} />
+          {stray ? <Banner tone="warn">A {name} started on <b>{fmtD(stray.date)}</b> is still in progress. Once it is submitted and signed it replaces this skip; until then the lease shows as skipped.</Banner> : null}
           <p className="small muted">{kind === 'Move-in' ? 'You can still record a take-over inspection any time from Take-over & handover; the handover inspection at exit will then have a baseline to compare against.' : 'You can still record a handover inspection from Take-over & handover; its findings will then flow into the deposit settlement.'}</p>
         </>
       ) : (

@@ -23,7 +23,7 @@ import OwnersBlock from '../leases/OwnersBlock'
 import OwnerHomePage from '../ownerPortal/OwnerHomePage'
 import PropertiesPage from './PropertiesPage'
 
-const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
+const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['contracts', 'Contracts'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
 
 function Summary({ P }) {
   const O = owner(P.ownerId); const o = isOwner(); const fv = frontOf(P); const L = leaseOf(P.id)
@@ -68,6 +68,7 @@ export default function PropertyDetailPage() {
   let body = null
   if (tab === 'summary') body = <Summary P={P} />
   if (tab === 'lease') body = L ? <LeaseDetail L={L} /> : <Empty panel>No lease recorded. {o ? '' : <Btn primary onClick={() => newLease(P.id)}>Create lease</Btn>}</Empty>
+  if (tab === 'contracts') body = <Empty panel>Contracts — coming soon. This tab will hold the property’s contracts and their documents.</Empty> // placeholder until the contracts module is specified
   if (tab === 'ledger') body = <LedgersBody fixedPid={P.id} />
   if (tab === 'tickets') body = <TicketTable list={S.tickets.filter(t => t.propertyId === P.id)} pid={P.id} />
   if (tab === 'messages') body = <ThreadPanel pid={P.id} />

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -6,9 +7,9 @@ import { DrawerHost, ToastHost, Lightbox } from './components/app/Overlays'
 import { Btn } from './components/ui/Layout'
 import CurrentPage from './features/pages'
 import LoginPage from './features/auth/LoginPage'
-import { useStore } from './store/store'
+import { useStore, UI } from './store/store'
 import { dispatch } from './app/store'
-import { loadPortfolio } from './app/bootstrap'
+import { loadPortfolio, refreshPortfolio, startAutoRefresh } from './app/bootstrap'
 import { signOut } from './services/auth'
 import { AppSkeleton } from './components/ui/Skeletons'
 import BrandMark from './components/app/BrandMark'
@@ -44,6 +45,9 @@ export default function App() {
   const auth = useSelector(s => s.auth.status)
   const data = useSelector(s => s.entities.status)
   const error = useSelector(s => s.entities.error)
+  // Keep records current across machines: refresh on every page change, plus the timer / focus refresh.
+  useEffect(() => { startAutoRefresh() }, [])
+  useEffect(() => { refreshPortfolio() }, [UI.route, UI.sel, UI.tab]) // eslint-disable-line react-hooks/exhaustive-deps
   let body
   if (auth === 'checking') body = <Splash text="Checking your sign-in…" />
   else if (auth === 'signedOut') body = <LoginPage />

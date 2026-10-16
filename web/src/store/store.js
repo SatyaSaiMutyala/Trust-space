@@ -15,7 +15,7 @@ export const S = Object.fromEntries(COLS.map(c => [c, []]))
 export const UI = { route: 'overview', sel: null, tab: 'summary', filt: {}, conv: null, convOpen: false, schedMode: 'month', led: null, siteMode: 'board', tdsv: null }
 export const ME = { uid: null, canEdit: true, linked: null, resolved: false }
 /** live: signed in and talking to the API; user: signed-in account; drawer/lightbox/sheet: overlays */
-export const APP = { live: false, drawer: null, lightbox: null, sheet: false, user: null }
+export const APP = { live: false, drawer: null, lightbox: null, sheet: false, user: null, pending: 0 } // pending = saves/removes in flight
 
 /* ---------- subscription ---------- */
 let version = 0
@@ -70,6 +70,10 @@ export function toast(msg, severity = 'info') { if (msg) dispatch(notify(msg, se
 /* ---------- persistence ---------- */
 /** Persist a record (PUT /api/<col>/:id). The screen updates at once; if the API refuses, the change is rolled back. quiet = only report errors. */
 export async function save(col, obj, quiet) {
+  APP.pending++
+  try { return await saveNow(col, obj, quiet) } finally { APP.pending-- }
+}
+async function saveNow(col, obj, quiet) {
   obj.id = obj.id || newId(); obj.updatedAt = nowISO(); if (!obj.createdAt) obj.createdAt = obj.updatedAt
   const prev = getState().entities[col].entities[obj.id]
   const sent = JSON.parse(JSON.stringify(obj))
@@ -88,9 +92,10 @@ export async function save(col, obj, quiet) {
 /** Delete a record (DELETE /api/<col>/:id); restored if the API refuses. */
 export async function remove(col, id) {
   const prev = getState().entities[col].entities[id]
-  dispatch(recordRemoved({ col, id }))
+  dispatch(recordRemoved({ col, id })); APP.pending++
   try { const res = await callApi('removeRecord', { resource: col, id }); toast(res.message, 'success') }
   catch (e) { if (prev) dispatch(recordReplaced({ col, rec: prev })); toast(e.message, 'error') }
+  finally { APP.pending-- }
 }
 
 /* ---------- Redux → working copies ---------- */

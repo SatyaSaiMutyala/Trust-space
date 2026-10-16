@@ -1,16 +1,29 @@
-/* Inspection buttons for a lease (prototype inspActionsFor) as descriptors: { key, label, primary, onClick }[]. */
+/* Inspection buttons for a lease (prototype inspActionsFor) as descriptors: { key, label, primary, onClick }[].
+   A skipped take-over / handover shows as "Skipped" while any inspection is still only In progress; a submitted or signed
+   inspection supersedes the skip. */
 import { isOwner, openDrawer } from '../../store/store'
 import { inspOf } from '../../domain/inspection'
 import { newInsp, openInsp } from '../../store/actions'
 
+const NAME = { 'Move-in': 'Take-over', 'Move-out': 'Handover' }
+
 export function inspActions(L) {
-  const mi = inspOf(L.id, 'Move-in'), mo = inspOf(L.id, 'Move-out'); const o = isOwner(); const b = []
-  const skip = kind => ({ key: 'sk-' + kind, label: kind === 'Move-in' ? 'Skip — existing lease' : 'Skip — no handover record', onClick: () => openDrawer({ kind: 'skipInsp', id: L.id, insp: kind }) })
-  if (mi) { b.push({ key: 'mi', label: `Take-over · ${mi.status}`, onClick: () => openInsp(mi.id) }); if (!o && mi.status === 'In progress' && !L.takeoverSkip) b.push(skip('Move-in')) }
-  else if (L.takeoverSkip) { b.push({ key: 'mi', label: 'Take-over · Skipped', onClick: () => openDrawer({ kind: 'skipInsp', id: L.id, insp: 'Move-in' }) }); if (!o) b.push({ key: 'mi2', label: 'Record take-over inspection', onClick: () => newInsp(L.id, 'Move-in') }) }
-  else if (!o) { b.push({ key: 'mi', label: 'Start take-over inspection', primary: true, onClick: () => newInsp(L.id, 'Move-in') }); b.push(skip('Move-in')) }
-  if (mo) { b.push({ key: 'mo', label: `Handover · ${mo.status}`, onClick: () => openInsp(mo.id) }); if (!o && mo.status === 'In progress' && !L.handoverSkip) b.push(skip('Move-out')) }
-  else if (L.handoverSkip) { b.push({ key: 'mo', label: 'Handover · Skipped', onClick: () => openDrawer({ kind: 'skipInsp', id: L.id, insp: 'Move-out' }) }); if (!o && L.exit && L.exit.noticeDate) b.push({ key: 'mo2', label: 'Record handover inspection', onClick: () => newInsp(L.id, 'Move-out') }) }
-  else if (!o && L.exit && L.exit.noticeDate) { b.push({ key: 'mo', label: 'Start handover inspection', primary: true, onClick: () => newInsp(L.id, 'Move-out') }); b.push(skip('Move-out')) }
-  return b
+  const o = isOwner(); const b = []
+  const skipDrawer = kind => openDrawer({ kind: 'skipInsp', id: L.id, insp: kind })
+  const push = (kind, sk, canStart) => {
+    const I = inspOf(L.id, kind); const n = NAME[kind]; const live = I && I.status !== 'In progress'
+    if (sk && !live) {
+      b.push({ key: kind, label: `${n} · Skipped`, onClick: () => skipDrawer(kind) })
+      if (!o) b.push(I ? { key: kind + '2', label: `Continue ${n.toLowerCase()} · In progress`, onClick: () => openInsp(I.id) } : canStart ? { key: kind + '2', label: `Record ${n.toLowerCase()} inspection`, onClick: () => newInsp(L.id, kind) } : null)
+    } else if (I) {
+      b.push({ key: kind, label: `${n} · ${I.status}`, onClick: () => openInsp(I.id) })
+      if (!o && I.status === 'In progress') b.push({ key: kind + '-sk', label: kind === 'Move-in' ? 'Skip — existing lease' : 'Skip — no handover record', onClick: () => skipDrawer(kind) })
+    } else if (!o && canStart) {
+      b.push({ key: kind, label: `Start ${n.toLowerCase()} inspection`, primary: true, onClick: () => newInsp(L.id, kind) })
+      b.push({ key: kind + '-sk', label: kind === 'Move-in' ? 'Skip — existing lease' : 'Skip — no handover record', onClick: () => skipDrawer(kind) })
+    }
+  }
+  push('Move-in', L.takeoverSkip, true)
+  push('Move-out', L.handoverSkip, !!(L.exit && L.exit.noticeDate))
+  return b.filter(Boolean)
 }
