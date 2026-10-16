@@ -197,12 +197,14 @@ export function SchedulePanel({ L }) {
           <div className="eyebrow">Rent schedule — full term</div>
           <span className="small muted">{fmtD(L.start)} to {fmtD(sc.end)}{sc.end !== L.end ? ' (exit date)' : ''} · {L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · {L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}</span>
         </div>
-        <div className="actions">
-          <Seg ariaLabel="Schedule view" options={[['month', 'Monthly'], ['year', 'Yearly'], ...(isMulti(L) ? [['owner', 'By owner']] : [])]} value={mode} onChange={schedMode} />
-          <Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>
-        </div>
+        <Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>
       </div>
       <SchedTotals sc={sc} L={L} />
+      {/* The view switch only changes the month-by-month table below, so it sits right above it — not above the totals and owner split. */}
+      <div className="filters" style={{ justifyContent: 'space-between', margin: '14px 0 8px' }}>
+        <div className="eyebrow">{mode === 'year' ? 'Year by year' : mode === 'owner' ? 'Month by month — per owner' : 'Month by month'}</div>
+        <Seg ariaLabel="Schedule view" options={[['month', 'Monthly'], ['year', 'Yearly'], ...(isMulti(L) ? [['owner', 'By owner']] : [])]} value={mode} onChange={schedMode} />
+      </div>
       <ScheduleTable sc={sc} L={L} mode={mode} />
     </div>
   )
@@ -250,9 +252,9 @@ export default function LeaseDetail({ L }) {
         {isMulti(L) ? <OwnersBlock L={L} /> : null}
         {depAdjs(L, null, true).length ? <DepAdjTable L={L} /> : null}
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>Key clauses</div><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></div>
-        <SchedulePanel L={L} />
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>Joint inspections</div><div className="actions">{hasInspBtn ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></div>
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>Signed agreement &amp; annexures</div>{(L.docs || []).length ? <FileLinks files={L.docs} /> : <span className="muted small">No documents uploaded.</span>}</div>
+        <SchedulePanel L={L} />
       </Box>
     </Panel>
   )
