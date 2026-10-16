@@ -8,7 +8,7 @@ import { fmtD, pctLabel, daysTo } from '../../domain/utils'
 import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
-import { StatusChip } from '../../components/ui/Status'
+import { StatusChip, Badge } from '../../components/ui/Status'
 import { Facade, PhotoStrip } from '../../components/ui/Media'
 import { SampleBanner } from '../../components/app/Banners'
 import CriticalDates from '../shared/CriticalDates'
@@ -33,7 +33,26 @@ function leaseLeft(L) {
   if (d < 0) return { v: 'Expired', k: 'bad' }
   const a = new Date(), b = new Date(end + 'T00:00:00'); let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); if (b.getDate() < a.getDate()) m--
   const v = m >= 1 ? `${m} month${m > 1 ? 's' : ''} left` : `${d} day${d === 1 ? '' : 's'} left`
-  return { v: v + ' · ' + fmtD(end), k: m >= 6 ? 'ok' : m >= 3 ? 'warn' : 'bad' }
+  return { v, k: m >= 6 ? 'ok' : m >= 3 ? 'warn' : 'bad', end }
+}
+
+/** One tile of the status strip under the property name: small label over a chip or value. */
+function Stat({ label, children }) {
+  return (
+    <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', gap: '5px', px: 1.5, py: 1, border: '1px solid var(--line)', borderRadius: '10px', bgcolor: 'var(--surface)', minWidth: 0 }}>
+      <span className="eyebrow" style={{ fontSize: 10.5 }}>{label}</span>
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', color: 'var(--ink)', fontSize: 13.5, lineHeight: 1.5 }}>{children}</Box>
+    </Box>
+  )
+}
+
+/** Segmented tab bar: pills in a sunken track, the selected one raised. */
+const TABS_SX = {
+  minHeight: 0, borderBottom: 'none', bgcolor: 'var(--sunk)', borderRadius: '12px', p: '4px', width: 'fit-content', maxWidth: '100%',
+  '& .MuiTabs-indicator': { display: 'none' },
+  '& .MuiTab-root': { minHeight: 36, px: 2, py: 0.5, minWidth: 0, borderRadius: '9px', color: 'var(--muted)', fontWeight: 500, fontSize: 14, transition: 'background-color .15s, color .15s', '&:hover': { color: 'var(--ink)', bgcolor: 'color-mix(in srgb, var(--surface) 55%, transparent)' } },
+  '& .MuiTab-root.Mui-selected': { color: 'var(--ink)', bgcolor: 'var(--surface)', fontWeight: 600, boxShadow: '0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--line)' },
+  '@media (max-width:760px)': { width: '100%', '& .MuiTab-root': { px: 1.5 } },
 }
 
 /** One owner's contact, tax and bank facts (prototype's owner card on the property summary). */
@@ -108,6 +127,7 @@ export default function PropertyDetailPage() {
   if (!P || !inScope({ propertyId: P.id })) { UI.route = isOwner() ? 'o-home' : 'properties'; return isOwner() ? <OwnerHomePage /> : <PropertiesPage /> }
   const L = leaseOf(P.id); const tab = UI.tab; const o = isOwner()
   const occ = occStatus(P), rs = rentStatus(P), rp = repairStatus(P), ll = leaseLeft(L)
+  const openTickets = S.tickets.filter(t => t.propertyId === P.id && !['Resolved', 'Closed'].includes(t.status)).length
   let body = null
   if (tab === 'summary') body = <Summary P={P} />
   if (tab === 'lease') body = L ? <LeaseDetail L={L} /> : <Empty panel>No lease recorded. {o ? '' : <Btn primary onClick={() => newLease(P.id)}>Create lease</Btn>}</Empty>
@@ -122,15 +142,21 @@ export default function PropertyDetailPage() {
       <div><Btn ghost sm onClick={() => go(o ? 'o-home' : 'properties')}>← All properties</Btn></div>
       <PageHead
         title={P.name}
-        sub={<><span className="mono">{P.code}</span> · {P.city} · Status <StatusChip label={occ.v} k={occ.k} /> · Rent <StatusChip label={rs.v} k={rs.k} /> · Repairs <StatusChip label={rp.v} k={rp.k} />{ll ? <> · Lease <StatusChip label={ll.v} k={ll.k} /></> : null}</>}
+        subWide
+        sub={<Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
+          <Stat label="Premises"><span className="mono">{P.code}</span><span className="muted">·</span>{P.city}</Stat>
+          <Stat label="Status"><StatusChip label={occ.v} k={occ.k} /></Stat>
+          <Stat label="Rent"><StatusChip label={rs.v} k={rs.k} /></Stat>
+          <Stat label="Repairs"><StatusChip label={rp.v} k={rp.k} /></Stat>
+          {ll ? <Stat label="Lease"><StatusChip label={ll.v} k={ll.k} /><span className="small muted">ends {fmtD(ll.end)}</span></Stat> : null}
+        </Box>}
         actions={o
           ? <><Btn onClick={() => newTicket(P.id)}>Report an issue</Btn><Btn primary onClick={() => newInvoice({ prop: P.id })}>Raise invoice</Btn></>
           : <><Btn onClick={() => newTicket(P.id)}>New ticket</Btn><Btn onClick={() => newInvoice({ prop: P.id })}>Record invoice</Btn></>}
       />
       <SampleBanner />
-      <Tabs value={TABS.some(([k]) => k === tab) ? tab : false} onChange={(e, v) => { UI.tab = v; emit() }} variant="scrollable" scrollButtons={false}
-        sx={{ '& .MuiTab-root': { color: 'var(--muted)', px: 1.5, minWidth: 0 }, '& .MuiTab-root.Mui-selected': { color: 'var(--ink)' }, '& .MuiTabs-indicator': { bgcolor: 'var(--accent)' }, '@media (max-width:760px)': { '& .MuiTab-root': { px: 1.75 } } }}>
-        {TABS.map(([k, l]) => <Tab key={k} value={k} label={l} disableRipple />)}
+      <Tabs value={TABS.some(([k]) => k === tab) ? tab : false} onChange={(e, v) => { UI.tab = v; emit() }} variant="scrollable" scrollButtons={false} sx={TABS_SX}>
+        {TABS.map(([k, l]) => <Tab key={k} value={k} disableRipple label={k === 'tickets' && openTickets ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{l}<Badge n={openTickets} hot /></span> : l} />)}
       </Tabs>
       {body}
     </>

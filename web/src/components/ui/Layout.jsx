@@ -25,12 +25,13 @@ export function ActLink({ onClick, children, ...rest }) {
 }
 
 /** Page title row: h1, optional subtitle and action buttons. */
-export function PageHead({ title, sub, actions }) {
+/** subWide: the subtitle is a row of status chips rather than prose, so it may use the full width. */
+export function PageHead({ title, sub, actions, subWide }) {
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1.5, '@media (max-width:760px)': { '& .actions': { width: '100%' }, '& .actions .MuiButton-root': { flex: '1 1 auto', whiteSpace: 'normal', textAlign: 'center' } } }}>
-      <div>
+      <div style={subWide ? { flex: '1 1 auto', minWidth: 0 } : undefined}>
         <h1>{title}</h1>
-        {sub ? <Box component="p" sx={{ m: '4px 0 0', color: 'var(--muted)', maxWidth: '68ch' }}>{sub}</Box> : null}
+        {sub ? <Box component="p" sx={{ m: '4px 0 0', color: 'var(--muted)', maxWidth: subWide ? 'none' : '68ch' }}>{sub}</Box> : null}
       </div>
       {actions ? <div className="actions">{actions}</div> : null}
     </Box>
