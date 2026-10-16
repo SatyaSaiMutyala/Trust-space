@@ -1,8 +1,8 @@
-/* Rent roll grid — port of rollGrid (reference/TruSpace.html). Props: { leases, months = 7 } */
-import { useStore, prop, owner, openProp } from '../../store/store'
-import { openInv, newInvoice } from '../../store/actions'
+/* Rent roll grid — port of rollGrid (prototype). Props: { leases, months = 7 } */
+import { useStore, prop, openProp, isOwner, role } from '../../store/store'
+import { openInv, newInvoice, rentMonth } from '../../store/actions'
 import { CUR, perAdd, perLabel, inr } from '../../domain/utils'
-import { rentCell, rentFor } from '../../domain/lease'
+import { rentCell, rentFor, ownersLabel, ownerShare, isMulti, leaseOwners } from '../../domain/lease'
 import { ActLink } from '../../components/ui/Layout'
 
 const LAB = { paid: '✓', process: '…', late: '!', missing: '—', upcoming: '', na: '', free: 'RF' }
@@ -19,13 +19,14 @@ export default function RentRoll({ leases, months = 7 }) {
         const P = prop(L.propertyId)
         return (
           <div className="row" key={L.id}>
-            <div><ActLink onClick={() => openProp(L.propertyId)}><b>{P?.name || '—'}</b></ActLink><div className="code">{P?.code} · {owner(L.ownerId)?.name || ''}</div></div>
+            <div><ActLink onClick={() => openProp(L.propertyId)}><b>{P?.name || '—'}</b></ActLink><div className="code">{P?.code} · {ownersLabel(L)}</div></div>
             {pers.map(p => {
-              const c = rentCell(L, p); const t = c.k === 'na' ? '' : `${perLabel(p)}: ${TXT[c.k]}`
-              const act = c.inv ? () => openInv(c.inv.id) : c.k === 'missing' ? () => newInvoice({ lease: L.id, period: p }) : null
-              return <div key={p}><button type="button" className={`cell ${c.k}`} onClick={act || undefined} tabIndex={act ? undefined : -1} title={t} aria-label={t}>{LAB[c.k]}</button></div>
+              const c = rentCell(L, p); const t = c.k === 'na' ? '' : `${perLabel(p)}: ${TXT[c.k]}`; const tt = t + (c.multi ? ` · ${c.paid} of ${c.n} owners paid` : '')
+              const act = c.multi && c.k !== 'na' && c.k !== 'free' ? () => rentMonth(L.id, p) : c.inv ? () => openInv(c.inv.id) : c.k === 'missing' ? () => newInvoice({ lease: L.id, period: p }) : null
+              const tt2 = c.adjusted ? tt + ` · ${c.adjusted === c.n ? '' : c.adjusted + ' owner(s) '}settled from security deposit` : tt
+              return <div key={p}><button type="button" className={`cell ${c.k} ${c.adjusted ? 'dep' : ''}`} onClick={act || undefined} tabIndex={act ? undefined : -1} title={tt2} aria-label={tt2}>{c.adjusted && c.k === 'paid' ? 'D' : c.multi && ['late', 'process'].includes(c.k) ? c.paid + '/' + c.n : LAB[c.k]}</button></div>
             })}
-            <div className="num">{inr(rentFor(L, CUR))}</div>
+            <div className="num">{inr(isOwner() ? rentFor(L, CUR) * ownerShare(L, role().ownerId, 'rent') : rentFor(L, CUR))}{isMulti(L) && !isOwner() ? <div className="small muted">{leaseOwners(L).length} owners</div> : null}</div>
           </div>
         )
       })}

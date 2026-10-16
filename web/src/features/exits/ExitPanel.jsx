@@ -5,9 +5,9 @@ import TableHead from '@mui/material/TableHead'
 import TableBody from '@mui/material/TableBody'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
-import { S, isOwner, useStore } from '../../store/store'
-import { openInsp, newInsp, startExit } from '../../store/actions'
-import { lockEnd } from '../../domain/lease'
+import { S, isOwner, owner, useStore } from '../../store/store'
+import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
+import { lockEnd, depHeld, depAdjusted, isMulti, leaseOwners, splitAmt, ownerShare, obOutstanding } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
 import { TODAY, daysTo, fmtD, inr } from '../../domain/utils'
 import { Btn, Panel, Banner, Facts, TableCard } from '../../components/ui/Layout'
@@ -33,7 +33,9 @@ export default function ExitPanel({ L }) {
   }
   const dedTotal = (x.deductions || []).reduce((s, d) => s + (+d.amount || 0), 0)
   const pendInv = S.invoices.filter(i => i.leaseId === L.id && !['Paid', 'Rejected'].includes(i.status))
-  const refund = (+L.deposit || 0) - dedTotal
+  const refund = depHeld(L) - dedTotal; const adjTot = depAdjusted(L)
+  const multi = isMulti(L); const dSplit = leaseOwners(L).map(w => depHeld(L, w.ownerId)); const dedS = splitAmt(dedTotal, leaseOwners(L), 'dep')
+  const refundRows = multi ? leaseOwners(L).map((w, i) => ({ ownerId: w.ownerId, dep: dSplit[i], ded: dedS[i], due: dSplit[i] - dedS[i], got: (x.refunds || []).find(r => r.ownerId === w.ownerId) })) : []
 
   const submit = step => async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
@@ -42,11 +44,12 @@ export default function ExitPanel({ L }) {
   const submitBtn = label => <Cell full><Btn primary type="submit" disabled={busy}>{label}</Btn></Cell>
 
   let form = null
+  const forms = []
   if (!o && stage < 5) {
     if (stage === 1) {
       const mo = inspOf(L.id, 'Move-out')
       form = (
-        <Banner sx={bannerSx}>
+        <Banner sx={bannerSx} key="s1">
           <span><b>Next: joint handover inspection with the owner.</b> Every item is checked against the take-over record and photographed; agreed damages flow into the deposit settlement.</span>
           {mo ? <Btn primary onClick={() => openInsp(mo.id)}>Continue inspection · {mo.status}</Btn> : <Btn primary onClick={() => newInsp(L.id, 'Move-out')}>Start handover inspection</Btn>}
         </Banner>
@@ -61,15 +64,38 @@ export default function ExitPanel({ L }) {
         {submitBtn('Confirm handover')}
       </FormGrid></form>
     )
-    if (stage === 3) form = (
+    if (form) forms.push(form)
+    if (stage <= 3 && !o) forms.push(
+      <Banner sx={bannerSx} key="dep">
+        <span>Use the security deposit for the remaining months’ rent instead of paying cash? Held now: <b>{inr(depHeld(L))}</b>.</span>
+        <Btn sm onClick={() => depAdjOpen(L.id)}>Adjust deposit against rent</Btn>
+      </Banner>
+    )
+    if (stage === 3) forms.push(
       <form onSubmit={submit(4)} key="s3"><FormGrid>
         <TextInput id="ex-ded" name="deductions" label="Deductions from deposit — one per line as “description, amount”" full multiline
           placeholder={'Wall repainting, 18000\nFinal electricity bill, 6420'} defaultValue={(x.deductions || []).map(d => d.desc + ', ' + d.amount).join('\n')}
-          hint={`Pending owner invoices on this lease: ${pendInv.length} (${inr(pendInv.reduce((s, i) => s + i.net, 0))}). Settle them before closing.`} />
+          hint={`Pending owner invoices on this lease: ${pendInv.length} (${inr(pendInv.reduce((s, i) => s + i.net, 0))})${obOutstanding([L]) ? ` plus opening arrears ${inr(obOutstanding([L]))}` : ''}. Settle them before closing.`} />
         {submitBtn('Agree final settlement')}
       </FormGrid></form>
     )
-    if (stage === 4) form = (
+    if (stage === 4 && multi) forms.push(
+      <form onSubmit={submit(5)} key="s4m"><FormGrid>
+        <Cell full><div className="eyebrow">Refund received from each owner</div></Cell>
+        {refundRows.map((r, i) => (
+          <Cell full key={r.ownerId}><div className="ofrow">
+            <b>{owner(r.ownerId)?.name || ''}</b><span className="small muted">Deposit held {inr(r.dep)} − share of deductions {inr(r.ded)} = <b>{inr(r.due)}</b></span>
+            <FormGrid sx={{ mt: 1 }}>
+              <TextInput id={'ex-ra' + i} name={'ramt_' + r.ownerId} label="Amount received" type="number" defaultValue={r.due} required />
+              <TextInput id={'ex-rd' + i} name={'rdate_' + r.ownerId} label="Received on" type="date" defaultValue={TODAY} required />
+              <TextInput id={'ex-ru' + i} name={'rutr_' + r.ownerId} label="UTR / reference" required />
+            </FormGrid>
+          </div></Cell>
+        ))}
+        {submitBtn('Close exit & terminate lease')}
+      </FormGrid></form>
+    )
+    else if (stage === 4) forms.push(
       <form onSubmit={submit(5)} key="s4"><FormGrid>
         <TextInput id="ex-rd" name="refundDate" label="Refund received on" type="date" defaultValue={TODAY} required />
         <TextInput id="ex-utr" name="utr" label="UTR / reference" required />
@@ -87,13 +113,27 @@ export default function ExitPanel({ L }) {
           ['Notice served', `${fmtD(x.noticeDate)} by ${x.noticeBy}`],
           ['Effective date', fmtD(x.effective) + (x.effective >= TODAY ? ` · in ${daysTo(x.effective)} days` : '')],
           ['Reason', x.reason || '—'],
-          ['Security deposit', inr(L.deposit)],
+          ['Security deposit', <>{inr(L.deposit)}{adjTot ? <div className="small muted">{inr(adjTot)} adjusted against rent · {inr(depHeld(L))} held</div> : null}</>],
           ['Deductions', inr(dedTotal)],
           ['Refund due', <b key="r">{inr(refund)}</b>],
           x.inspectionDate ? ['Inspection', fmtD(x.inspectionDate)] : null,
           x.handoverDate ? ['Handover', fmtD(x.handoverDate) + ` · meter ${x.meterFinal} kWh`] : null,
-          x.refundDate ? ['Refund received', `${fmtD(x.refundDate)} · ${x.utr}`] : null,
+          x.refundDate && !multi ? ['Refund received', `${fmtD(x.refundDate)} · ${x.utr}`] : null,
         ]} />
+        {multi ? (
+          <TableCard panel={false} className="otable">
+            <TableHead><TableRow><TableCell>Owner</TableCell><TableCell className="num" align="right">Deposit held</TableCell><TableCell className="num" align="right">Share of deductions</TableCell><TableCell className="num" align="right">Refund due</TableCell><TableCell>Received</TableCell></TableRow></TableHead>
+            <TableBody>{refundRows.map(r => (
+              <TableRow key={r.ownerId}>
+                <TableCell>{owner(r.ownerId)?.name || ''} <span className="small muted">{+ownerShare(L, r.ownerId, 'dep') * 100}%</span></TableCell>
+                <TableCell className="num" align="right">{inr(r.dep)}</TableCell>
+                <TableCell className="num" align="right">{r.ded ? '−' + inr(r.ded) : '—'}</TableCell>
+                <TableCell className="num" align="right"><b>{inr(r.due)}</b></TableCell>
+                <TableCell className="small">{r.got ? `${inr(r.got.amount)} · ${fmtD(r.got.date)} · ${r.got.utr}` : <span className="muted">Pending</span>}</TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </TableCard>
+        ) : null}
         {x.inspectionId ? <div><Btn sm onClick={() => openInsp(x.inspectionId)}>Open signed handover inspection</Btn></div> : null}
         {x.inspectionNotes ? (
           <div>
@@ -108,7 +148,7 @@ export default function ExitPanel({ L }) {
             <TableBody>{x.deductions.map((d, i) => <TableRow key={i}><TableCell>{d.desc}</TableCell><TableCell className="num" align="right">{inr(d.amount)}</TableCell></TableRow>)}</TableBody>
           </TableCard>
         ) : null}
-        {form}
+        {forms}
         {!o && stage < 5 && stage >= 1 ? <div><Btn sm danger onClick={() => cancelExit(L.id)}>Withdraw notice</Btn></div> : null}
       </Box>
     </Panel>

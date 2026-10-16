@@ -1,8 +1,8 @@
-/* Lease form with live yearly schedule preview — port of DRAWERS.lease + SUBMIT.lease (reference/TruSpace.html). */
+/* Lease form with co-owners and live yearly schedule preview — port of DRAWERS.lease, ownerRowHTML, ownerRowsHTML, ACT.lsAddOwner/lsDelOwner + SUBMIT.lease (prototype). */
 import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import DrawerLayout from '../../components/app/DrawerLayout'
-import { useStore, S, isFranchisee, closeDrawer, remove } from '../../store/store'
+import { useStore, S, isFranchisee, closeDrawer, remove, prop, owner, toast } from '../../store/store'
 import { TODAY, addDays, addMonths, dayCount, fmtD } from '../../domain/utils'
 import { rentStartOf, schedule, clearSchedCache } from '../../domain/lease'
 import { Btn } from '../../components/ui/Layout'
@@ -11,7 +11,10 @@ import { FileLinks } from '../../components/ui/Media'
 import { FormGrid, Cell, SectionTitle, FieldBox, TextInput, SelectInput, CheckField, FileInput } from '../../components/form/Fields'
 import { SchedTotals, ScheduleTable } from './LeaseDetail'
 import RentByYear from './RentByYear'
-import { leaseFromForm, submitLease } from './actions'
+import { leaseFromForm, submitLease, ownerSums } from './actions'
+import OwnerRows from './OwnerRows'
+
+let SEQ = 0 // keys for co-owner rows
 
 function initialLease(d) {
   return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, notice: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: 'Advance', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
@@ -23,21 +26,49 @@ export default function LeaseFormDrawer({ d }) {
   const formRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [pv, setPv] = useState(null)
+  const [sums, setSums] = useState({})
+  const [rows, setRows] = useState(() => (L && L.owners && L.owners.length ? L.owners : [{ ownerId: (L && (L.ownerId || prop(L.propertyId)?.ownerId)) || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]).map(o => ({ key: ++SEQ, o })))
+  const [same] = useState(() => rows.every(({ o }) => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
 
   const upd = () => {
     const f = formRef.current; if (!f) return
     const x = leaseFromForm(f, { id: '_preview' }); clearSchedCache('_preview'); const sc = schedule(x)
-    setPv({ x, sc })
+    setPv({ x, sc }); setSums(ownerSums(f))
   }
-  useEffect(upd, [])
+  useEffect(upd, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!L) return <DrawerLayout title="Lease">Not found</DrawerLayout>
   const term = Math.round(dayCount(L.start, L.end) / 30.44)
+
+  /* Co-owner rows: values stay uncontrolled; these handlers write into the row's fields like the prototype. */
+  const orows = () => [...formRef.current.querySelectorAll('.orow')]
+  const fld = (tr, k) => tr.querySelector(`[name="o-${k}"]`)
+  const sameOn = () => !!formRef.current.querySelector('#ls-same')?.checked
+  const addOwner = () => {
+    const all = orows(); const n = all.length + 1; const even = Math.floor(10000 / n) / 100
+    const lastShare = Math.round((100 - even * (n - 1)) * 100) / 100; const v = sameOn() ? lastShare : even
+    if (sameOn()) all.forEach(tr => ['rent', 'maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = even }))
+    if (n === 2) { const g = fld(all[0], 'gst'); const O = owner(fld(all[0], 'id').value); if (O && !g.value) g.value = O.gstin ? 'Forward' : 'RCM' }
+    setRows(r => r.concat({ key: ++SEQ, o: { ownerId: '', rent: v, maint: v, dep: v, adv: v, gst: '' } }))
+  }
+  const delOwner = key => {
+    if (rows.length <= 1) { toast('A lease needs at least one owner.', 'warning'); return }
+    const rest = rows.filter(r => r.key !== key)
+    if (rest.length === 1) { const tr = orows().find(t => t.dataset.key === String(rest[0].key)); ['rent', 'maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = 100 }) }
+    setRows(rest)
+  }
 
   const onInput = e => {
     const f = formRef.current; const t = e.target
     if (t.id === 'ls-term' && +t.value > 0) f.elements.end.value = addDays(addMonths(f.elements.start.value, +t.value), -1)
     if (t.id === 'ls-depx' && +t.value > 0) f.elements.deposit.value = Math.round(+t.value * (+f.elements.rent.value || 0))
+    const tr = t.closest('.orow'); if (tr && t.name === 'o-rent' && sameOn()) ['maint', 'dep', 'adv'].forEach(k => { fld(tr, k).value = t.value })
     upd()
+  }
+  const onChange = e => {
+    const f = formRef.current; const t = e.target
+    if (t.name === 'o-id') { const O = owner(t.value); const g = fld(t.closest('.orow'), 'gst'); if (O && orows().length > 1) g.value = O.gstin ? 'Forward' : 'RCM' }
+    if (t.id === 'ls-prop') { const rs = orows(); const P = prop(t.value); if (P && rs.length === 1 && !fld(rs[0], 'id').value) fld(rs[0], 'id').value = P.ownerId }
+    if (f) upd()
   }
   const onSubmit = async e => {
     e.preventDefault(); setBusy(true)
@@ -53,13 +84,16 @@ export default function LeaseFormDrawer({ d }) {
         <Btn onClick={closeDrawer}>Cancel</Btn>
         <Btn primary type="submit" form="f-lease" disabled={busy} sx={{ whiteSpace: { xs: 'normal', md: 'nowrap' } }}>Save lease &amp; view schedule</Btn>
       </>}>
-      <form id="f-lease" ref={formRef} onSubmit={onSubmit} onInput={onInput} onChange={upd}>
+      <form id="f-lease" ref={formRef} onSubmit={onSubmit} onInput={onInput} onChange={onChange}>
         <FormGrid>
           <SectionTitle first>1 · Premises &amp; agreement</SectionTitle>
           <TextInput id="ls-ref" name="ref" label="Lease reference" defaultValue={L.ref} required />
           <SelectInput id="ls-prop" name="propertyId" label="Property" required options={[['', '— choose —'], ...S.properties.map(p => [p.id, `${p.name} (${p.code})`])]} defaultValue={L.propertyId || ''} />
           <SelectInput id="ls-stat" name="status" label="Agreement status" options={[['Draft', 'Draft / term sheet'], ['Active', 'Signed & active']]} defaultValue={L.status === 'Draft' ? 'Draft' : 'Active'} />
           <CheckField id="ls-reg" name="registered" label="Registered with sub-registrar" defaultChecked={L.registered} full={false} />
+
+          <SectionTitle>Owners &amp; share of payments</SectionTitle>
+          <Cell full><OwnerRows rows={rows} same={same} sums={sums} onAdd={addOwner} onDel={delOwner} /></Cell>
 
           <SectionTitle>2 · Term</SectionTitle>
           <TextInput id="ls-st" name="start" label="Lease start (possession) date" type="date" defaultValue={L.start} required />

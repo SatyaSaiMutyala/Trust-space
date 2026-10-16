@@ -1,7 +1,7 @@
 /* Property card — port of pcard + statusRows (reference/TruSpace.html). Props: { P } */
-import { useStore, owner, openProp } from '../../store/store'
+import { useStore, owner, role, isOwner, openProp } from '../../store/store'
 import { CUR, inr } from '../../domain/utils'
-import { leaseOf, leaseState, rentFor, frontOf, occStatus, rentStatus, repairStatus } from '../../domain/lease'
+import { leaseOf, leaseState, rentFor, frontOf, occStatus, rentStatus, repairStatus, ownersLabel, ownerShare, isMulti } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { StatusChip } from '../../components/ui/Status'
 import { Facade } from '../../components/ui/Media'
@@ -24,7 +24,7 @@ export default function PropertyCard({ P }) {
       <div className="pb">
         <div className="code">{P.code}</div>
         <h3>{P.name}</h3>
-        <div className="small muted">{P.city} · {(+P.area || 0).toLocaleString('en-IN')} sq ft · {owner(P.ownerId)?.name || 'Owner not set'}{L && !['Draft', 'Terminated'].includes(leaseState(L)) ? <> · <span className="mono">{inr(rentFor(L, CUR))}</span>/mo</> : null}</div>
+        <div className="small muted">{P.city} · {(+P.area || 0).toLocaleString('en-IN')} sq ft · {L ? ownersLabel(L) : owner(P.ownerId)?.name || 'Owner not set'}{L && !['Draft', 'Terminated'].includes(leaseState(L)) ? <> · <span className="mono">{inr(isOwner() ? rentFor(L, CUR) * ownerShare(L, role().ownerId, 'rent') : rentFor(L, CUR))}</span>/mo{isOwner() && isMulti(L) ? ' (your share)' : ''}</> : null}</div>
         <StatusRows P={P} />
       </div>
     </button>

@@ -58,6 +58,24 @@ a{color:var(--accent)}
 /* Wide tables and grids scroll inside their panel instead of widening the page */
 .tbl-wrap{overflow-x:auto;max-width:100%}
 table.ledger td{padding:8px 12px}
+/* Co-owner shares, opening balances, deposit adjustments, TDS returns */
+.otable td,.otable th{padding:7px 10px}
+.otable tr.youRow td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.oedit select{min-width:200px}
+.oedit input{width:84px;text-align:right}
+.oedit input.ob-per{width:150px;text-align:left}
+.oedit input.ob-note{width:200px;text-align:left}
+.oedit input.ob-amt{width:130px}
+.ofrow{display:grid;gap:4px;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.obchips{display:flex;flex-wrap:wrap;gap:4px}
+.obchip{font-size:12px;border-radius:6px;padding:2px 7px;border:1px solid var(--line);white-space:nowrap}
+.obchip.due{border-color:var(--bad);color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)}
+.obchip.paid{color:var(--muted);text-decoration:line-through}
+.obchip b{font-family:var(--f-mono);font-weight:500}
+.da-row.off td{opacity:.5}
+.dafs{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px;margin:0}
+.dafs legend{padding:0 6px}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 
 /* Rent roll grid */
 .roll{display:grid;gap:0;font-size:13px}
@@ -73,6 +91,7 @@ table.ledger td{padding:8px 12px}
 .cell.upcoming{background:var(--sunk);color:var(--muted);cursor:default}
 .cell.na{background:transparent;cursor:default}
 .cell.free{background:transparent;color:var(--muted);border:1px dotted var(--line);cursor:default}
+.cell.paid.dep{background:color-mix(in srgb,var(--sun) 80%,transparent);color:#3a2b00}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 

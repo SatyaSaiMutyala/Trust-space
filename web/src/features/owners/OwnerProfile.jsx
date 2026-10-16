@@ -1,6 +1,7 @@
 /* Owner profile sections (prototype ownerProfile). full = show the whole account number. */
 import { useStore } from '../../store/store'
-import { maskAcct, fmtAddr, noticeAddrOf, bankState } from '../../domain/lease'
+import { maskAcct, fmtAddr, noticeAddrOf, bankState, tdsRate, panValid, certFor } from '../../domain/lease'
+import { TODAY } from '../../domain/utils'
 import { StatusChip } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import Box from '@mui/material/Box'
@@ -20,6 +21,7 @@ export default function OwnerProfile({ O, full }) {
     <>
       <Sec t="Identity & tax">
         {F('Name as per PAN', O.name)}{F('Type', O.kind)}{F('PAN', <span className="mono">{O.pan || ''}</span>)}{F('GSTIN', <span className="mono">{O.gstin || 'Unregistered'}</span>)}
+        {F('TDS rate today', `${tdsRate(O.id, TODAY)}%${!panValid(O) ? ' — no valid PAN' : certFor(O, TODAY) ? ' — lower-deduction certificate' : ''}`)}
         {F('KYC copies', [O.panFile ? 'PAN' : '', O.gstFile ? 'GST' : ''].filter(Boolean).join(', ') || <span className="muted">None uploaded</span>)}
       </Sec>
       <Sec t="Contact">

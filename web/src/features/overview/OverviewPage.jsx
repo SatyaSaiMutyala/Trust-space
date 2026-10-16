@@ -2,7 +2,7 @@
 import { useStore, S, isFranchisee, partner, role } from '../../store/store'
 import { newProperty, newLease, runAct } from '../../store/actions'
 import { CUR, TODAY, fmtD, inr } from '../../domain/utils'
-import { leaseState, rentFor, invState, slaBreached } from '../../domain/lease'
+import { leaseState, rentFor, invState, slaBreached, depHeld, obOutstanding } from '../../domain/lease'
 import { attentionItems } from '../../domain/attention'
 import { Btn, ActLink, PageHead, Panel, Kpis, Kpi, Cols } from '../../components/ui/Layout'
 import { Legend } from '../../components/ui/Status'
@@ -37,7 +37,7 @@ export default function OverviewPage() {
   const overdue = pend.filter(i => invState(i) === 'Overdue')
   const openT = S.tickets.filter(t => !['Resolved', 'Closed'].includes(t.status))
   const p1 = openT.filter(t => t.priority === 'P1').length
-  const dep = S.leases.filter(l => l.depositPaid && leaseState(l) !== 'Terminated').reduce((s, l) => s + (+l.deposit || 0), 0)
+  const dep = S.leases.filter(l => l.depositPaid && leaseState(l) !== 'Terminated').reduce((s, l) => s + depHeld(l), 0)
   const fr = isFranchisee()
   return (
     <>
@@ -50,7 +50,7 @@ export default function OverviewPage() {
       <Kpis>
         <Kpi label="Monthly rent roll" value={inr(rentRoll)} sub={`${active.length} running leases · ${inr(rentRoll * 12)}/yr`} />
         <Kpi label="Leased area" value={`${area.toLocaleString('en-IN')} sq ft`} sub={`${area ? inr(rentRoll / area) : '—'} per sq ft blended`} />
-        <Kpi alert={overdue.length} label="Payable to owners" value={inr(pend.reduce((s, i) => s + i.net, 0))} sub={`${pend.length} invoices open · ${overdue.length} overdue`} />
+        <Kpi alert={overdue.length} label="Payable to owners" value={inr(pend.reduce((s, i) => s + i.net, 0) + obOutstanding(S.leases))} sub={`${pend.length} invoices open · ${overdue.length} overdue${obOutstanding(S.leases) ? ` · ${inr(obOutstanding(S.leases))} opening arrears` : ''}`} />
         <Kpi alert={p1} label="Open tickets" value={openT.length} sub={`${p1} critical · ${openT.filter(slaBreached).length} past SLA`} />
         <Kpi label="Deposits with owners" value={inr(dep)} sub="Refundable security deposits" />
       </Kpis>

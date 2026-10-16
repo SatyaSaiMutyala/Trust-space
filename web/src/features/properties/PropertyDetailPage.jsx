@@ -5,7 +5,7 @@ import Box from '@mui/material/Box'
 import { useStore, S, UI, isOwner, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
 import { fmtD } from '../../domain/utils'
-import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState } from '../../domain/lease'
+import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti } from '../../domain/lease'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
@@ -19,13 +19,14 @@ import InspectionTable from '../inspections/InspectionTable'
 import InspectionActions from '../inspections/InspectionActions'
 import ThreadPanel from '../messages/ThreadPanel'
 import ExitPanel from '../exits/ExitPanel'
+import OwnersBlock from '../leases/OwnersBlock'
 import OwnerHomePage from '../ownerPortal/OwnerHomePage'
 import PropertiesPage from './PropertiesPage'
 
 const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
 
 function Summary({ P }) {
-  const O = owner(P.ownerId); const o = isOwner(); const fv = frontOf(P)
+  const O = owner(P.ownerId); const o = isOwner(); const fv = frontOf(P); const L = leaseOf(P.id)
   const bs = O ? bankState(O) : null
   return (
     <>
@@ -42,7 +43,7 @@ function Summary({ P }) {
             ]} />
           </Box>
         </Panel>
-        <Panel title="Owner" actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}>
+        <Panel title={L && isMulti(L) ? 'Owners' : 'Owner'} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}>
           {O ? <Facts items={[
             ['Name', O.name], ['Type', O.kind], ['Mobile', O.phone],
             ['Emergency', [O.emergency?.name, O.emergency?.phone].filter(Boolean).join(' · ') || '—'],
@@ -52,6 +53,7 @@ function Summary({ P }) {
           ]} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
         </Panel>
       </Cols>
+      {L && isMulti(L) ? <Panel title="Co-owners & shares"><OwnersBlock L={L} /></Panel> : null}
       <Panel title="Upcoming dates"><CriticalDates days={365} pid={P.id} /></Panel>
     </>
   )

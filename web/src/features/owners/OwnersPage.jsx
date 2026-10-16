@@ -7,10 +7,10 @@ import TableHead from '@mui/material/TableHead'
 import TableBody from '@mui/material/TableBody'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '../invoices/TableCell'
-import { S, useStore } from '../../store/store'
+import { S, prop, useStore } from '../../store/store'
 import { newOwner, editOwner, viewOwnerProfile } from '../../store/actions'
 import { inr, CUR } from '../../domain/utils'
-import { leaseOf, leaseState, rentFor, maskAcct } from '../../domain/lease'
+import { leaseOf, leaseState, rentFor, maskAcct, leasesOfOwner, isMulti, ownerShare } from '../../domain/lease'
 import { PageHead, Btn, TableCard, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { TableSkeleton, Refreshing } from '../../components/ui/Skeletons'
@@ -59,8 +59,8 @@ export default function OwnersPage() {
           <TableHead><TableRow><TableCell>Owner</TableCell><TableCell>Contact</TableCell><TableCell>Emergency</TableCell><TableCell>PAN / GSTIN</TableCell><TableCell>Bank for rent</TableCell><TableCell>Properties</TableCell><TableCell className="num">Monthly rent</TableCell><TableCell>Portal</TableCell><TableCell sx={STICKY} /></TableRow></TableHead>
           <TableBody>
             {L.rows.map(o => {
-              const ps = S.properties.filter(p => p.ownerId === o.id)
-              const rent = ps.map(p => leaseOf(p.id)).filter(l => l && !['Draft', 'Terminated'].includes(leaseState(l))).reduce((s, l) => s + rentFor(l, CUR), 0)
+              const ls = leasesOfOwner(o.id); const ps = [...new Set(ls.map(L => L.propertyId).concat(S.properties.filter(p => p.ownerId === o.id).map(p => p.id)))].map(prop).filter(Boolean)
+              const rent = ls.filter(l => !['Draft', 'Terminated'].includes(leaseState(l)) && leaseOf(l.propertyId) === l).reduce((s, l) => s + rentFor(l, CUR) * ownerShare(l, o.id, 'rent'), 0)
               return (
                 <TableRow key={o.id}>
                   <TableCell sx={{ minWidth: 120 }}><b>{o.name}</b><div className="small muted">{o.kind}</div></TableCell>
@@ -68,7 +68,7 @@ export default function OwnersPage() {
                   <TableCell className="small" sx={{ minWidth: 120 }}>{o.emergency?.phone ? <>{o.emergency.name || ''}{o.emergency.rel ? ' (' + o.emergency.rel + ')' : ''}<br /><span style={NW}>{o.emergency.phone}</span></> : <span className="muted">Not set</span>}</TableCell>
                   <TableCell className="mono small">{o.pan || '—'}<br />{o.gstin || 'GST unregistered'}</TableCell>
                   <TableCell className="small">{o.bankName || o.bank || ''} <span className="mono" style={NW}>{maskAcct(o.acctNo)}</span><br /><BankChip O={o} /></TableCell>
-                  <TableCell className="small">{ps.length ? ps.map((p, i) => <span key={p.id}>{i ? <br /> : null}{p.name}</span>) : '—'}</TableCell>
+                  <TableCell className="small">{ps.length ? ps.map((p, i) => { const Lp = leaseOf(p.id); return <span key={p.id}>{i ? <br /> : null}{p.name}{Lp && isMulti(Lp) ? <> <span className="muted">({+ownerShare(Lp, o.id, 'rent') * 100}%)</span></> : null}</span> }) : '—'}</TableCell>
                   <TableCell className="num">{inr(rent)}</TableCell>
                   <TableCell><Portal accounts={U.rows.filter(u => u.ownerId === o.id)} /></TableCell>
                   <TableCell sx={STICKY}><div className="actions"><Btn sm onClick={() => viewOwnerProfile(o.id)}>Details</Btn><Btn sm onClick={() => editOwner(o.id)}>Edit</Btn></div></TableCell>

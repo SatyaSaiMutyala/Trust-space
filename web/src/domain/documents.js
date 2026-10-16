@@ -1,4 +1,4 @@
-/* Downloadable invoice document — ported verbatim from reference/TruSpace.html (invDoc / invoiceHTML). */
+/* Downloadable invoice document — ported verbatim from the prototype (invDoc / invoiceHTML). */
 import { S, prop, owner, partner, tenantOf } from '../store/store'
 import { esc, fmtD, perLabel, inr } from './utils'
 import { maskAcct } from './lease'
@@ -12,7 +12,7 @@ export function invDocHTML(i, P, O, L) {
       <tr><td>${esc(i.desc || `${i.type} for ${perLabel(i.period)}`)}${i.type === 'Rent' ? ' · SAC 997212' : ''}</td><td class="num">${inr(i.base)}</td></tr>
       ${i.gst ? `<tr><td>${P?.state === 'Telangana' && (O?.gstin || '').startsWith('36') ? 'CGST 9% + SGST 9%' : 'IGST 18%'}</td><td class="num">${inr(i.gst)}</td></tr>` : ''}
       <tr class="tot"><td>Invoice total</td><td class="num">${inr(i.total)}</td></tr>
-      ${i.tds ? `<tr><td>Less: TDS 10% to be deducted by TrustLab</td><td class="num">−${inr(i.tds)}</td></tr>` : ''}
+      ${i.tds ? `<tr><td>Less: TDS ${i.base ? Math.round(i.tds / i.base * 1000) / 10 : 10}% to be deducted by TrustLab</td><td class="num">−${inr(i.tds)}</td></tr>` : ''}
       <tr class="tot"><td>Net payable</td><td class="num">${inr(i.net)}</td></tr></tbody></table></div>
     ${i.rcm ? `<div style="font-size:12px;color:#555">GST on this supply is payable by the recipient under reverse charge (owner not registered under GST).</div>` : ''}
     <div style="font-size:12px;color:#555">Payment to: ${esc(O?.acctHolder || O?.name || '')} · ${esc([O?.bankName, O?.bankBranch].filter(Boolean).join(', ') || O?.bank || 'bank as per lease')}${O?.acctNo ? ' · A/c ' + esc(maskAcct(O.acctNo)) + ' · IFSC ' + esc(O.ifsc || '') : ''}</div></div>`

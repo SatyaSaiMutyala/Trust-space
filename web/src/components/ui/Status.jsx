@@ -22,6 +22,7 @@ export function Legend() {
       <span><i style={{ background: 'color-mix(in srgb,var(--bad) 25%,transparent)', outline: '1px solid var(--bad)' }} />Overdue</span>
       <span><i style={{ outline: '1px dashed var(--bad)' }} />Not invoiced</span>
       <span><i style={{ background: 'var(--sunk)' }} />Upcoming</span>
+      <span><i style={{ background: 'color-mix(in srgb,var(--sun) 80%,transparent)' }} />D = from deposit</span>
     </div>
   )
 }

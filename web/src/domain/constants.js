@@ -1,5 +1,5 @@
 /* Reference data ported verbatim from reference/TruSpace.html. */
-export const COLS = ['properties', 'owners', 'leases', 'invoices', 'tickets', 'messages', 'inspections', 'sites', 'reqs', 'partners', 'people']
+export const COLS = ['properties', 'owners', 'leases', 'invoices', 'tickets', 'messages', 'inspections', 'sites', 'reqs', 'partners', 'tds', 'people']
 
 export const TYPES = ['Laboratory', 'Collection centre', 'Hospital', 'Clinic', 'Polyclinic', 'Hospital lab (HLM)', 'Office', 'Warehouse / store', 'Staff accommodation']
 export const SITE_PURPOSE = ['Laboratory', 'Collection centre', 'Hospital', 'Clinic', 'Polyclinic']
@@ -19,12 +19,12 @@ export const PRI_K = { P1: 'bad', P2: 'warn', P3: 'info', P4: 'idle' }
 
 /* Navigation */
 export const NAV_TDPL = [
-  ['overview', 'Overview'], ['sites', 'Site scouting'], ['properties', 'Properties'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'],
+  ['overview', 'Overview'], ['sites', 'Site scouting'], ['properties', 'Properties'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['opening', 'Opening balances'], ['tds', 'TDS'],
   ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners'], ['access', 'Portal access'],
 ]
 export const NAV_OWNER = [['o-home', 'My properties'], ['o-me', 'My details'], ['o-docs', 'Agreements'], ['ledgers', 'Ledgers'], ['invoices', 'Invoices & payments'], ['tickets', 'Repairs & tickets'], ['inspections', 'Inspections'], ['messages', 'Messages']]
 export const NAV_FR = [['sites', 'My locations']]
-export const NAV_FR_FULL = [['sites', 'My locations'], ['overview', 'Premises overview'], ['properties', 'Premises'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners']]
+export const NAV_FR_FULL = [['sites', 'My locations'], ['overview', 'Premises overview'], ['properties', 'Premises'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['opening', 'Opening balances'], ['tds', 'TDS'], ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners']]
 
 /* Exits */
 export const EXIT_STEPS = ['Notice served', 'Joint inspection', 'Handover', 'Final settlement', 'Deposit refunded']

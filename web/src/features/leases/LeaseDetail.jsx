@@ -1,4 +1,4 @@
-/* Lease detail panel + full-term rent schedule — port of leaseDetail, schedTotalsHTML, scheduleTable, schedulePanel (reference/TruSpace.html). */
+/* Lease detail panel + full-term rent schedule — port of leaseDetail, schedTotalsHTML, ownerSplitTable, scheduleByOwner, scheduleTable, schedulePanel (prototype). */
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
 import TableHead from '@mui/material/TableHead'
@@ -6,16 +6,63 @@ import TableBody from '@mui/material/TableBody'
 import TableFooter from '@mui/material/TableFooter'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
-import { useStore, UI, isOwner } from '../../store/store'
-import { editLease } from '../../store/actions'
+import { useStore, UI, isOwner, role, owner } from '../../store/store'
+import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal } from '../../domain/utils'
-import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule } from '../../domain/lease'
+import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
 import { Btn, Panel, Facts, Kpis, Kpi, Banner } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import InspectionActions from '../inspections/InspectionActions'
 import { activateLease, renewLease, schedMode, schedCsv } from './actions'
+import OwnersBlock from './OwnersBlock'
+import DepAdjTable from './DepAdjTable'
+
+const OTABLE_SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head': { fontSize: 11 }, '& .MuiTableCell-footer': { color: 'var(--ink)' } }
+
+/** Split by owner — whole term (ownerSplitTable). */
+export function OwnerSplitTable({ sc }) {
+  const me = isOwner() ? role().ownerId : null
+  const os = sc.owners || []; const t = k => os.reduce((a, x) => a + x[k], 0)
+  return (
+    <div className="tbl-wrap" style={{ marginBottom: 12 }}>
+      <Table size="small" className="otable" sx={OTABLE_SX}>
+        <TableHead><TableRow>
+          <TableCell>Split by owner — whole term</TableCell><TableCell className="num">Rent</TableCell><TableCell className="num">Adv. adj.</TableCell><TableCell className="num">Maint.</TableCell><TableCell className="num">GST</TableCell><TableCell className="num">RCM</TableCell><TableCell className="num">TDS</TableCell><TableCell className="num">Net to owner</TableCell><TableCell className="num">Deposit</TableCell><TableCell className="num">Advance</TableCell>
+        </TableRow></TableHead>
+        <TableBody>
+          {os.map(x => (
+            <TableRow key={x.ownerId} className={me === x.ownerId ? 'youRow' : undefined}>
+              <TableCell><b>{owner(x.ownerId)?.name || '—'}</b> <span className="small muted">{+x.share.rent}%</span></TableCell>
+              <TableCell className="num">{inr(x.rent)}</TableCell>
+              <TableCell className="num">{x.adj ? '−' + inr(x.adj) : '—'}</TableCell>
+              <TableCell className="num">{inr(x.maint)}</TableCell>
+              <TableCell className="num">{x.gst ? inr(x.gst) : '—'}</TableCell>
+              <TableCell className="num">{x.rcm ? inr(x.rcm) : '—'}</TableCell>
+              <TableCell className="num">{x.tds ? '−' + inr(x.tds) : '—'}</TableCell>
+              <TableCell className="num"><b>{inr(x.net)}</b></TableCell>
+              <TableCell className="num">{inr(x.deposit)}</TableCell>
+              <TableCell className="num">{x.adv ? inr(x.adv) : '—'}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter><TableRow className="yr">
+          <TableCell><b>Total</b></TableCell>
+          <TableCell className="num">{inr(t('rent'))}</TableCell>
+          <TableCell className="num">{t('adj') ? '−' + inr(t('adj')) : '—'}</TableCell>
+          <TableCell className="num">{inr(t('maint'))}</TableCell>
+          <TableCell className="num">{inr(t('gst'))}</TableCell>
+          <TableCell className="num">{inr(t('rcm'))}</TableCell>
+          <TableCell className="num">{t('tds') ? '−' + inr(t('tds')) : '—'}</TableCell>
+          <TableCell className="num"><b>{inr(t('net'))}</b></TableCell>
+          <TableCell className="num">{inr(t('deposit'))}</TableCell>
+          <TableCell className="num">{inr(t('adv'))}</TableCell>
+        </TableRow></TableFooter>
+      </Table>
+    </div>
+  )
+}
 
 /** KPI strip, "At signing" strip and unadjusted-advance warning (schedTotalsHTML). */
 export function SchedTotals({ sc, L }) {
@@ -39,6 +86,7 @@ export function SchedTotals({ sc, L }) {
         {u.brokerage ? <span>Brokerage <b className="mono">{inr(u.brokerage)}</b></span> : null}
         <span>Paid at signing <b className="mono">{inr(u.deposit + u.adv + u.advGst - u.advTds + u.stamp + u.brokerage)}</b></span>
       </div>
+      {isMulti(L) ? <OwnerSplitTable sc={sc} /> : null}
       {sc.unadjusted > 0 ? <Banner>Advance rent of {inr(sc.unadjusted)} cannot be adjusted within the term — reduce it or shorten the adjustment period.</Banner> : null}
     </>
   )
@@ -69,9 +117,42 @@ const SCHED_SX = {
   },
 }
 
-/** Month-by-month (mode 'month') or year-by-year (mode 'year') schedule table (scheduleTable). */
+/** Net to each co-owner, month by month (scheduleByOwner). */
+function ScheduleByOwner({ sc }) {
+  const os = sc.owners || []
+  return (
+    <div className="tbl-wrap sched">
+      <Table size="small" sx={SCHED_SX}>
+        <TableHead><TableRow>
+          <TableCell>Month</TableCell>
+          {os.map(x => <TableCell key={x.ownerId} className="num">{owner(x.ownerId)?.name || '—'}<div className="small muted" style={{ textTransform: 'none', letterSpacing: 0 }}>{+x.share.rent}% · net</div></TableCell>)}
+          <TableCell className="num">Total net</TableCell><TableCell>Due by</TableCell>
+        </TableRow></TableHead>
+        <TableBody>
+          {sc.rows.map(r => (
+            <TableRow key={r.p} className={`${r.esc ? 'escrow' : ''} ${r.p === CUR ? 'nowrow' : ''}`}>
+              <TableCell>{perLabel(r.p)}{r.notes.length ? <div className="small muted">{r.notes.join(' · ')}</div> : null}</TableCell>
+              {r.split.map(x => <TableCell key={x.ownerId} className="num">{inr(x.net)}{x.tds ? <div className="small muted">TDS {inr(x.tds)}</div> : null}</TableCell>)}
+              <TableCell className="num"><b>{inr(r.net)}</b></TableCell>
+              <TableCell className="small">{fmtD(r.due)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter><TableRow className="yr tot">
+          <TableCell><b>Whole term</b></TableCell>
+          {os.map(x => <TableCell key={x.ownerId} className="num"><b>{inr(x.net)}</b></TableCell>)}
+          <TableCell className="num"><b>{inr(sc.tot.net)}</b></TableCell><TableCell />
+        </TableRow></TableFooter>
+      </Table>
+    </div>
+  )
+}
+
+/** Month-by-month (mode 'month'), year-by-year (mode 'year') or by-owner (mode 'owner', co-owned leases) schedule table (scheduleTable). */
 export function ScheduleTable({ sc, L, mode }) {
-  const gstCol = L.gstMode === 'RCM' ? 'rcm' : 'gst'; const gstH = L.gstMode === 'RCM' ? 'GST (RCM)' : 'GST'
+  if (mode === 'owner' && isMulti(L)) return <ScheduleByOwner sc={sc} />
+  const modes = new Set(leaseOwners(L).map(o => ownerGstMode(L, o.ownerId))); const mixed = modes.has('Forward') && modes.has('RCM')
+  const gstCol = !mixed && modes.has('RCM') ? 'rcm' : 'gst'; const gstH = mixed ? 'GST (on invoice)' : gstCol === 'rcm' ? 'GST (RCM)' : 'GST'
   const body = []
   sc.years.forEach(y => {
     if (mode !== 'year') sc.rows.filter(r => r.y === y.y).forEach(r => body.push(
@@ -117,7 +198,7 @@ export function SchedulePanel({ L }) {
           <span className="small muted">{fmtD(L.start)} to {fmtD(sc.end)}{sc.end !== L.end ? ' (exit date)' : ''} · {L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · {L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}</span>
         </div>
         <div className="actions">
-          <Seg ariaLabel="Schedule view" options={[['month', 'Monthly'], ['year', 'Yearly']]} value={mode} onChange={schedMode} />
+          <Seg ariaLabel="Schedule view" options={[['month', 'Monthly'], ['year', 'Yearly'], ...(isMulti(L) ? [['owner', 'By owner']] : [])]} value={mode} onChange={schedMode} />
           <Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>
         </div>
       </div>
@@ -141,6 +222,7 @@ export default function LeaseDetail({ L }) {
         <Btn sm onClick={() => editLease(L.id)}>Edit</Btn>
         {st === 'Draft' ? <Btn sm primary onClick={() => activateLease(L.id)}>Mark signed &amp; active</Btn> : null}
         {['Active', 'Renewal due', 'Expired'].includes(st) ? <Btn sm onClick={() => renewLease(L.id)}>Renew</Btn> : null}
+        {['Active', 'Renewal due', 'Expired', 'Notice period'].includes(st) && +L.deposit ? <Btn sm onClick={() => depAdjOpen(L.id)}>Adjust deposit against rent</Btn> : null}
       </>}</div>}
     >
       <Box sx={{ display: 'grid', gap: '18px', gridTemplateColumns: 'minmax(0,1fr)' }}>
@@ -149,7 +231,7 @@ export default function LeaseDetail({ L }) {
           ['Base rent', <span key="b" className="mono">{inr(L.rent)}</span>],
           ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None'],
           ['Next escalation', ne ? fmtD(ne) : '—'],
-          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span> {L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>],
+          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span> {L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}{depAdjusted(L) ? <div className="small muted">{inr(depAdjusted(L))} adjusted against rent · <b>{inr(depHeld(L))}</b> held</div> : null}</>],
           ['Lock-in', L.lockIn ? `${L.lockIn} months · ends ${fmtD(le)}` : 'None'],
           ['Notice period', `${L.notice} months · serve by ${fmtD(noticeBy(L))}`],
           ['Rent payment', `${L.payTiming === 'Arrears' ? 'In arrears' : 'In advance'} · by the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
@@ -160,11 +242,13 @@ export default function LeaseDetail({ L }) {
         <Facts items={[
           ['Maintenance', `${L.maintType}${L.maint ? ' · ' + inr(L.maint) + '/mo' : ''}`],
           ['Electricity', L.elec],
-          ['GST on rent', GST_TXT[L.gstMode]],
-          ['TDS on rent', L.tds ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month' : 'Not deducted'],
+          ['GST on rent', isMulti(L) ? 'Per owner — see owners' : GST_TXT[L.gstMode]],
+          ['TDS on rent', L.tds ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month' + (tdsPerOwner(L) ? ' — tested on each co-owner’s share' : '') : 'Not deducted'],
           ['Registration', L.registered ? 'Registered' : 'Unregistered'],
           ['Stamp duty', L.stamp ? inr(L.stamp) : '—'],
         ]} />
+        {isMulti(L) ? <OwnersBlock L={L} /> : null}
+        {depAdjs(L, null, true).length ? <DepAdjTable L={L} /> : null}
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>Key clauses</div><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></div>
         <SchedulePanel L={L} />
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>Joint inspections</div><div className="actions">{hasInspBtn ? <InspectionActions L={L} /> : <span className="small muted">None yet</span>}</div></div>

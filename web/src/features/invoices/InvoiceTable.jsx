@@ -38,7 +38,7 @@ export default function InvoiceTable({ invoices, list, compact }) {
             <TableCell className="num">{i.tds ? inr(i.tds) : '—'}</TableCell>
             <TableCell className="num"><b>{inr(i.net)}</b></TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap' }}><StatusChip label={invState(i)} /></TableCell>
-            <TableCell className="small">{i.paidDate ? <>{fmtD(i.paidDate)}<div className="code">{i.utr || ''}</div></> : ''}</TableCell>
+            <TableCell className="small">{i.paidDate ? <>{fmtD(i.paidDate)}<div className="code">{i.paidBy === 'Deposit' ? 'From deposit' : i.utr || ''}</div></> : ''}</TableCell>
           </ClickRow>
         ))}
       </TableBody>

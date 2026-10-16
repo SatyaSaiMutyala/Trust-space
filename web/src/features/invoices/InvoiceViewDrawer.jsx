@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import { S, prop, owner, partner, tenantOf, isOwner, remove, closeDrawer, useStore } from '../../store/store'
-import { newInvoice } from '../../store/actions'
+import { newInvoice, depAdjOpen } from '../../store/actions'
 import { inr, fmtD, perLabel, TODAY } from '../../domain/utils'
-import { invState, maskAcct } from '../../domain/lease'
+import { invState, maskAcct, depHeld } from '../../domain/lease'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { Btn, Panel, Cols } from '../../components/ui/Layout'
 import { StatusChip, Timeline, ConfirmButton } from '../../components/ui/Status'
@@ -32,7 +32,7 @@ export function InvDoc({ i, P, O, L }) {
         <tr><td>{i.desc || `${i.type} for ${perLabel(i.period)}`}{i.type === 'Rent' ? ' · SAC 997212' : ''}</td><td className="num">{inr(i.base)}</td></tr>
         {i.gst ? <tr><td>{P?.state === 'Telangana' && (O?.gstin || '').startsWith('36') ? 'CGST 9% + SGST 9%' : 'IGST 18%'}</td><td className="num">{inr(i.gst)}</td></tr> : null}
         <tr className="tot"><td>Invoice total</td><td className="num">{inr(i.total)}</td></tr>
-        {i.tds ? <tr><td>Less: TDS 10% to be deducted by TrustLab</td><td className="num">−{inr(i.tds)}</td></tr> : null}
+        {i.tds ? <tr><td>Less: TDS {i.base ? Math.round(i.tds / i.base * 1000) / 10 : 10}% to be deducted by TrustLab</td><td className="num">−{inr(i.tds)}</td></tr> : null}
         <tr className="tot"><td>Net payable</td><td className="num">{inr(i.net)}</td></tr>
       </tbody></Box></div>
       {i.rcm ? <div style={grey}>GST on this supply is payable by the recipient under reverse charge (owner not registered under GST).</div> : null}
@@ -55,7 +55,7 @@ function RejectForm({ id, onDone }) {
   )
 }
 
-function PayForm({ i }) {
+function PayForm({ i, L }) {
   const [busy, setBusy] = useState(false)
   return (
     <Panel title={<h3>Record payment</h3>}>
@@ -65,7 +65,7 @@ function PayForm({ i }) {
           <TextInput id="py-u" name="utr" label="UTR / reference" defaultValue="" required />
           <TextInput id="py-a" name="paidAmount" label="Amount transferred (₹)" type="number" defaultValue={i.net} required />
           <TextInput id="py-t" name="tdsDeducted" label="TDS deducted (₹)" type="number" defaultValue={i.tds} />
-          <Cell full><Btn primary type="submit" disabled={busy}>Mark paid</Btn></Cell>
+          <Cell full><div className="actions"><Btn primary type="submit" disabled={busy}>Mark paid</Btn>{i.type === 'Rent' && L && +L.deposit && depHeld(L, i.ownerId) > 0 ? <Btn onClick={() => depAdjOpen(L.id, [{ period: i.period, ownerId: i.ownerId }])}>Settle from security deposit instead</Btn> : null}</div></Cell>
         </FormGrid>
       </form>
     </Panel>
@@ -106,7 +106,7 @@ export default function InvoiceViewDrawer({ d }) {
           {(i.files || []).length ? <PhotoStrip files={i.files} /> : <span className="muted small">None</span>}
         </Panel>
       </Cols>
-      {!o && i.status === 'Approved' ? <PayForm i={i} /> : null}
+      {!o && i.status === 'Approved' ? <PayForm i={i} L={L} /> : null}
       {rej && ['Submitted', 'Verified'].includes(i.status) ? <RejectForm id={i.id} onDone={() => setRej(false)} /> : null}
     </DrawerLayout>
   )

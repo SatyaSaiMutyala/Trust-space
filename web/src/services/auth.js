@@ -78,7 +78,7 @@ export function passwordProblem(p) {
  */
 const DEV_EMAIL = {
   tdpl: 'admin@trustlab.example', staff: 'facilities@trustlab.example', o1: 'sr.kondapalli@example.com', o2: 'accounts@meridian.example.com', o3: 'ln.pydi@example.com', o4: 'padma.g@example.com',
-  o5: 'vgupta.m@example.com', o6: 'saikrupa@example.com', o7: 'ch.nrao@example.com', 'fr:pa1': 'srisai@example.com', 'fr:pa2': 'medpoint@example.com',
+  o5: 'vgupta.m@example.com', o6: 'saikrupa@example.com', o7: 'ch.nrao@example.com', o8: 'sravani.pydi@example.com', 'fr:pa1': 'srisai@example.com', 'fr:pa2': 'medpoint@example.com',
 }
 export async function devSignIn(role) {
   try { await signIn({ login: DEV_EMAIL[role || 'tdpl'] || DEV_EMAIL.tdpl, password: DEMO_PASSWORD }) }

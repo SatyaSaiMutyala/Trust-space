@@ -12,7 +12,7 @@ import { notify, recordReplaced, recordRemoved } from '../app/slices'
 
 export const ALL = Object.fromEntries(COLS.map(c => [c, []]))
 export const S = Object.fromEntries(COLS.map(c => [c, []]))
-export const UI = { route: 'overview', sel: null, tab: 'summary', filt: {}, conv: null, convOpen: false, schedMode: 'month', led: null, siteMode: 'board' }
+export const UI = { route: 'overview', sel: null, tab: 'summary', filt: {}, conv: null, convOpen: false, schedMode: 'month', led: null, siteMode: 'board', tdsv: null }
 export const ME = { uid: null, canEdit: true, linked: null, resolved: false }
 /** live: signed in and talking to the API; user: signed-in account; drawer/lightbox/sheet: overlays */
 export const APP = { live: false, drawer: null, lightbox: null, sheet: false, user: null }
@@ -38,13 +38,13 @@ export const isFranchisee = () => role().kind === 'franchisee'
 /* Each workspace sees its own premises: TrustLab sees TrustLab-leased premises; a franchise partner sees only the premises it manages in TruSpace; an owner sees theirs. */
 export function rescope() {
   const r = role()
-  if (r.kind === 'owner') { COLS.forEach(c => S[c] = ALL[c]); return }
+  if (r.kind === 'owner') { COLS.forEach(c => S[c] = ALL[c]); S.invoices = ALL.invoices.filter(i => i.ownerId === r.ownerId); return }
   const mine = p => r.kind === 'franchisee' ? (p.managedBy === 'franchise' && p.partnerId === r.partnerId) : p.managedBy !== 'franchise'
   S.properties = ALL.properties.filter(mine); const ids = new Set(S.properties.map(p => p.id))
   for (const c of ['leases', 'invoices', 'tickets', 'inspections', 'messages']) S[c] = ALL[c].filter(x => ids.has(x.propertyId))
-  const own = new Set(S.properties.map(p => p.ownerId))
+  const own = new Set(S.properties.map(p => p.ownerId)); S.leases.forEach(L => (L.owners || []).forEach(o => own.add(o.ownerId)))
   S.owners = r.kind === 'franchisee' ? ALL.owners.filter(o => own.has(o.id) || o.partnerId === r.partnerId) : ALL.owners.filter(o => own.has(o.id) || (!ALL.properties.some(p => p.ownerId === o.id) && !o.partnerId))
-  for (const c of ['sites', 'reqs', 'partners', 'people']) S[c] = ALL[c]
+  for (const c of ['sites', 'reqs', 'partners', 'tds', 'people']) S[c] = ALL[c]
 }
 
 export const prop = id => S.properties.find(p => p.id === id)
@@ -54,7 +54,7 @@ export const tenantOf = P => P && P.managedBy === 'franchise' ? (S.partners.find
 export const actor = () => { const r = role(); return r.kind === 'owner' ? (owner(r.ownerId)?.name || 'Owner') : r.kind === 'franchisee' ? (partner(r.partnerId)?.name || 'Franchise partner') + ' (franchise)' : 'TrustLab Facilities' }
 export const side = () => isOwner() ? 'owner' : 'tdpl'
 export const frFull = r => r.kind === 'franchisee' && (partner(r.partnerId)?.premisesMgmt || ALL.properties.some(p => p.partnerId === r.partnerId))
-export function scopeProps() { const r = role(); return r.kind === 'owner' ? S.properties.filter(p => p.ownerId === r.ownerId) : S.properties }
+export function scopeProps() { const r = role(); return r.kind === 'owner' ? S.properties.filter(p => p.ownerId === r.ownerId || S.leases.some(L => L.propertyId === p.id && (L.owners || []).some(o => o.ownerId === r.ownerId))) : S.properties }
 export function inScope(rec) { const ids = new Set(scopeProps().map(p => p.id)); return ids.has(rec.propertyId) }
 export const frScope = () => { const r = role(); return r.kind === 'franchisee' ? new Set(S.reqs.filter(q => q.partnerId === r.partnerId).map(q => q.id)) : null }
 export function unread() { const s = side(); return S.messages.filter(m => inScope(m) && m.from !== s && !(m.read || {})[s]).length }
