@@ -10,7 +10,7 @@ import TicketFormDrawer from './tickets/TicketFormDrawer'
 import TicketViewDrawer from './tickets/TicketViewDrawer'
 import ExitStartDrawer from './exits/ExitStartDrawer'
 import InspectDrawer from './inspections/InspectDrawer'
-import SkipTakeoverDrawer from './inspections/SkipTakeoverDrawer'
+import SkipInspectionDrawer from './inspections/SkipInspectionDrawer'
 import ReqDrawer from './sites/ReqDrawer'
 import SiteDrawer from './sites/SiteDrawer'
 import PartnerDrawer from './sites/PartnerDrawer'
@@ -30,7 +30,7 @@ export const DRAWERS = {
   owner: OwnerFormDrawer, ownerView: OwnerViewDrawer,
   invoice: InvoiceFormDrawer, invoiceView: InvoiceViewDrawer,
   ticket: TicketFormDrawer, ticketView: TicketViewDrawer,
-  exitStart: ExitStartDrawer, inspect: InspectDrawer, skipTakeover: SkipTakeoverDrawer,
+  exitStart: ExitStartDrawer, inspect: InspectDrawer, skipInsp: SkipInspectionDrawer,
   req: ReqDrawer, site: SiteDrawer, partner: PartnerDrawer, partners: PartnersDrawer,
   rentMonth: RentMonthDrawer, depAdj: DepAdjDrawer, opening: OpeningDrawer, obPay: ObPayDrawer,
   tdsMonth: TdsMonthDrawer, tdsChallan: TdsChallanDrawer, tdsReturn: TdsReturnDrawer, tds16: Tds16Drawer, tdsCert: TdsCertDrawer,

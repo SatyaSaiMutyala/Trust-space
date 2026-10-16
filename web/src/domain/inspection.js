@@ -7,6 +7,9 @@ import { fileUrl } from '../services/files'
 
 let inspT = null
 export function saveInsp(I, now) { clearTimeout(inspT); I.updatedAt = nowISO(); if (now) return save('inspections', I, true); inspT = setTimeout(() => save('inspections', I, true), 700) }
+/** Skipped inspections (no record exists — premises taken over / handed back before TruSpace): L.takeoverSkip / L.handoverSkip. */
+export const skipKey = kind => kind === 'Move-out' ? 'handoverSkip' : 'takeoverSkip'
+export const SKIP_NOTE_MIN = 30
 export const inspOf = (leaseId, kind) => S.inspections.filter(i => i.leaseId === leaseId && i.kind === kind).sort(by('createdAt', -1))[0]
 export function buildInspection(L, kind) {
   const prev = kind === 'Move-out' ? inspOf(L.id, 'Move-in') : null
@@ -61,7 +64,7 @@ export function inspAttention(items) {
   S.leases.forEach(L => {
     const st = leaseState(L); if (['Terminated', 'Expired'].includes(st)) return
     if (!inspOf(L.id, 'Move-in') && !L.takeoverSkip && daysTo(L.start) >= -90) items.push({ k: 'warn', t: 'Take-over inspection not done', s: `${prop(L.propertyId)?.name} · possession ${fmtD(L.start)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-in' } })
-    if (L.exit?.noticeDate && (L.exit.stage || 0) < 2 && !inspOf(L.id, 'Move-out')) items.push({ k: 'warn', t: 'Schedule handover inspection with owner', s: `${prop(L.propertyId)?.name} · vacate by ${fmtD(L.exit.effective)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-out' } })
+    if (L.exit?.noticeDate && (L.exit.stage || 0) < 2 && !inspOf(L.id, 'Move-out') && !L.handoverSkip) items.push({ k: 'warn', t: 'Schedule handover inspection with owner', s: `${prop(L.propertyId)?.name} · vacate by ${fmtD(L.exit.effective)}`, a: { act: 'newInsp', lease: L.id, kind: 'Move-out' } })
   })
 }
 
