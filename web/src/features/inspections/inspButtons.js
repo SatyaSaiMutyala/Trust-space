@@ -5,7 +5,7 @@ import { newInsp, openInsp } from '../../store/actions'
 
 export function inspActions(L) {
   const mi = inspOf(L.id, 'Move-in'), mo = inspOf(L.id, 'Move-out'); const o = isOwner(); const b = []
-  if (mi) b.push({ key: 'mi', label: `Take-over · ${mi.status}`, onClick: () => openInsp(mi.id) })
+  if (mi) { b.push({ key: 'mi', label: `Take-over · ${mi.status}`, onClick: () => openInsp(mi.id) }); if (!o && mi.status === 'In progress' && !L.takeoverSkip) b.push({ key: 'sk', label: 'Skip — existing lease', onClick: () => openDrawer({ kind: 'skipTakeover', id: L.id }) }) }
   else if (L.takeoverSkip) { b.push({ key: 'mi', label: 'Take-over · Skipped', onClick: () => openDrawer({ kind: 'skipTakeover', id: L.id }) }); if (!o) b.push({ key: 'mi2', label: 'Record take-over inspection', onClick: () => newInsp(L.id, 'Move-in') }) }
   else if (!o) { b.push({ key: 'mi', label: 'Start take-over inspection', primary: true, onClick: () => newInsp(L.id, 'Move-in') }); b.push({ key: 'sk', label: 'Skip — existing lease', onClick: () => openDrawer({ kind: 'skipTakeover', id: L.id }) }) }
   if (mo) b.push({ key: 'mo', label: `Handover · ${mo.status}`, onClick: () => openInsp(mo.id) })

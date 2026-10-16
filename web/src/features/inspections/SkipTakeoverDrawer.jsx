@@ -2,8 +2,9 @@
    Stores L.takeoverSkip = { reason, note, on, by }; a real take-over inspection can still be recorded later. */
 import { useState } from 'react'
 import DrawerLayout from '../../components/app/DrawerLayout'
-import { S, prop, closeDrawer, useStore, save, toast, actor } from '../../store/store'
+import { S, prop, closeDrawer, useStore, save, remove, toast, actor } from '../../store/store'
 import { TODAY, fmtD } from '../../domain/utils'
+import { inspOf } from '../../domain/inspection'
 import { Btn, Banner, Empty } from '../../components/ui/Layout'
 import { FormGrid, TextInput, SelectInput } from '../../components/form/Fields'
 
@@ -14,12 +15,13 @@ export default function SkipTakeoverDrawer({ d }) {
   const [busy, setBusy] = useState(false)
   const L = S.leases.find(l => l.id === d.id)
   if (!L) return <DrawerLayout title="Skip take-over inspection"><Empty>Removed.</Empty></DrawerLayout>
-  const sk = L.takeoverSkip
+  const sk = L.takeoverSkip; const mi = inspOf(L.id, 'Move-in'); const stray = mi && mi.status === 'In progress' ? mi : null // started by mistake — discarded on skip
   const onSubmit = async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
     try {
       const fd = new FormData(e.currentTarget)
       L.takeoverSkip = { reason: fd.get('reason'), note: (fd.get('note') || '').trim(), on: TODAY, by: actor() }
+      if (stray) await remove('inspections', stray.id)
       await save('leases', L, true); closeDrawer(); toast('Take-over inspection skipped for ' + L.ref, 'success')
     } finally { setBusy(false) }
   }
@@ -37,6 +39,7 @@ export default function SkipTakeoverDrawer({ d }) {
       ) : (
         <>
           <Banner>Use this for agreements that were already running when the premises came into TruSpace. The lease carries on as normal — rent, ledgers and exit are unaffected — only the take-over inspection reminder is cleared. The handover inspection at exit will have no take-over baseline.</Banner>
+          {stray ? <Banner tone="warn">The take-over inspection started on <b>{fmtD(stray.date)}</b> is still in progress (not submitted or signed). Skipping removes that record.</Banner> : null}
           <form id="f-skip" onSubmit={onSubmit}>
             <FormGrid>
               <SelectInput id="sk-r" name="reason" label="Reason" full options={REASONS} defaultValue={REASONS[0]} />

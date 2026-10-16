@@ -2,7 +2,7 @@
  * Sign-in for the web app, through the API (/api/auth/*, see backend/API.md) with Redux Toolkit.
  * Every function resolves the API's { message, data } or throws an Error carrying the API's message.
  */
-import { UI, APP, emit } from '../store/store'
+import { UI, APP, emit, recallView } from '../store/store'
 import { dispatch, callApi } from '../app/store'
 import { credentialsReceived, signedOut, entitiesCleared } from '../app/slices'
 import { loadPortfolio } from '../app/bootstrap'
@@ -17,16 +17,18 @@ export const DEMO_ACCOUNTS = [
   { label: 'Franchise partner', email: 'medpoint@example.com', name: 'MedPoint' },
 ]
 
-/** Land each role on its home page with a clean view state. */
-function resetView(user) {
+/** Land each role on its home page with a clean view state — or, on a page refresh, back where the user was. */
+function resetView(user, v) {
   UI.sel = null; UI.filt = {}; UI.conv = null; UI.convOpen = false; APP.drawer = null; APP.sheet = false
   UI.route = user?.role === 'owner' ? 'o-home' : user?.role === 'franchisee' ? 'sites' : 'overview'
+  if (v) { UI.route = v.route; UI.sel = v.sel || null; UI.tab = v.tab || 'summary'; UI.conv = v.conv || null; UI.convOpen = !!v.convOpen }
   emit()
 }
 
-async function startSession(data) {
+async function startSession(data, restoring) {
+  const v = restoring ? recallView(data.user?.id) : null // read before sign-in is dispatched: that emit() overwrites the memory
   dispatch(credentialsReceived(data))
-  resetView(data.user)
+  resetView(data.user, v)
   await dispatch(loadPortfolio())
 }
 
@@ -40,7 +42,7 @@ export async function signIn({ login, password, remember }) {
 export async function restoreSession() {
   try {
     const res = await callApi('refresh')
-    await startSession(res.data)
+    await startSession(res.data, true)
   } catch {
     dispatch(signedOut())
   }

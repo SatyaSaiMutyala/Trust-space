@@ -20,7 +20,11 @@ export const APP = { live: false, drawer: null, lightbox: null, sheet: false, us
 /* ---------- subscription ---------- */
 let version = 0
 const listeners = new Set()
-export function emit() { version++; listeners.forEach(l => l()) }
+const VIEW_KEY = 'truspace.view'
+/** Remember where the user is (route, property, tab) so a browser refresh lands on the same page. */
+export function rememberView(userId) { try { sessionStorage.setItem(VIEW_KEY, JSON.stringify({ u: userId, route: UI.route, sel: UI.sel, tab: UI.tab, conv: UI.conv, convOpen: UI.convOpen })) } catch { /* storage unavailable */ } }
+export function recallView(userId) { try { const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null'); return v && v.u === userId && v.route ? v : null } catch { return null } }
+export function emit() { version++; listeners.forEach(l => l()); if (APP.user?.id) rememberView(APP.user.id) }
 const subscribe = l => { listeners.add(l); return () => listeners.delete(l) }
 /** Re-render the calling component on every store change. */
 export function useStore() { return useSyncExternalStore(subscribe, () => version) }
