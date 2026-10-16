@@ -33,14 +33,16 @@ export async function payInvoice(id, fd) {
  * SUBMIT.invoice. gst = GST checkbox state (checked && !disabled) or undefined when the box is absent.
  * dup = object whose .ok flag is set after the first duplicate warning (the prototype's f.dataset.dupOk).
  */
-export async function submitInvoice(fd, { gst, dup }) {
+/** Create an invoice, or with `id` rewrite an existing one (status, workflow log and payment details are kept; new files are added). */
+export async function submitInvoice(fd, { gst, dup, id }) {
+  const old = id ? S.invoices.find(i => i.id === id) : null
   const pid = fd.get('propertyId'); const L = leaseOf(pid); const type = fd.get('type'); const period = fd.get('period')
   const oid = isOwner() ? role().ownerId : (fd.get('ownerId') || L.ownerId)
-  const d0 = S.invoices.find(i => i.leaseId === L.id && i.type === type && i.period === period && i.status !== 'Rejected' && (i.ownerId || L.ownerId) === oid)
+  const d0 = S.invoices.find(i => i.id !== id && i.leaseId === L.id && i.type === type && i.period === period && i.status !== 'Rejected' && (i.ownerId || L.ownerId) === oid)
   if (d0 && type !== 'Other' && !dup.ok) { dup.ok = true; toast(`${type} for ${perLabel(period)} already exists (${d0.number}). Submit again to add another.`, 'warning'); return }
   const c = calc(L, type, fd.get('base'), period, gst, oid)
   const files = await uploadFiles(fd.getAll('files').filter(x => x.size))
-  if (fd.get('mode') === 'upload' && !files.length) { toast('Attach the invoice copy to upload it.', 'warning'); return }
+  if (fd.get('mode') === 'upload' && !files.length && !(old?.files || []).length) { toast('Attach the invoice copy to upload it.', 'warning'); return }
   const reading = type === 'Electricity' ? { open: num(fd.get('ropen')), close: num(fd.get('rclose')), rate: num(fd.get('rrate')), fixed: num(fd.get('rfixed')) } : undefined
   const date = fd.get('date')
   const inv = {
@@ -49,6 +51,11 @@ export async function submitInvoice(fd, { gst, dup }) {
     base: c.base, gst: c.gst, rcm: c.rcm, tds: c.tds, total: c.total, net: c.net, source: fd.get('mode') === 'upload' ? 'Uploaded' : 'Generated', files, status: 'Submitted',
     desc: fd.get('desc') + (reading ? ` · ${reading.open}–${reading.close} kWh @ ₹${reading.rate}` : ''), reading,
     log: [{ at: nowISO(), by: actor(), text: isOwner() ? 'Invoice submitted by owner' : 'Recorded by TrustLab on owner’s behalf' }],
+  }
+  if (old) {
+    Object.assign(inv, { files: (old.files || []).concat(files), status: old.status, log: (old.log || []).concat({ at: nowISO(), by: actor(), text: `Invoice edited${old.number !== inv.number ? ` (was ${old.number})` : ''}` }) })
+    const saved = await save('invoices', Object.assign({}, old, inv))
+    openDrawer({ kind: 'invoiceView', id: saved.id }); return
   }
   const saved = await save('invoices', inv)
   if (type === 'Rent' && adjFor(L, period, oid)) await settleWithDeposit(L)

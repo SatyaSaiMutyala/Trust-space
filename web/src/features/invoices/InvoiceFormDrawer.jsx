@@ -73,14 +73,14 @@ export default function InvoiceFormDrawer({ d }) {
     e.preventDefault(); if (busy) return
     const f = e.currentTarget; const gb = q('iv-gst')
     setBusy(true)
-    try { await submitInvoice(new FormData(f), { gst: gb ? gb.checked && !gb.disabled : undefined, dup: dup.current }) } finally { setBusy(false) }
+    try { await submitInvoice(new FormData(f), { gst: gb ? gb.checked && !gb.disabled : undefined, dup: dup.current, id: d.id }) } finally { setBusy(false) }
   }
 
   return (
     <DrawerLayout
-      title={o ? (mode === 'upload' ? 'Upload invoice' : 'Generate invoice') : 'Record owner invoice'}
-      sub={o ? 'Addressed to TrustLab Diagnostics Private Limited. TDS and GST follow your lease.' : 'Enter an invoice received from the owner, or raise one on their behalf.'}
-      footer={props.length ? <><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-inv" disabled={busy}>Submit invoice</Btn></> : null}>
+      title={d.id ? `Edit invoice ${d.number}` : o ? (mode === 'upload' ? 'Upload invoice' : 'Generate invoice') : 'Record owner invoice'}
+      sub={d.id ? 'Amounts, GST and TDS are recalculated from the lease when you save. The workflow status is kept.' : o ? 'Addressed to TrustLab Diagnostics Private Limited. TDS and GST follow your lease.' : 'Enter an invoice received from the owner, or raise one on their behalf.'}
+      footer={props.length ? <><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-inv" disabled={busy}>{d.id ? 'Save changes' : 'Submit invoice'}</Btn></> : null}>
       {props.length ? (
         <form id="f-inv" ref={formRef} key={p.gen} onSubmit={onSubmit} onInput={onInput} onChange={onChange} noValidate={false}>
           <FormGrid>
@@ -107,7 +107,7 @@ export default function InvoiceFormDrawer({ d }) {
               : <Cell />}
             <TextInput id="iv-desc" name="desc" label="Description" full defaultValue={d.desc ?? (type === 'Rent' ? `Rent for ${prop(pid)?.name} for ${perLabel(period)}` : type === 'Maintenance' ? 'Common area maintenance' : '')} />
             <FieldBox id="iv-files" full label={mode === 'upload' ? 'Invoice copy (PDF or photo) — required' : 'Supporting documents (DISCOM bill, receipts)'}>
-              <input type="file" id="iv-files" name="files" multiple accept="application/pdf,image/*" required={mode === 'upload'} style={{ maxWidth: '100%' }} />
+              <input type="file" id="iv-files" name="files" multiple accept="application/pdf,image/*" required={mode === 'upload' && !d.id} style={{ maxWidth: '100%' }} />
             </FieldBox>
             <Cell full id="iv-calc"><CalcBox c={c} L={L} /></Cell>
           </FormGrid>

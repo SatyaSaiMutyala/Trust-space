@@ -1,7 +1,7 @@
 /* Invoice document, workflow and payment (prototype DRAWERS.invoiceView + invDoc + invStep / invReject / SUBMIT.reject / SUBMIT.pay). */
 import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
-import { S, prop, owner, partner, tenantOf, isOwner, remove, closeDrawer, useStore } from '../../store/store'
+import { S, prop, owner, partner, tenantOf, isOwner, remove, closeDrawer, openDrawer, useStore } from '../../store/store'
 import { newInvoice, depAdjOpen } from '../../store/actions'
 import { inr, fmtD, perLabel, TODAY } from '../../domain/utils'
 import { invState, maskAcct, depHeld } from '../../domain/lease'
@@ -82,6 +82,8 @@ export default function InvoiceViewDrawer({ d }) {
   if (!i) return <DrawerLayout title="Invoice"><div className="empty">This invoice was removed.</div></DrawerLayout>
   const P = prop(i.propertyId), O = owner(i.ownerId), L = S.leases.find(l => l.id === i.leaseId); const st = invState(i); const o = isOwner()
   const acts = []
+  // Edit: TrustLab any time (amounts are recalculated from the lease); the owner only while it is still Submitted.
+  if (!o || i.status === 'Submitted') acts.push(<Btn key="e" onClick={() => openDrawer({ kind: 'invoice', id: i.id, prop: i.propertyId, lease: i.leaseId, type: i.type, period: i.period, mode: i.source === 'Uploaded' ? 'upload' : 'generate', owner: i.ownerId, number: i.number, base: i.base, gst: !!i.gst, date: i.date, desc: i.reading ? (i.desc || '').replace(/ · \d.*kWh.*$/, '') : i.desc, reading: i.reading })}>Edit</Btn>)
   if (!o) {
     if (i.status === 'Submitted') acts.push(<Btn primary key="v" sx={WRAP} onClick={() => invStep(i.id, 'Verified')}>Verify (Accounts Payable)</Btn>)
     if (i.status === 'Verified') acts.push(<Btn primary key="a" sx={WRAP} onClick={() => invStep(i.id, 'Approved')}>Approve for payment (CMD)</Btn>)
