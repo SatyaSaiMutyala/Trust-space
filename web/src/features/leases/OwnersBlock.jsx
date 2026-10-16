@@ -6,7 +6,7 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, isOwner, role, owner } from '../../store/store'
 import { CUR, inr, pctLabel } from '../../domain/utils'
-import { schedule, rentFor, depAdjusted, depHeld, maskAcct, tdsPerOwner } from '../../domain/lease'
+import { schedule, rentFor, depAdjusted, depHeld, maskAcct, tdsPerOwner, tdsRate, panValid, certFor } from '../../domain/lease'
 import { StatusChip } from '../../components/ui/Status'
 import { BankChip } from '../owners/OwnerProfile'
 
@@ -35,7 +35,7 @@ export default function OwnersBlock({ L }) {
                   <TableCell className="num">{inr(x.deposit)}<div className="small muted">{pctLabel(sh.dep)}{depAdjusted(L, x.ownerId) ? ` · held ${inr(depHeld(L, x.ownerId))}` : ''}</div></TableCell>
                   <TableCell className="num">{x.adv ? inr(x.adv) : '—'}<div className="small muted">{pctLabel(sh.adv)}</div></TableCell>
                   <TableCell className="small">{G[x.mode] || x.mode}</TableCell>
-                  <TableCell className="small">{x.tdsOn ? '10%' : 'Below threshold'}</TableCell>
+                  <TableCell className="small">{x.tdsOn ? (!panValid(O) ? <span style={{ color: 'var(--bad)' }}>{tdsRate(x.ownerId, CUR + '-01')}% — no valid PAN</span> : certFor(O, CUR + '-01') ? `${tdsRate(x.ownerId, CUR + '-01')}% (certificate)` : `${tdsRate(x.ownerId, CUR + '-01')}%`) : 'Below threshold'}</TableCell>
                   <TableCell className="num">{inr(Math.round(rentFor(L, CUR) * sh.rent / 100))}</TableCell>
                   <TableCell className="small" sx={{ whiteSpace: 'nowrap' }}>{O ? <>{O.bankName || ''} {maskAcct(O.acctNo)} <BankChip O={O} /></> : ''}</TableCell>
                 </TableRow>

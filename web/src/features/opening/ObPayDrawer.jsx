@@ -3,7 +3,7 @@ import { useState } from 'react'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { S, prop, owner, closeDrawer, useStore } from '../../store/store'
 import { TODAY, inr, perLabel } from '../../domain/utils'
-import { OB_DATE, obItems, schedRow, tdsRate } from '../../domain/lease'
+import { OB_DATE, obItems, schedRow, tdsRate, panValid } from '../../domain/lease'
 import { Btn, Empty } from '../../components/ui/Layout'
 import { FormGrid, TextInput } from '../../components/form/Fields'
 import { submitObPay, obUnpay } from './actions'
@@ -28,7 +28,7 @@ export default function ObPayDrawer({ d }) {
           <TextInput id="obp-d" name="paidOn" label="Paid on" type="date" defaultValue={it.paidOn || TODAY} min={OB_DATE} required />
           <TextInput id="obp-u" name="utr" label="UTR / reference" defaultValue={it.utr || ''} required />
           <TextInput id="obp-a" name="paidAmount" label="Amount transferred (₹)" type="number" defaultValue={it.paidAmount ?? ((+it.amount || 0) - tdsS)} min={0} required />
-          <TextInput id="obp-t" name="tds" label="TDS deducted (₹)" type="number" defaultValue={it.tds ?? tdsS} min={0} hint={tdsS ? '10% on rent as per lease' : ''} />
+          <TextInput id="obp-t" name="tds" label="TDS deducted (₹)" type="number" defaultValue={it.tds ?? tdsS} min={0} hint={tdsS ? `${tdsRate(it.ownerId, it.paidOn || TODAY)}% on rent as per lease${panValid(owner(it.ownerId)) ? '' : ' — 20% as the owner has no valid PAN'}` : ''} />
         </FormGrid>
       </form>
     </DrawerLayout>

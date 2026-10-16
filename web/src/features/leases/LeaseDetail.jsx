@@ -9,7 +9,7 @@ import TableCell from '@mui/material/TableCell'
 import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
-import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld } from '../../domain/lease'
+import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld, tdsRate, panValid } from '../../domain/lease'
 import { inspOf } from '../../domain/inspection'
 import { Btn, Panel, Facts, Kpis, Kpi, Banner } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
@@ -243,7 +243,7 @@ export default function LeaseDetail({ L }) {
           ['Maintenance', `${L.maintType}${L.maint ? ' · ' + inr(L.maint) + '/mo' : ''}`],
           ['Electricity', L.elec],
           ['GST on rent', isMulti(L) ? 'Per owner — see owners' : GST_TXT[L.gstMode]],
-          ['TDS on rent', L.tds ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month' + (tdsPerOwner(L) ? ' — tested on each co-owner’s share' : '') : 'Not deducted'],
+          ['TDS on rent', L.tds ? (isMulti(L) ? '10% (s.393, formerly 194-I) when rent exceeds ₹50,000/month — 20% for a co-owner without a valid PAN' + (tdsPerOwner(L) ? ' · tested on each co-owner’s share' : '') : !panValid(owner(L.ownerId)) ? <span key="t" style={{ color: 'var(--bad)' }}>20% — owner has no valid PAN (s.393, formerly 194-I; 10% once a valid PAN is on file)</span> : `${tdsRate(L.ownerId, CUR + '-01')}% (s.393, formerly 194-I) when rent exceeds ₹50,000/month`) : 'Not deducted'],
           ['Registration', L.registered ? 'Registered' : 'Unregistered'],
           ['Stamp duty', L.stamp ? inr(L.stamp) : '—'],
         ]} />

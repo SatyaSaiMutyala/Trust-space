@@ -161,7 +161,7 @@ export default function LeaseFormDrawer({ d }) {
           <SectionTitle>6 · GST &amp; TDS</SectionTitle>
           <SelectInput id="ls-gst" name="gstMode" label="GST on rent" options={[['Forward', 'Owner registered — 18% on invoice'], ['RCM', 'Owner unregistered — TrustLab pays 18% under RCM'], ['None', 'Not applicable']]} defaultValue={L.gstMode} />
           <FieldBox label="TDS">
-            <CheckField grid={false} id="ls-tds" name="tds" label="Deduct 10% when rent exceeds ₹50,000/month" defaultChecked={L.tds} />
+            <CheckField grid={false} id="ls-tds" name="tds" label="Deduct TDS when rent exceeds ₹50,000/month (10%; 20% if the owner has no valid PAN)" defaultChecked={L.tds} />
             <CheckField grid={false} id="ls-tdm" name="tdsOnMaint" label="Also on maintenance paid to owner" defaultChecked={L.tdsOnMaint} />
           </FieldBox>
 
