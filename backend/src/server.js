@@ -1,6 +1,7 @@
 import app from './app.js'
 import { env } from './config/env.js'
 import { connectDb } from './config/db.js'
+import { startInvoiceScheduler } from './services/invoiceGenerator.js'
 
 try {
   await connectDb(env.mongoUri)
@@ -12,3 +13,4 @@ try {
 }
 
 app.listen(env.port, () => console.log(`TruSpace API running on http://localhost:${env.port}/api`))
+startInvoiceScheduler() // rent invoices on the 1st of every month

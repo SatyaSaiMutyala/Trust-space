@@ -473,6 +473,33 @@ test('properties: co-owners with shares are validated, and a co-owner on the pro
   await call('DELETE', '/properties/p-co'); await call('DELETE', '/trash/properties/p-co')
 })
 
+test('rent invoices are generated for every owner of every active lease, once per month', async () => {
+  const r1 = await call('POST', '/invoices/generate', { period: '2026-11' })
+  assert.equal(r1.status, 200, r1.body.message)
+  const made = r1.body.data.created
+  const refL3 = (await call('GET', '/leases/l3')).body.data.ref, refL6 = (await call('GET', '/leases/l6')).body.data.ref
+  assert.equal(made.filter(x => x.leaseRef === refL3).length, 2, 'co-owned lease: one invoice per co-owner')
+  assert.ok(!made.some(x => x.leaseRef === refL6), 'draft lease is skipped')
+  assert.match(r1.body.message, /generated for Nov 2026/)
+  const inv = (await call('GET', '/invoices?period=2026-11&type=Rent&limit=100')).body.data
+  const badInv = inv.filter(i => !(i.source === 'Generated' && i.status === 'Verified' && i.computedBy === 'server' && i.net > 0 && i.dueDate >= i.date))
+  assert.deepEqual(badInv.map(i => ({ n: i.number, s: i.source, st: i.status, c: i.computedBy, net: i.net, d: i.date, due: i.dueDate })), [], 'every generated invoice is verified, server-computed and due after its date')
+  assert.equal(inv.length, made.length - 1, 'staff list has every generated invoice except the franchise-managed lease’s (that partner sees it)')
+  const a = inv.find(i => i.leaseId === 'l3' && i.ownerId === 'o3'), b = inv.find(i => i.leaseId === 'l3' && i.ownerId === 'o8')
+  assert.ok(a && b && Math.abs(a.base / (a.base + b.base) - 0.6) < 0.01, 'rent split by the co-owners’ shares (60:40)')
+  assert.ok(inv.every(i => /^[A-Z]+\/26-27\/\d{3}$/.test(i.number)), 'numbers continue each owner’s own sequence')
+  assert.equal(new Set(inv.map(i => i.ownerId + '|' + i.number)).size, inv.length, 'numbers unique per owner')
+  const r2 = await call('POST', '/invoices/generate', { period: '2026-11' })
+  assert.equal(r2.body.data.created.length, 0, 'running again creates nothing'); assert.ok(r2.body.data.skipped.every(s => s.reason === 'Already invoiced' || s.reason !== undefined))
+  assert.match(r2.body.message, /Nothing to generate/)
+  const run = await call('GET', '/invoices/generate?period=2026-11')
+  assert.equal(run.body.data.period, '2026-11'); assert.equal(run.body.data.created, made.length)
+  assert.equal((await call('POST', '/invoices/generate', { period: 'nov-26' })).status, 400)
+  const { accessToken: t } = await tokenFor('accounts@meridian.example.com') // an owner may not generate
+  assert.equal((await call('POST', '/invoices/generate', { period: '2026-11' }, t)).status, 403)
+  for (const m of made) { await call('DELETE', '/invoices/' + m.id); await call('DELETE', '/trash/invoices/' + m.id) }
+})
+
 test('leases: co-owner shares, deposit adjustments and opening balances are validated', async () => {
   const L = (await call('GET', '/leases/l3')).body.data
   assert.equal(L.owners.length, 2)

@@ -2,16 +2,16 @@
    screen options={{ title, icon: 'home', badge: 2 }}. The active tab sits in a mist pill. */
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useBottomInset from './useBottomInset';
 import { colors, ms, s, vs, shadows } from '../theme';
 import AppText from './AppText';
 import Icon from './Icon';
 import { Badge } from './Badge';
 
 export default function FloatingTabBar({ state, descriptors, navigation }) {
-  const insets = useSafeAreaInsets();
+  const { gap } = useBottomInset(); // full clearance above an opaque 3-button bar, compact above a gesture area
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, vs(10)) }]}>
+    <View pointerEvents="box-none" style={[styles.wrap, { bottom: gap(vs(10)) }]}>
       <View style={[styles.bar, shadows.float]}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];

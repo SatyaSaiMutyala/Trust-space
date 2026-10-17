@@ -11,6 +11,7 @@ import leasesRouter from './routes/leases.js'
 import reportsRouter from './routes/reports.js'
 import trashRouter from './routes/trash.js'
 import assetRouter from './routes/assets.js'
+import invoicesRouter from './routes/invoices.js'
 import { notFoundRoute, errorHandler } from './middleware/errors.js'
 
 if (!env.auth.jwtSecret) throw new Error('JWT_SECRET must be set in production.')
@@ -32,6 +33,7 @@ app.use('/api/users', usersRouter)
 app.use('/api/assets', assetRouter)
 app.use('/api/tds', tdsRouter) // /tds/report etc. — before the generic /tds/:id routes
 app.use('/api/leases', leasesRouter) // /leases/:id/schedule
+app.use('/api/invoices', invoicesRouter) // /invoices/generate — before the generic /invoices/:id routes
 app.use('/api', reportsRouter) // /ledgers, /rent-roll, /rent-status
 app.use('/api/trash', trashRouter)
 app.use('/api', resourceRouter)

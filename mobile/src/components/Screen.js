@@ -6,11 +6,14 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import useBottomInset from './useBottomInset';
 import { colors, gutter, tabBarSpace, vs } from '../theme';
 
 export default function Screen({ children, scroll = true, padded = true, tabs = false, bg = 'surface', footer, edges, style, contentStyle, keyboard = 'handled', stickyHeaderIndices, avoidKeyboard = true }) {
-  const edgeList = edges || (footer ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom']);
-  const inner = [padded && styles.padded, tabs && { paddingBottom: tabBarSpace }, contentStyle];
+  const { gap } = useBottomInset();
+  // Tab screens: the floating bar is absolute, so the scroll content needs room for the bar plus its clearance from the edge.
+  const edgeList = edges || (footer || tabs ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom']);
+  const inner = [padded && styles.padded, tabs && { paddingBottom: tabBarSpace + gap(vs(10)) }, contentStyle];
   const body = scroll
     ? <ScrollView style={styles.grow} contentContainerStyle={[styles.growContent, inner]} keyboardShouldPersistTaps={keyboard} keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} stickyHeaderIndices={stickyHeaderIndices} automaticallyAdjustKeyboardInsets={false}>{children}</ScrollView>
     : <View style={[styles.grow, inner]}>{children}</View>;

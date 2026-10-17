@@ -1,12 +1,12 @@
 /* "More" → All sections (design p.3): search, Premises and Money grids of section tiles. Also hosts sign-out and the
    role preview switch (until real accounts exist). */
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signedOut, switchRole } from '../../store/slices/authSlice';
 import { colors, ms, s, vs, tabBarSpace } from '../../theme';
-import { BottomSheet, AppText, Icon, Segmented, Button } from '../../components';
+import { BottomSheet, AppText, Icon, Segmented, Button, ConfirmDialog } from '../../components';
 import { sections } from '../../mock/data';
 
 function SectionTile({ icon, title, sub, subTone, onPress }) {
@@ -22,6 +22,7 @@ function SectionTile({ icon, title, sub, subTone, onPress }) {
 export default function AllSectionsSheet({ open, onClose }) {
   const nav = useNavigation();
   const dispatch = useAppDispatch();
+  const [askOut, setAskOut] = useState(false);
   const role = useAppSelector(st => st.auth.role);
   const go = to => { onClose(); setTimeout(() => nav.navigate(to), 120); };
   return (
@@ -41,9 +42,10 @@ export default function AllSectionsSheet({ open, onClose }) {
       <AppText variant="title" color="muted" style={styles.group}>Account</AppText>
       <AppText variant="small" color="muted" style={styles.previewHint}>Preview as</AppText>
       <Segmented compact value={role} onChange={r => { dispatch(switchRole(r)); onClose(); }} options={[{ label: 'Staff', value: 'staff' }, { label: 'Owner', value: 'owner' }, { label: 'Franchise', value: 'franchise' }]} />
-      <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => { onClose(); dispatch(signedOut()); }} style={styles.signOut} />
+      <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => setAskOut(true)} style={styles.signOut} />
       <Button title="Delete account" variant="ghost" size="md" color={colors.coral} onPress={() => go('DeleteAccount')} style={styles.del} />
       <View style={{ height: tabBarSpace }} />
+      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signedOut()); }} />
     </BottomSheet>
   );
 }

@@ -1,14 +1,14 @@
 /* Owner ledger (design p.21 "Error"): what went wrong, Try again; a toast for an oversized upload. */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomInset } from '../../components';
 import { s, vs, ms } from '../../theme';
 import { Screen, AppText, Header, ErrorState, Toast, ListRow, Chip, Tile } from '../../components';
 import { invoicesList } from '../../mock/data';
 
 export default function OwnerLedgersScreen() {
   const [failed, setFailed] = useState(true);
-  const insets = useSafeAreaInsets();
+  const { gap } = useBottomInset();
   return (
     <Screen>
       <Header />
@@ -16,7 +16,7 @@ export default function OwnerLedgersScreen() {
       {failed ? (
         <>
           <ErrorState title="Couldn't load this ledger" body="The server took too long to reply. Your filters are kept. Try again, or check back in a few minutes." action="Try again" onAction={() => setFailed(false)} />
-          <View style={[styles.toastWrap, { bottom: insets.bottom + vs(16) }]}>
+          <View style={[styles.toastWrap, { bottom: gap(vs(16)) }]}>
             <Toast lead="The video is 26 MB." text="Files can be up to 20 MB. Record a shorter clip or switch to 720p." />
           </View>
         </>

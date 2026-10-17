@@ -1,16 +1,17 @@
 /* "More" sheet for owners and franchise partners: profile, documents, help, sign out, role preview. */
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signedOut, switchRole } from '../../store/slices/authSlice';
 import { vs, tabBarSpace } from '../../theme';
-import { BottomSheet, AppText, ListRow, Icon, Segmented, Button } from '../../components';
+import { BottomSheet, AppText, ListRow, Icon, Segmented, Button, ConfirmDialog } from '../../components';
 import { colors } from '../../theme';
 
 export default function MoreSheet({ open, onClose }) {
   const nav = useNavigation();
   const dispatch = useAppDispatch();
+  const [askOut, setAskOut] = useState(false); // the sheet stays open under the pop-up, so Cancel returns to it
   const { role, user } = useAppSelector(st => st.auth);
   const go = to => { onClose(); setTimeout(() => nav.navigate(to), 120); };
   const rows = role === 'owner' ? [
@@ -28,9 +29,10 @@ export default function MoreSheet({ open, onClose }) {
       {rows.map((r, i) => <ListRow key={r.title} left={<Icon name={r.icon} size={24} color={colors.teal} />} title={r.title} sub={r.sub} chevron divider={i < rows.length - 1} onPress={() => (r.to ? go(r.to) : onClose())} />)}
       <AppText variant="title" color="muted" style={styles.group}>Preview as</AppText>
       <Segmented compact value={role} onChange={r => { dispatch(switchRole(r)); onClose(); }} options={[{ label: 'Staff', value: 'staff' }, { label: 'Owner', value: 'owner' }, { label: 'Franchise', value: 'franchise' }]} />
-      <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => { onClose(); dispatch(signedOut()); }} style={styles.signOut} />
+      <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => setAskOut(true)} style={styles.signOut} />
       <Button title="Delete account" variant="ghost" size="md" color={colors.coral} onPress={() => go('DeleteAccount')} style={styles.del} />
       <View style={{ height: tabBarSpace }} />
+      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signedOut()); }} />
     </BottomSheet>
   );
 }

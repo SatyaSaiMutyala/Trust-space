@@ -2,7 +2,7 @@
      <BottomSheet open onClose title="All sections">…</BottomSheet> */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useBottomInset from './useBottomInset';
 import { colors, gutter, ms, s, vs } from '../theme';
 import AppText from './AppText';
 import IconButton from './IconButton';
@@ -10,7 +10,7 @@ import IconButton from './IconButton';
 export default function BottomSheet({ open, onClose, title, children, height, scroll = false, padded = true, footer }) {
   const y = useRef(new Animated.Value(600)).current;
   const fade = useRef(new Animated.Value(0)).current;
-  const insets = useSafeAreaInsets();
+  const { inset } = useBottomInset();
   useEffect(() => {
     if (open) {
       Animated.parallel([
@@ -28,7 +28,7 @@ export default function BottomSheet({ open, onClose, title, children, height, sc
       <Animated.View style={[styles.backdrop, { opacity: fade }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
       </Animated.View>
-      <Animated.View style={[styles.sheet, height ? { height: height + insets.bottom } : { maxHeight: '92%' }, { paddingBottom: insets.bottom + vs(12), transform: [{ translateY: y }] }]}>
+      <Animated.View style={[styles.sheet, height ? { height: height + inset } : { maxHeight: '92%' }, { paddingBottom: inset + vs(12), transform: [{ translateY: y }] }]}>
         <View style={styles.handle} />
         {title ? (
           <View style={[styles.titleRow, padded && styles.pad]}>

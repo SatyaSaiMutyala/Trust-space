@@ -1,14 +1,14 @@
 /* Sticky bottom action bar: optional hint line above the buttons (muted or amber), buttons side by side or stacked. */
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useBottomInset from './useBottomInset';
 import { colors, gutter, ms, s, vs, shadows } from '../theme';
 import AppText from './AppText';
 
 export default function Footer({ children, hint, hintColor = 'muted', hintWeight, stacked, bg = colors.white, style, flat }) {
-  const insets = useSafeAreaInsets();
+  const { pad } = useBottomInset(); // the inset is padded inside the bar, so system buttons sit on its background
   return (
-    <View style={[styles.bar, { backgroundColor: bg, paddingBottom: Math.max(insets.bottom, vs(12)) }, !flat && shadows.sheet, style]}>
+    <View style={[styles.bar, { backgroundColor: bg, paddingBottom: pad(vs(12)) }, !flat && shadows.sheet, style]}>
       {hint ? <AppText variant="small" weight={hintWeight} color={hintColor} center style={styles.hint}>{hint}</AppText> : null}
       <View style={[styles.row, stacked && styles.stacked]}>{children}</View>
     </View>

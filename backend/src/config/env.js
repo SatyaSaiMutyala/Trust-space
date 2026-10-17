@@ -18,6 +18,12 @@ export const env = {
     resetMinutes: Number(process.env.RESET_MINUTES) || 30, // password-reset link lifetime
     cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production',
   },
+  invoices: {
+    /** Generate every lease's rent invoices on the 1st of the month (off in tests; set INVOICE_AUTOGEN=off to disable). */
+    autoGenerate: process.env.INVOICE_AUTOGEN ? process.env.INVOICE_AUTOGEN !== 'off' : process.env.NODE_ENV !== 'test',
+    /** Status a generated invoice starts in: Verified (ready to approve) or Submitted (staff verify first). */
+    autoStatus: ['Submitted', 'Verified'].includes(process.env.INVOICE_AUTO_STATUS) ? process.env.INVOICE_AUTO_STATUS : 'Verified',
+  },
   /** 's3' (AWS S3) or 'local' (backend/uploads) */
   storageDriver: (process.env.STORAGE_DRIVER || 'local').toLowerCase(),
   uploadDir: path.resolve(process.env.UPLOAD_DIR || 'uploads'),

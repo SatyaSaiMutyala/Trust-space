@@ -86,6 +86,8 @@ export const api = createApi({
     trashRestore: b.mutation({ query: ({ resource, id }) => ({ url: `/trash/${resource}/${encodeURIComponent(id)}/restore`, method: 'POST' }), invalidatesTags: (r, e, { resource }) => [{ type: 'List', id: 'trash' }, { type: 'List', id: resource }] }),
     trashDestroy: b.mutation({ query: ({ resource, id }) => ({ url: `/trash/${resource}/${encodeURIComponent(id)}`, method: 'DELETE' }), invalidatesTags: [{ type: 'List', id: 'trash' }] }),
     trashEmpty: b.mutation({ query: () => ({ url: '/trash', method: 'DELETE' }), invalidatesTags: [{ type: 'List', id: 'trash' }] }),
+    /** POST /invoices/generate — this month's rent invoices for every owner of every active lease (idempotent). */
+    invoicesGenerate: b.mutation({ query: (body = {}) => ({ url: '/invoices/generate', method: 'POST', body }), invalidatesTags: [{ type: 'List', id: 'invoices' }] }),
 
     /* server-computed reports (shared/calc on the API) — refetched when the records they depend on are saved */
     tdsReport: b.query({

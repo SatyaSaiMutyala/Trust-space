@@ -37,3 +37,5 @@ export { default as Divider } from './Divider';
 export { default as OtpInput } from './OtpInput';
 export { default as PickerSheet } from './PickerSheet';
 export { default as StepFrame } from './StepFrame';
+export { default as useBottomInset } from './useBottomInset';
+export { default as ConfirmDialog } from './ConfirmDialog';

@@ -3,7 +3,9 @@
  * search (number, description, UTR), type, status (incl. Overdue / All open), property, invoice-date range and
  * pagination via GET /api/invoices (useServerList).
  */
-import { S, isOwner, scopeProps, useStore } from '../../store/store'
+import { S, isOwner, scopeProps, useStore, toast } from '../../store/store'
+import { callApi } from '../../app/store'
+import { refreshPortfolio } from '../../app/bootstrap'
 import { newInvoice } from '../../store/actions'
 import { leaseState } from '../../domain/lease'
 import { INV_TYPES } from '../../domain/constants'
@@ -30,6 +32,10 @@ export default function InvoicesPage() {
   useStore()
   const L = useServerList('invoices', 'invoices', { defaults: { limit: 10 } })
   const o = isOwner()
+  /** Create this month's rent invoices now (the server does the same on the 1st); skips leases already invoiced. */
+  const generateRent = async () => {
+    try { const r = await callApi('invoicesGenerate', {}); toast(r.message, r.data?.created?.length ? 'success' : 'info'); await refreshPortfolio({ force: true }) } catch (e) { toast(e.message, 'error') }
+  }
   return (
     <>
       <PageHead
@@ -37,7 +43,7 @@ export default function InvoicesPage() {
         sub={o ? 'Raise rent, electricity and maintenance invoices to TrustLab, or upload your own. Track verification and payment here.' : 'Owner invoices move from Submitted → Verified by Accounts Payable → Approved by CMD → Paid. TDS and RCM are calculated from each lease.'}
         actions={<>
           <Btn onClick={exportCsv}>Download statement (CSV)</Btn>
-          {o ? <><Btn onClick={() => newInvoice({ mode: 'upload' })}>Upload invoice</Btn><Btn primary onClick={() => newInvoice()}>Generate invoice</Btn></> : <Btn primary onClick={() => newInvoice()}>Record owner invoice</Btn>}
+          {o ? <><Btn onClick={() => newInvoice({ mode: 'upload' })}>Upload invoice</Btn><Btn primary onClick={() => newInvoice()}>Generate invoice</Btn></> : <><Btn onClick={generateRent} title="Rent invoices are generated on the 1st of every month; this creates any that are still missing for this month">Generate this month’s rent</Btn><Btn primary onClick={() => newInvoice()}>Record owner invoice</Btn></>}
         </>}
       />
       <SampleBanner />
