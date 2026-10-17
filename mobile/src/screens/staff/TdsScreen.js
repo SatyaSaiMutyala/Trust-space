@@ -12,8 +12,7 @@ export default function TdsScreen() {
   const [tab, setTab] = useState('monthly');
   return (
     <Screen>
-      <Header right={<AppText variant="mono" color="muted" style={styles.fy}>{tds.fy}</AppText>} />
-      <AppText variant="display" style={styles.title}>TDS</AppText>
+      <Header heading="TDS" right={<AppText variant="mono" color="muted" style={styles.fy}>{tds.fy}</AppText>} />
       <Segmented value={tab} onChange={setTab} style={styles.seg} options={[{ label: 'Monthly', value: 'monthly' }, { label: 'Challans', value: 'challans' }, { label: 'Returns', value: 'returns' }, { label: 'PAN', value: 'pan' }]} />
       {tab === 'monthly' ? (
         <>

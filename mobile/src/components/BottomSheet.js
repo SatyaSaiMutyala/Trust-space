@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white, borderTopLeftRadius: ms(28), borderTopRightRadius: ms(28), paddingTop: vs(8) },
   handle: { alignSelf: 'center', width: s(40), height: vs(5), borderRadius: 3, backgroundColor: colors.line, marginBottom: vs(10) },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: vs(14) },
-  title: { fontSize: ms(27) },
+  title: { fontSize: ms(20) },
   pad: { paddingHorizontal: gutter },
   body: { flexShrink: 1 },
 });

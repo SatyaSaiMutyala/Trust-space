@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-TruSpace.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-TruSpace.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		3AD716A802C3C2AEA2D06BF7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 793B79A02FAE11BE3E048CDD /* GoogleService-Info.plist */; };
 		409D48C3C1ED48DD8DFE45C3 /* IBMPlexMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AE451C4D99CE400DAB423787 /* IBMPlexMono-Medium.ttf */; };
 		40C87577EE2244559806F844 /* IBMPlexMono-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 88E6F5E6E94C4ADF832E3490 /* IBMPlexMono-SemiBold.ttf */; };
 		52501EDC4D1B4C9DA46D0662 /* IBMPlexSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E024C31CB9EB4FE6A0B7668F /* IBMPlexSans-Regular.ttf */; };
@@ -37,6 +38,7 @@
 		718AA6F61E6044FB9F4EA463 /* IBMPlexSans-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSans-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSans-Medium.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = TruSpace/AppDelegate.swift; sourceTree = "<group>"; };
 		761780EE2CA45674006654EF /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = TruSpace/SceneDelegate.swift; sourceTree = "<group>"; };
+		793B79A02FAE11BE3E048CDD /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = TruSpace/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		88E6F5E6E94C4ADF832E3490 /* IBMPlexMono-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexMono-SemiBold.ttf"; path = "../src/assets/fonts/IBMPlexMono-SemiBold.ttf"; sourceTree = "<group>"; };
 		AE451C4D99CE400DAB423787 /* IBMPlexMono-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexMono-Medium.ttf"; path = "../src/assets/fonts/IBMPlexMono-Medium.ttf"; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				793B79A02FAE11BE3E048CDD /* GoogleService-Info.plist */,
 			);
 			name = TruSpace;
 			sourceTree = "<group>";
@@ -209,6 +212,7 @@
 				40C87577EE2244559806F844 /* IBMPlexMono-SemiBold.ttf in Resources */,
 				52501EDC4D1B4C9DA46D0662 /* IBMPlexSans-Regular.ttf in Resources */,
 				C102AA7A41FE4772BE70ACBC /* IBMPlexSans-Bold.ttf in Resources */,
+				3AD716A802C3C2AEA2D06BF7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

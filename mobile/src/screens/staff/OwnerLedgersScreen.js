@@ -11,8 +11,7 @@ export default function OwnerLedgersScreen() {
   const { gap } = useBottomInset();
   return (
     <Screen>
-      <Header />
-      <AppText variant="display" style={styles.title}>Owner ledger</AppText>
+      <Header heading="Owner ledger" />
       {failed ? (
         <>
           <ErrorState title="Couldn't load this ledger" body="The server took too long to reply. Your filters are kept. Try again, or check back in a few minutes." action="Try again" onAction={() => setFailed(false)} />

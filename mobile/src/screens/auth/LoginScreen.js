@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   tagline: { marginTop: vs(2), fontSize: ms(15) },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: s(10), backgroundColor: colors.tealTint, borderRadius: ms(16), padding: s(14), marginTop: vs(20) },
   noticeText: { flex: 1 },
-  welcome: { marginTop: vs(30), marginBottom: vs(22), fontSize: ms(30) },
+  welcome: { marginTop: vs(30), marginBottom: vs(22), fontSize: ms(22) },
   field: { marginBottom: vs(18) },
   remember: { marginTop: vs(2) },
   signIn: { marginTop: vs(22) },

@@ -29,8 +29,7 @@ export default function AreaPhotosScreen() {
         <Button title="Next: videos" variant="primary" full onPress={() => nav.navigate('VideoRecording')} />
       </Footer>
     )}>
-      <Header title={areas.title} />
-      <AppText variant="display" style={styles.title}>Area photos</AppText>
+      <Header heading="Area photos" sub={areas.title} />
       <StepBars steps={areas.steps} />
       <AppText variant="body" color="muted" style={styles.intro}>Take one wide photo of each area. <AppText variant="bodySemi">3 of 4 done.</AppText> They save on this phone first, so no signal is fine.</AppText>
       {pairs.map((row, i) => (

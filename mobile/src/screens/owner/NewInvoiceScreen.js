@@ -16,8 +16,7 @@ export default function NewInvoiceScreen() {
   const metered = type === 'Electricity' || type === 'Water';
   return (
     <Screen footer={<Footer><Button title="Send invoice" variant="primary" full onPress={() => nav.goBack()} /></Footer>}>
-      <Header />
-      <AppText variant="display" style={styles.title}>New invoice</AppText>
+      <Header heading="New invoice" />
       <Segmented value={mode} onChange={setMode} style={styles.seg} options={[{ label: 'Make here', value: 'make', icon: 'file-text' }, { label: 'Upload', value: 'upload', icon: 'upload' }]} />
       <Input label="Property" select value={newInvoice.property} onPress={() => {}} style={styles.field} />
       <AppText variant="label" style={styles.label}>What is it for?</AppText>

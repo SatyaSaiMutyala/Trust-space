@@ -1,5 +1,5 @@
-/* Page wrapper: safe areas, background, optional scrolling, optional sticky footer, keyboard avoidance.
-     <Screen footer={<Footer>…</Footer>}>…</Screen>
+/* Page wrapper: safe areas, background, optional scrolling, optional pinned header and sticky footer, keyboard avoidance.
+     <Screen header={<View>…</View>} footer={<Footer>…</Footer>}>…</Screen>   (header and footer never scroll)
    `tabs` adds bottom space for the floating tab bar; `bg` picks the page colour (surface | canvas | dark).
    When the keyboard opens, the content and the footer move up with it (iOS pads, Android resizes the window via
    adjustResize in the manifest) and dragging the list dismisses it. */
@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import useBottomInset from './useBottomInset';
 import { colors, gutter, tabBarSpace, vs } from '../theme';
 
-export default function Screen({ children, scroll = true, padded = true, tabs = false, bg = 'surface', footer, edges, style, contentStyle, keyboard = 'handled', stickyHeaderIndices, avoidKeyboard = true }) {
+export default function Screen({ children, scroll = true, padded = true, tabs = false, bg = 'surface', topBg, header, footer, edges, style, contentStyle, keyboard = 'handled', stickyHeaderIndices, avoidKeyboard = true }) {
   const { gap } = useBottomInset();
   // Tab screens: the floating bar is absolute, so the scroll content needs room for the bar plus its clearance from the edge.
   const edgeList = edges || (footer || tabs ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom']);
@@ -18,8 +18,10 @@ export default function Screen({ children, scroll = true, padded = true, tabs = 
     ? <ScrollView style={styles.grow} contentContainerStyle={[styles.growContent, inner]} keyboardShouldPersistTaps={keyboard} keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} stickyHeaderIndices={stickyHeaderIndices} automaticallyAdjustKeyboardInsets={false}>{children}</ScrollView>
     : <View style={[styles.grow, inner]}>{children}</View>;
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors[bg] || bg }, style]} edges={edgeList}>
-      <KeyboardAvoidingView style={styles.grow} behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={avoidKeyboard}>
+    // topBg colours the status-bar strip (the safe area) separately, e.g. a white pinned header over a grey page
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors[topBg || bg] || topBg || bg }, style]} edges={edgeList}>
+      <KeyboardAvoidingView style={[styles.grow, { backgroundColor: colors[bg] || bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} enabled={avoidKeyboard}>
+        {header}
         {body}
         {footer}
       </KeyboardAvoidingView>

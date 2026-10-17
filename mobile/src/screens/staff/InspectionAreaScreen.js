@@ -21,8 +21,7 @@ export default function InspectionAreaScreen() {
     )}>
       {offline ? <Banner lead="You're offline." text={`${ui.pendingChanges} changes and ${ui.pendingPhotos} photos are saved on this phone and will upload when you're back online.`} style={styles.banner} /> : null}
       <View style={styles.pad}>
-        <Header title={offlineArea.title} back={!offline} style={offline && styles.noBack} />
-        <AppText variant="h1" style={styles.title}>{offlineArea.area}</AppText>
+        <Header heading={offlineArea.area} sub={offlineArea.title} back={!offline} style={offline && styles.noBack} />
         <ProgressBar value={offlineArea.progress} height={6} style={styles.progress} />
         {offlineArea.items.map(it => (
           <Card key={it.title} outlined style={styles.item} onPress={() => nav.navigate('InspectionItem')}>

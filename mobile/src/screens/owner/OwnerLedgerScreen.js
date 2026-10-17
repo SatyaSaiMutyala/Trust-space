@@ -9,14 +9,12 @@ export default function OwnerLedgerScreen() {
   const l = ownerLedger;
   return (
     <Screen>
-      <Header right={(
+      <Header heading="Ledger" sub={l.property} right={(
         <Pressable style={styles.fy} accessibilityRole="button" accessibilityLabel="Financial year">
           <AppText variant="title">{l.fy}</AppText>
           <Icon name="chevron-down" size={20} color={colors.ink} />
         </Pressable>
       )} />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>{l.property}</AppText>
-      <AppText variant="display" style={styles.title}>Ledger</AppText>
       <View style={styles.tiles}>
         {l.tiles.map(t => <Tile key={t.label} tone={t.tone} label={t.label} value={t.value} valueVariant="monoMd" compact style={styles.tile} />)}
       </View>

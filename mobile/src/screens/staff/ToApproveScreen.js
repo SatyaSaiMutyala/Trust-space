@@ -31,8 +31,7 @@ export default function ToApproveScreen() {
       </Footer>
     )}>
       <View style={styles.pad}>
-        <Header right={<AppText variant="mono" color="muted" style={styles.count}>{i + 1} of {approvals.length}</AppText>} />
-        <AppText variant="display" style={styles.title}>To approve</AppText>
+        <Header heading="To approve" right={<AppText variant="mono" color="muted" style={styles.count}>{i + 1} of {approvals.length}</AppText>} />
       </View>
       <View style={styles.stackWrap}>
         <View style={[styles.ghost, styles.ghost2]} />

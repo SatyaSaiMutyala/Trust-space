@@ -23,9 +23,7 @@ export default function TicketDetailScreen() {
         <Button title="Mark resolved" variant="primary" onPress={() => nav.goBack()} style={styles.resolve} />
       </Footer>
     )}>
-      <Header title={t.code} mono right={<IconButton name="more" onPress={() => {}} accessibilityLabel="More" />} />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>{t.property}</AppText>
-      <AppText variant="h1" style={styles.title}>{t.title}</AppText>
+      <Header heading={t.title} sub={`${t.code} · ${t.property}`} right={<IconButton name="more" onPress={() => {}} accessibilityLabel="More" />} />
       <View style={styles.chips}>{t.chips.map(c => <Chip key={c.label} {...c} />)}</View>
       <View style={styles.sla}>
         <Ring size={52} stroke={6} value={t.sla.value} />

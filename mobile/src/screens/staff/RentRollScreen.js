@@ -20,13 +20,12 @@ export default function RentRollScreen() {
   return (
     <Screen padded={false} scroll={false}>
       <View style={styles.pad}>
-        <Header right={(
+        <Header heading="Rent roll" right={(
           <Pressable style={styles.fy} accessibilityRole="button" accessibilityLabel="Financial year">
             <AppText variant="title">{rentRoll.fy}</AppText>
             <Icon name="chevron-down" size={20} color={colors.ink} />
           </Pressable>
         )} />
-        <AppText variant="display" style={styles.title}>Rent roll</AppText>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} style={styles.filtersWrap}>
         {rentRoll.filters.map(f => <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />)}

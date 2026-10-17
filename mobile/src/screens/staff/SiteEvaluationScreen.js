@@ -30,9 +30,7 @@ export default function SiteEvaluationScreen() {
       </Footer>
     )}>
       <View style={styles.pad}>
-        <Header right={<View style={styles.saved}><Icon name="check" size={18} color={colors.muted} /><AppText variant="body" color="muted">{site.saved}</AppText></View>} />
-        <AppText variant="body" color="muted" style={styles.eyebrow}>Site evaluation, {site.place}</AppText>
-        <AppText variant="display" style={styles.title}>{site.name}</AppText>
+        <Header heading={site.name} sub={`Site evaluation, ${site.place}`} right={<View style={styles.saved}><Icon name="check" size={18} color={colors.muted} /><AppText variant="body" color="muted">{site.saved}</AppText></View>} />
         <View style={styles.chips}>{site.chips.map(c => <Chip key={c.label} {...c} />)}</View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.steps} style={styles.stepsWrap}>

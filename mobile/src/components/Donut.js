@@ -14,8 +14,9 @@ export function Donut({ size = 80, stroke = 9, segments = [], track = colors.onT
       <Svg width={sz} height={sz} style={StyleSheet.absoluteFill}>
         <Circle cx={sz / 2} cy={sz / 2} r={r} stroke={track} strokeWidth={st} fill="none" />
         {segments.map((sg, i) => {
-          const len = (sg.value / total) * c;
-          const el = <Circle key={i} cx={sz / 2} cy={sz / 2} r={r} stroke={sg.color} strokeWidth={st} fill="none" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset} strokeLinecap="butt" transform={`rotate(-90 ${sz / 2} ${sz / 2})`} />;
+          // the last segment runs to the exact end of the ring, so rounding never leaves a hairline gap
+          const len = i === segments.length - 1 ? c - offset : (sg.value / total) * c;
+          const el = <Circle key={i} cx={sz / 2} cy={sz / 2} r={r} stroke={sg.color} strokeWidth={st} fill="none" strokeDasharray={`${len + 0.5} ${Math.max(0, c - len - 0.5)}`} strokeDashoffset={-offset} strokeLinecap="butt" transform={`rotate(-90 ${sz / 2} ${sz / 2})`} />;
           offset += len;
           return el;
         })}
@@ -56,4 +57,4 @@ export function Ring({ size = 44, stroke = 5, value = 0.3, color = colors.amber,
   );
 }
 
-const styles = StyleSheet.create({ center: { alignItems: 'center', justifyContent: 'center' } });
+const styles = StyleSheet.create({ center: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' } });

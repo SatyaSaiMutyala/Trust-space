@@ -17,9 +17,7 @@ export default function DepositRequestScreen() {
         <Button title="Decline" variant="secondary" onPress={() => nav.goBack()} style={styles.decline} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>{d.eyebrow}</AppText>
-      <AppText variant="h1" style={styles.title}>{d.title}</AppText>
+      <Header heading={d.title} sub={d.eyebrow} />
       <AppText variant="body" color="muted" style={styles.body}>{d.body}</AppText>
       <View style={styles.card}>
         <View style={styles.shareRow}>

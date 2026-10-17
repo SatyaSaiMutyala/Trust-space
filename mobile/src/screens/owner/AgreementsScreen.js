@@ -8,8 +8,7 @@ import { agreements } from '../../mock/data';
 export default function AgreementsScreen() {
   return (
     <Screen>
-      <Header />
-      <AppText variant="display" style={styles.title}>Agreements</AppText>
+      <Header heading="Agreements" />
       {agreements.map(g => (
         <View key={g.group}>
           <AppText variant="title" color="muted" style={styles.group}>{g.group}</AppText>

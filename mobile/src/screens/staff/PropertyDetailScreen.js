@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, ms, s, vs, gutter } from '../../theme';
 import { Screen, AppText, Arch, IconButton, Chip, Tile, Avatar, ListRow, Footer, Button, Icon, KeyValueRow, SectionHeader, EmptyState } from '../../components';
 import { property } from '../../mock/data';
@@ -24,6 +25,7 @@ function Tabs({ tabs, value, onChange }) {
 
 export default function PropertyDetailScreen() {
   const nav = useNavigation();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('Summary');
   const p = property;
   return (
@@ -40,9 +42,8 @@ export default function PropertyDetailScreen() {
           </View>
           <View style={styles.photosChip}><AppText variant="smallSemi" color="white">{p.photos} photos</AppText></View>
         </Arch>
-        <View style={styles.photoBar}>
+        <View style={[styles.photoBar, { top: insets.top + vs(7) }]}>
           <IconButton name="chevron-left" variant="light" onPress={() => nav.goBack()} accessibilityLabel="Back" />
-          <IconButton name="more" variant="light" onPress={() => {}} accessibilityLabel="More" />
         </View>
       </View>
       <View style={styles.pad}>
@@ -80,13 +81,13 @@ export default function PropertyDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  photoWrap: { paddingHorizontal: gutter, paddingTop: vs(16) },
+  photoWrap: { paddingHorizontal: gutter, paddingTop: 0 },
   photo: { width: '100%' },
   plan: { position: 'absolute', left: '17%', right: '17%', top: '36%', bottom: 0, flexDirection: 'row', borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)', borderBottomWidth: 0 },
   planCell: { flex: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.55)' },
   planMid: { borderTopWidth: 1, marginTop: '35%' },
   photosChip: { position: 'absolute', alignSelf: 'center', bottom: vs(18), backgroundColor: 'rgba(16,32,30,0.78)', borderRadius: ms(14), paddingHorizontal: s(14), paddingVertical: vs(8) },
-  photoBar: { position: 'absolute', top: vs(40), left: gutter + s(8), right: gutter + s(8), flexDirection: 'row', justifyContent: 'space-between' },
+  photoBar: { position: 'absolute', left: gutter - s(10), right: gutter - s(10), flexDirection: 'row', justifyContent: 'space-between' }, // same x as the Header's back chevron on other screens
   pad: { paddingHorizontal: gutter },
   code: { marginTop: vs(18), fontSize: ms(14.5) },
   name: { marginTop: vs(6) },

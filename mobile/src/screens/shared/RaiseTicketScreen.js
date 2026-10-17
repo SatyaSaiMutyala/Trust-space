@@ -20,8 +20,7 @@ export default function RaiseTicketScreen() {
         <Button title={owner ? 'Send report' : 'Raise ticket'} variant="primary" full onPress={() => nav.goBack()} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="display" style={styles.title}>{owner ? 'Report an issue' : 'Raise ticket'}</AppText>
+      <Header heading={owner ? 'Report an issue' : 'Raise ticket'} />
       <Input label="Property" select value={f.property} onPress={() => {}} style={styles.field} />
       <Input label="What is wrong?" value={f.title} onChangeText={set('title')} placeholder="e.g. AC not cooling in the sample room" autoCapitalize="sentences" style={styles.field} />
       <AppText variant="label" style={styles.label}>Where</AppText>

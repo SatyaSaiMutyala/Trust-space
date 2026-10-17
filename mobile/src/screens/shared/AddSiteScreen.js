@@ -19,9 +19,7 @@ export default function AddSiteScreen() {
         <Button title={role === 'franchise' ? 'Send for review' : 'Start evaluation'} variant="primary" full onPress={() => nav.replace('SiteEvaluation')} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>{role === 'franchise' ? 'A place you have found' : 'Site scouting'}</AppText>
-      <AppText variant="display" style={styles.title}>Add a location</AppText>
+      <Header heading="Add a location" sub={role === 'franchise' ? 'A place you have found' : 'Site scouting'} />
       <Input label="Name or landmark" value={f.name} onChangeText={set('name')} placeholder="e.g. Ramnagar main road" autoCapitalize="words" style={styles.field} />
       <Input label="Town" select value={f.town} onPress={() => {}} style={styles.field} />
       <AppText variant="label" style={styles.label}>What will it be?</AppText>

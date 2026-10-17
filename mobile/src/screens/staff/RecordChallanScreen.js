@@ -16,9 +16,7 @@ export default function RecordChallanScreen() {
         <Button title="Save challan" variant="primary" full onPress={() => nav.goBack()} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>{challan.month} TDS</AppText>
-      <AppText variant="display" style={styles.title}>Record challan</AppText>
+      <Header heading="Record challan" sub={`${challan.month} TDS`} />
       <View style={styles.summary}>
         {[['To deposit', challan.toDeposit], ['Interest', challan.interest], ['Total', challan.total]].map(([l, v], i) => (
           <View key={l} style={[styles.sumCol, i === 2 && styles.sumTotal]}>

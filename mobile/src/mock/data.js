@@ -317,10 +317,14 @@ export const invoicesList = [
 ];
 
 export const notifications = [
-  { icon: 'file-check', title: 'Invoice approved', sub: 'K. Srinivasa Rao, ₹2,59,200 · just now', tone: 'teal' },
-  { icon: 'wrench', title: 'T-2288 is past SLA', sub: 'Kukatpally CC water leak · 2 h ago', tone: 'coral' },
-  { icon: 'message', title: 'M. Narsimha sent a photo', sub: 'Wyra Road CC · 10:14', tone: 'blue' },
-  { icon: 'credit-card', title: 'September TDS is 9 days late', sub: '₹1,84,600 to deposit · yesterday', tone: 'coral' },
+  { id: 'n1', icon: 'file-check', title: 'Invoice approved', sub: 'K. Srinivasa Rao, ₹2,59,200', when: 'Just now', tone: 'teal', read: false, to: 'ToApprove' },
+  { id: 'n2', icon: 'wrench', title: 'T-2288 is past SLA', sub: 'Kukatpally CC water leak', when: '2 h ago', tone: 'coral', read: false, to: 'TicketDetail' },
+  { id: 'n3', icon: 'message', title: 'M. Narsimha sent a photo', sub: 'Wyra Road CC · "The shutter lock is jammed…"', when: '10:14', tone: 'blue', read: false, to: 'Thread' },
+  { id: 'n4', icon: 'credit-card', title: 'September TDS is 9 days late', sub: '₹1,84,600 to deposit, interest ₹2,769', when: 'Yesterday', tone: 'coral', read: true, to: 'Tds' },
+  { id: 'n5', icon: 'inspect', title: 'Inspection saved offline', sub: 'Wyra Road handover · 14 changes waiting to upload', when: 'Yesterday', tone: 'amber', read: true, to: 'InspectionArea' },
+  { id: 'n6', icon: 'map-pin', title: 'Site sent for approval', sub: 'Siddipet Bus Stand Rd, ₹38,000', when: 'Mon', tone: 'blue', read: true, to: 'SiteEvaluation' },
+  { id: 'n7', icon: 'file-text', title: 'Lease renewal due', sub: 'Begumpet Central Lab · 120 days to end of term', when: 'Sun', tone: 'amber', read: true, to: 'PropertyDetail' },
+  { id: 'n8', icon: 'users', title: 'New owner signed up', sub: 'P. Radhika · waiting for PAN and bank check', when: 'Sat', tone: 'grey', read: true },
 ];
 
 export const offlineArea = {

@@ -25,8 +25,7 @@ export default function OwnerCheckSignScreen() {
         <Button title="Something is wrong" variant="danger" onPress={() => {}} style={styles.wrong} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="display" style={styles.title}>Check and sign</AppText>
+      <Header heading="Check and sign" />
       <AppText variant="body" color="muted" style={styles.intro}>{c.intro}</AppText>
       <View style={styles.tiles}>
         <View style={[styles.tile, { backgroundColor: colors.tealTint }]}><AppText variant="monoXl" color="tealInk">{c.fine}</AppText><AppText variant="body" color="tealInk" style={styles.tileSub}>things are fine</AppText></View>

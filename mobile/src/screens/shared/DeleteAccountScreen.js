@@ -42,8 +42,7 @@ export default function DeleteAccountScreen() {
         <Button title="Keep my account" variant="secondary" onPress={() => nav.goBack()} style={styles.keep} />
       </Footer>
     )}>
-      <Header />
-      <AppText variant="display" style={styles.title}>Delete account</AppText>
+      <Header heading="Delete account" />
       <AppText variant="body" color="muted" style={styles.intro}>This closes the account for {user?.name || 'you'}. It cannot be undone.</AppText>
       <View style={styles.card}>
         <Arch width={64} height={70} bg={colors.coralTint} bottomRadius={14}><View style={styles.iconWrap}><Icon name="alert-triangle" size={28} color={colors.coral} strokeWidth={1.8} /></View></Arch>

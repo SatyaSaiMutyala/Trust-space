@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { colors, ms, s, vs, gutter, fonts } from '../../theme';
+import { colors, ms, s, vs, gutter, fonts, shadows } from '../../theme';
 import { Screen, AppText, IconButton, AvatarGroup, Card, Icon, Chip, MessageBubble, Footer } from '../../components';
 import { thread } from '../../mock/data';
 
@@ -14,7 +14,22 @@ export default function ThreadScreen() {
   const [mode, setMode] = useState('Message');
   const [text, setText] = useState('');
   return (
-    <Screen padded={false} bg="canvas" footer={(
+    <Screen padded={false} bg="canvas" topBg="surface" header={(
+      <View style={[styles.head, shadows.card]}>
+        <IconButton name="chevron-left" onPress={() => nav.goBack()} iconSize={24} accessibilityLabel="Back" />
+        <Pressable style={styles.headMain} onPress={() => nav.navigate('PropertyDetail')} accessibilityRole="button" accessibilityLabel="Open property">
+          <AvatarGroup people={thread.avatars} size={40} />
+          <View style={styles.headText}>
+            <AppText variant="title" numberOfLines={1}>{thread.title}</AppText>
+            <View style={styles.headSub}>
+              <View style={styles.online} />
+              <AppText variant="caption" color="muted" numberOfLines={1}>{thread.people} · 2 owners</AppText>
+            </View>
+          </View>
+        </Pressable>
+        <IconButton name="building" variant="mist" size={40} iconSize={20} onPress={() => nav.navigate('PropertyDetail')} accessibilityLabel="Open property" />
+      </View>
+    )} footer={(
       <Footer stacked flat>
         <View style={styles.modes}>
           {['Message', 'Notice', 'Approval request'].map(m => (
@@ -32,15 +47,6 @@ export default function ThreadScreen() {
         </View>
       </Footer>
     )}>
-      <View style={styles.head}>
-        <IconButton name="chevron-left" onPress={() => nav.goBack()} iconSize={26} accessibilityLabel="Back" />
-        <AvatarGroup people={thread.avatars} size={40} />
-        <View style={styles.headText}>
-          <AppText variant="h4" numberOfLines={1}>{thread.title}</AppText>
-          <AppText variant="small" color="muted" numberOfLines={1}>{thread.people}</AppText>
-        </View>
-        <IconButton name="home" onPress={() => nav.navigate('PropertyDetail')} accessibilityLabel="Open property" />
-      </View>
       <View style={styles.list}>
         {thread.items.map((m, i) => {
           if (m.type === 'date') return <DatePill key={i} text={m.text} />;
@@ -72,8 +78,11 @@ export default function ThreadScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', gap: s(10), paddingHorizontal: s(10), paddingVertical: vs(8), backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
+  head: { flexDirection: 'row', alignItems: 'center', gap: s(6), paddingLeft: s(6), paddingRight: s(14), paddingTop: vs(4), paddingBottom: vs(10), backgroundColor: colors.white, borderBottomLeftRadius: ms(24), borderBottomRightRadius: ms(24), zIndex: 2 },
+  headMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(10) },
   headText: { flex: 1 },
+  headSub: { flexDirection: 'row', alignItems: 'center', gap: s(6), marginTop: vs(1) },
+  online: { width: ms(7), height: ms(7), borderRadius: ms(4), backgroundColor: colors.teal },
   list: { paddingHorizontal: gutter, paddingTop: vs(18), gap: vs(14) },
   datePill: { alignSelf: 'center', backgroundColor: colors.white, borderRadius: 999, paddingHorizontal: s(14), paddingVertical: vs(6) },
   msgCard: { backgroundColor: colors.white, marginLeft: s(26) },

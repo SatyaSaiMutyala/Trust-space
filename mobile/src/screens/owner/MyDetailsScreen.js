@@ -25,8 +25,7 @@ export default function MyDetailsScreen() {
   const set = k => v => setF(x => ({ ...x, [k]: v }));
   return (
     <Screen footer={<Footer><Button title="Save changes" variant="primary" full onPress={() => nav.goBack()} /></Footer>}>
-      <Header />
-      <AppText variant="display" style={styles.title}>My details</AppText>
+      <Header heading="My details" />
       <View style={styles.who}>
         <Avatar initials={d.initials} size={64} />
         <View style={styles.flex}>

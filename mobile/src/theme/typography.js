@@ -25,8 +25,8 @@ export const monoFamily = weight => (weight === 'bold' || weight === 'semibold' 
 const t = (fontFamily, size, line, extra) => ({ fontFamily, fontSize: ms(size), lineHeight: ms(line), ...extra });
 
 export const typography = {
-  display: t(fonts.display, 32, 38), // "Overview", "Rent roll"
-  h1: t(fonts.display, 27, 32), // "Welcome back", "Begumpet Central Lab"
+  display: t(fonts.display, 22, 28), // screen titles: "Overview", "Rent roll"
+  h1: t(fonts.display, 20, 25), // "Welcome back", "Begumpet Central Lab"
   h2: t(fonts.display, 22, 27), // "Needs you today", "Owners"
   h3: t(fonts.display, 18, 23), // "September is 9 days late", card titles
   h4: t(fonts.display, 16, 21),

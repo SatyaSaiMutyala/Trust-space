@@ -18,8 +18,7 @@ export default function SignOffScreen() {
         <Button title="Sign as owner" variant="primary" full onPress={() => nav.navigate('Tabs')} />
       </Footer>
     )}>
-      <Header title={signoff.title} />
-      <AppText variant="display" style={styles.title}>Sign off together</AppText>
+      <Header heading="Sign off together" sub={signoff.title} />
       <StepBars steps={signoff.steps} />
       <View style={styles.summary}>
         <View style={styles.summaryHead}>

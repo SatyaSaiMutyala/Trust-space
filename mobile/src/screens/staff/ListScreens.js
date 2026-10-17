@@ -16,9 +16,7 @@ function ListPage({ title, eyebrow, items, placeholder, renderRow, action }) {
   const nav = useNavigation();
   return (
     <Screen>
-      <Header right={action} />
-      {eyebrow ? <AppText variant="body" color="muted" style={styles.eyebrow}>{eyebrow}</AppText> : null}
-      <AppText variant="display" style={styles.title}>{title}</AppText>
+      <Header heading={title} sub={eyebrow} right={action} />
       <Pressable style={styles.search} onPress={() => nav.navigate('Search')} accessibilityRole="search">
         <Icon name="search" size={22} color={colors.muted} />
         <AppText variant="body" color="muted" style={styles.searchText}>{placeholder}</AppText>
@@ -64,9 +62,7 @@ export function DepositsScreen() {
   const nav = useNavigation();
   return (
     <Screen>
-      <Header />
-      <AppText variant="body" color="muted" style={styles.eyebrow}>36 leases</AppText>
-      <AppText variant="display" style={styles.title}>Deposits</AppText>
+      <Header heading="Deposits" sub="36 leases" />
       <View style={styles.tiles}>
         <Tile tone="mist" label="Held" value="₹1,92,00,000" compact />
         <Tile tone="amber" label="Adjusted this FY" value="₹3,36,000" compact />
