@@ -18,13 +18,14 @@ import InspectionsPage from './inspections/InspectionsPage'
 import SitesPage from './sites/SitesPage'
 import OpeningPage from './opening/OpeningPage'
 import TdsPage from './tds/TdsPage'
+import TrashPage from './trash/TrashPage'
 import { UI, APP, role, useStore } from '../store/store'
 import ErrorBoundary from '../components/app/ErrorBoundary'
 
 const PAGES = {
   overview: OverviewPage, properties: PropertiesPage, property: PropertyDetailPage, leases: LeasesPage,
   invoices: InvoicesPage, tickets: TicketsPage, messages: MessagesPage, exits: ExitsPage, inspections: InspectionsPage,
-  sites: SitesPage, owners: OwnersPage, access: AccessPage, 'o-home': OwnerHomePage, 'o-docs': OwnerDocsPage, 'o-me': OwnerMePage, ledgers: LedgersPage, opening: OpeningPage, tds: TdsPage,
+  sites: SitesPage, owners: OwnersPage, access: AccessPage, 'o-home': OwnerHomePage, 'o-docs': OwnerDocsPage, 'o-me': OwnerMePage, ledgers: LedgersPage, opening: OpeningPage, tds: TdsPage, trash: TrashPage,
 }
 
 export default function CurrentPage() {

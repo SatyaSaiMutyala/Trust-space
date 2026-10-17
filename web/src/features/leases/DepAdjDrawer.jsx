@@ -1,4 +1,5 @@
-/* Adjust security deposit against rent (prototype DRAWERS.depAdj + SUBMIT.depAdj). d = { lease, preset: [{ period, ownerId }] | null } */
+/* Adjust security deposit against rent (prototype DRAWERS.depAdj + SUBMIT.depAdj). d = { lease, preset: [{ period, ownerId }] | null }
+   The unpaid months, TDS and deposit held per owner come from the API (useLeaseDeposit). */
 import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
@@ -13,33 +14,32 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, prop, owner, closeDrawer } from '../../store/store'
 import { CUR, TODAY, inr, num, perLabel } from '../../domain/utils'
-import { isMulti, leaseOwners, depHeld, depAdjs, depAdjCandidates, invState } from '../../domain/lease'
-import { Btn } from '../../components/ui/Layout'
+import { isMulti, leaseOwners } from '../../domain/lease'
+import { Btn, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { FormGrid, TextInput, SelectInput } from '../../components/form/Fields'
 import { submitDepAdj } from './actions'
+import { useLeaseDeposit } from './useLeaseDeposit'
 
 const SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head': { fontSize: 11 } }
 const RADIO_SX = { m: 0, gap: 0.5, '& .MuiRadio-root': { p: 0.25 }, '& .MuiFormControlLabel-label': { fontSize: 13.5 }, '@media (pointer:coarse)': { minHeight: 44 } }
 
-export default function DepAdjDrawer({ d }) {
-  useStore()
-  const L = S.leases.find(l => l.id === d.lease)
-  const [cands] = useState(() => (L ? depAdjCandidates(L) : []))
+/** The form, mounted once the deposit figures are in so the candidates don't change under the user's ticks. */
+function DepAdjForm({ L, d, dep }) {
+  const cands = dep.candidates
   const formRef = useRef(null)
   const [busy, setBusy] = useState(false)
-  const [how, setHow] = useState(L && L.ownerPortal !== false ? 'portal' : '')
+  const [how, setHow] = useState(L.ownerPortal !== false ? 'portal' : '')
   const [live, setLive] = useState({ on: [], tot: 0, held: {} })
 
   const upd = () => {
-    const f = formRef.current; if (!f || !L) return
-    const held = {}; leaseOwners(L).forEach(o => held[o.ownerId] = depHeld(L, o.ownerId) - depAdjs(L, o.ownerId, true).filter(a => a.status === 'Proposed').reduce((s2, a) => s2 + (+a.amount || 0), 0))
+    const f = formRef.current; if (!f) return
+    const held = {}; dep.owners.forEach(o => { held[o.ownerId] = o.available })
     let tot = 0; const on = cands.map((c, i) => { const x = f.elements['on_' + i]?.checked; const amt = num(f.elements['amt_' + i]?.value); if (x) { held[c.ownerId] -= amt; tot += amt } return !!x })
     setLive({ on, tot, held })
   }
   useEffect(upd, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!L) return <DrawerLayout title="" />
   const multi = isMulti(L); const pre = new Set((d.preset || []).map(x => x.period + '|' + x.ownerId))
   const lastN = new Set(cands.map(c => c.period).sort().slice(-Math.min(3, cands.length)))
   const isPre = c => pre.size ? pre.has(c.period + '|' + c.ownerId) : (L.exit?.noticeDate ? lastN.has(c.period) : false)
@@ -47,10 +47,10 @@ export default function DepAdjDrawer({ d }) {
   const onChange = e => { if (e.target.name === 'how') setHow(e.target.value); upd() }
   const onSubmit = async e => {
     e.preventDefault(); setBusy(true)
-    try { await submitDepAdj(new FormData(e.currentTarget), L.id) } finally { setBusy(false) }
+    try { await submitDepAdj(new FormData(e.currentTarget), L.id, dep) } finally { setBusy(false) }
   }
   return (
-    <DrawerLayout title="Adjust security deposit against rent" sub={`${prop(L.propertyId)?.name || ''} · ${L.ref} · deposit held ${inr(depHeld(L))} of ${inr(L.deposit)}`}
+    <DrawerLayout title="Adjust security deposit against rent" sub={`${prop(L.propertyId)?.name || ''} · ${L.ref} · deposit held ${inr(dep.held)} of ${inr(dep.deposit)}`}
       footer={cands.length ? <><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-da" disabled={busy}>Adjust against deposit</Btn></> : null}>
       {cands.length ? (
         <form id="f-da" ref={formRef} onSubmit={onSubmit} onInput={upd} onChange={onChange} style={{ display: 'grid', gap: 14 }}>
@@ -61,23 +61,20 @@ export default function DepAdjDrawer({ d }) {
                 <TableCell /><TableCell>Rent month</TableCell>{multi ? <TableCell>Owner</TableCell> : null}<TableCell className="num">Rent (gross)</TableCell><TableCell className="num">TDS</TableCell><TableCell className="num">From deposit</TableCell><TableCell>Invoice</TableCell>
               </TableRow></TableHead>
               <TableBody>
-                {cands.map((c, i) => {
-                  const inv = c.inv ? S.invoices.find(x => x.id === c.inv) : null
-                  return (
-                    <TableRow key={c.period + '|' + c.ownerId} className={`da-row${live.on.length && !live.on[i] ? ' off' : ''}`}>
-                      <TableCell padding="checkbox"><Checkbox name={`on_${i}`} id={`da-on${i}`} defaultChecked={isPre(c)} size="small" slotProps={{ input: { 'aria-label': `Adjust ${perLabel(c.period)}` } }} /></TableCell>
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}><label htmlFor={`da-on${i}`}><b>{perLabel(c.period)}</b></label>{c.period === CUR ? <> <span className="small muted">this month</span></> : c.period < CUR ? <> <span className="small" style={{ color: 'var(--bad)' }}>overdue</span></> : null}</TableCell>
-                      {multi ? <TableCell className="small">{owner(c.ownerId)?.name || ''}</TableCell> : null}
-                      <TableCell className="num">{inr(c.gross)}</TableCell>
-                      <TableCell className="num">{c.tds ? inr(c.tds) : '—'}</TableCell>
-                      <TableCell className="num">
-                        <TextInput grid={false} type="number" name={`amt_${i}`} defaultValue={c.amount} min="0" htmlInput={{ 'aria-label': 'Amount from deposit' }} sx={{ width: 120, '& input': { textAlign: 'right', fontFamily: 'var(--f-mono)', py: '6px' } }} />
-                        <input type="hidden" name={`key_${i}`} value={`${c.period}|${c.ownerId}|${c.tds}`} />
-                      </TableCell>
-                      <TableCell className="small">{inv ? <StatusChip label={invState(inv)} /> : <span className="muted">Not yet</span>}</TableCell>
-                    </TableRow>
-                  )
-                })}
+                {cands.map((c, i) => (
+                  <TableRow key={c.period + '|' + c.ownerId} className={`da-row${live.on.length && !live.on[i] ? ' off' : ''}`}>
+                    <TableCell padding="checkbox"><Checkbox name={`on_${i}`} id={`da-on${i}`} defaultChecked={isPre(c)} size="small" slotProps={{ input: { 'aria-label': `Adjust ${perLabel(c.period)}` } }} /></TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}><label htmlFor={`da-on${i}`}><b>{perLabel(c.period)}</b></label>{c.period === CUR ? <> <span className="small muted">this month</span></> : c.period < CUR ? <> <span className="small" style={{ color: 'var(--bad)' }}>overdue</span></> : null}</TableCell>
+                    {multi ? <TableCell className="small">{owner(c.ownerId)?.name || ''}</TableCell> : null}
+                    <TableCell className="num">{inr(c.gross)}</TableCell>
+                    <TableCell className="num">{c.tds ? inr(c.tds) : '—'}</TableCell>
+                    <TableCell className="num">
+                      <TextInput grid={false} type="number" name={`amt_${i}`} defaultValue={c.amount} min="0" htmlInput={{ 'aria-label': 'Amount from deposit' }} sx={{ width: 120, '& input': { textAlign: 'right', fontFamily: 'var(--f-mono)', py: '6px' } }} />
+                      <input type="hidden" name={`key_${i}`} value={`${c.period}|${c.ownerId}|${c.tds}`} />
+                    </TableCell>
+                    <TableCell className="small">{c.invState ? <StatusChip label={c.invState} /> : <span className="muted">Not yet</span>}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -102,4 +99,13 @@ export default function DepAdjDrawer({ d }) {
       ) : <div className="empty">No unpaid rent months left to adjust.</div>}
     </DrawerLayout>
   )
+}
+
+export default function DepAdjDrawer({ d }) {
+  useStore()
+  const L = S.leases.find(l => l.id === d.lease)
+  const { dep } = useLeaseDeposit(L?.id)
+  if (!L) return <DrawerLayout title="" />
+  if (!dep) return <DrawerLayout title="Adjust security deposit against rent"><Empty>Loading…</Empty></DrawerLayout>
+  return <DepAdjForm key={dep.leaseId} L={L} d={d} dep={dep} />
 }

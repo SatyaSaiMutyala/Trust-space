@@ -4,7 +4,8 @@ import Box from '@mui/material/Box'
 import { S, prop, owner, partner, tenantOf, isOwner, remove, closeDrawer, openDrawer, useStore } from '../../store/store'
 import { newInvoice, depAdjOpen } from '../../store/actions'
 import { inr, fmtD, perLabel, TODAY } from '../../domain/utils'
-import { invState, maskAcct, depHeld } from '../../domain/lease'
+import { invState, maskAcct } from '../../domain/lease'
+import { useLeaseDeposit } from '../leases/useLeaseDeposit'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { Btn, Panel, Cols } from '../../components/ui/Layout'
 import { StatusChip, Timeline, ConfirmButton } from '../../components/ui/Status'
@@ -56,6 +57,7 @@ function RejectForm({ id, onDone }) {
 }
 
 function PayForm({ i, L }) {
+  const { dep } = useLeaseDeposit(L?.id)
   const [busy, setBusy] = useState(false)
   return (
     <Panel title={<h3>Record payment</h3>}>
@@ -65,7 +67,7 @@ function PayForm({ i, L }) {
           <TextInput id="py-u" name="utr" label="UTR / reference" defaultValue="" required />
           <TextInput id="py-a" name="paidAmount" label="Amount transferred (₹)" type="number" defaultValue={i.net} required />
           <TextInput id="py-t" name="tdsDeducted" label="TDS deducted (₹)" type="number" defaultValue={i.tds} />
-          <Cell full><div className="actions"><Btn primary type="submit" disabled={busy}>Mark paid</Btn>{i.type === 'Rent' && L && +L.deposit && depHeld(L, i.ownerId) > 0 ? <Btn onClick={() => depAdjOpen(L.id, [{ period: i.period, ownerId: i.ownerId }])}>Settle from security deposit instead</Btn> : null}</div></Cell>
+          <Cell full><div className="actions"><Btn primary type="submit" disabled={busy}>Mark paid</Btn>{i.type === 'Rent' && L && +L.deposit && (dep?.owners.find(o => o.ownerId === i.ownerId)?.held || 0) > 0 ? <Btn onClick={() => depAdjOpen(L.id, [{ period: i.period, ownerId: i.ownerId }])}>Settle from security deposit instead</Btn> : null}</div></Cell>
         </FormGrid>
       </form>
     </Panel>

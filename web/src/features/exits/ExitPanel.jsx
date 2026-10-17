@@ -7,7 +7,9 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { S, isOwner, owner, useStore, openDrawer } from '../../store/store'
 import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
-import { lockEnd, depHeld, depAdjusted, isMulti, leaseOwners, splitAmt, ownerShare, obOutstanding } from '../../domain/lease'
+import { lockEnd, isMulti, leaseOwners, ownerShare } from '../../domain/lease'
+import { useLeaseDeposit } from '../leases/useLeaseDeposit'
+import { useOpening } from '../opening/useOpening'
 import { inspOf, inspOpen } from '../../domain/inspection'
 import { TODAY, daysTo, fmtD, inr, pctLabel } from '../../domain/utils'
 import { Btn, Panel, Banner, Facts, TableCard } from '../../components/ui/Layout'
@@ -20,6 +22,8 @@ const bannerSx = { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: '
 
 export default function ExitPanel({ L }) {
   useStore()
+  const { dep } = useLeaseDeposit(L.id)
+  const { opening } = useOpening(); const obL = opening?.leases.find(l => l.leaseId === L.id)?.outstanding || 0 // opening arrears on this lease, computed by the API
   const [busy, setBusy] = useState(false)
   const x = L.exit || {}; const stage = x.stage || 0; const o = isOwner()
   if (!x.noticeDate) {
@@ -33,9 +37,9 @@ export default function ExitPanel({ L }) {
   }
   const dedTotal = (x.deductions || []).reduce((s, d) => s + (+d.amount || 0), 0)
   const pendInv = S.invoices.filter(i => i.leaseId === L.id && !['Paid', 'Rejected'].includes(i.status))
-  const refund = depHeld(L) - dedTotal; const adjTot = depAdjusted(L)
-  const multi = isMulti(L); const dSplit = leaseOwners(L).map(w => depHeld(L, w.ownerId)); const dedS = splitAmt(dedTotal, leaseOwners(L), 'dep')
-  const refundRows = multi ? leaseOwners(L).map((w, i) => ({ ownerId: w.ownerId, dep: dSplit[i], ded: dedS[i], due: dSplit[i] - dedS[i], got: (x.refunds || []).find(r => r.ownerId === w.ownerId) })) : []
+  const held = dep?.held || 0, adjTot = dep?.adjusted || 0; const refund = held - dedTotal
+  const multi = isMulti(L)
+  const refundRows = multi ? leaseOwners(L).map(w => { const s = dep?.settlement.rows.find(r => r.ownerId === w.ownerId) || { dep: 0, ded: 0, due: 0 }; return { ownerId: w.ownerId, dep: s.dep, ded: s.ded, due: s.due, got: (x.refunds || []).find(r => r.ownerId === w.ownerId) } }) : []
 
   const submit = step => async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
@@ -67,7 +71,7 @@ export default function ExitPanel({ L }) {
     if (form) forms.push(form)
     if (stage <= 3 && !o) forms.push(
       <Banner sx={bannerSx} key="dep">
-        <span>Use the security deposit for the remaining months’ rent instead of paying cash? Held now: <b>{inr(depHeld(L))}</b>.</span>
+        <span>Use the security deposit for the remaining months’ rent instead of paying cash? Held now: <b>{inr(held)}</b>.</span>
         <Btn sm onClick={() => depAdjOpen(L.id)}>Adjust deposit against rent</Btn>
       </Banner>
     )
@@ -75,7 +79,7 @@ export default function ExitPanel({ L }) {
       <form onSubmit={submit(4)} key="s3"><FormGrid>
         <TextInput id="ex-ded" name="deductions" label="Deductions from deposit — one per line as “description, amount”" full multiline
           placeholder={'Wall repainting, 18000\nFinal electricity bill, 6420'} defaultValue={(x.deductions || []).map(d => d.desc + ', ' + d.amount).join('\n')}
-          hint={`Pending owner invoices on this lease: ${pendInv.length} (${inr(pendInv.reduce((s, i) => s + i.net, 0))})${obOutstanding([L]) ? ` plus opening arrears ${inr(obOutstanding([L]))}` : ''}. Settle them before closing.`} />
+          hint={`Pending owner invoices on this lease: ${pendInv.length} (${inr(pendInv.reduce((s, i) => s + i.net, 0))})${obL ? ` plus opening arrears ${inr(obL)}` : ''}. Settle them before closing.`} />
         {submitBtn('Agree final settlement')}
       </FormGrid></form>
     )
@@ -113,7 +117,7 @@ export default function ExitPanel({ L }) {
           ['Notice served', `${fmtD(x.noticeDate)} by ${x.noticeBy}`],
           ['Effective date', fmtD(x.effective) + (x.effective >= TODAY ? ` · in ${daysTo(x.effective)} days` : '')],
           ['Reason', x.reason || '—'],
-          ['Security deposit', <>{inr(L.deposit)}{adjTot ? <div className="small muted">{inr(adjTot)} adjusted against rent · {inr(depHeld(L))} held</div> : null}</>],
+          ['Security deposit', <>{inr(L.deposit)}{adjTot ? <div className="small muted">{inr(adjTot)} adjusted against rent · {inr(held)} held</div> : null}</>],
           ['Deductions', inr(dedTotal)],
           ['Refund due', <b key="r">{inr(refund)}</b>],
           x.inspectionDate ? ['Inspection', fmtD(x.inspectionDate)] : null,

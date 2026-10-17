@@ -7,7 +7,7 @@ import TableCell from '../invoices/TableCell'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { owner, useStore } from '../../store/store'
 import { TODAY, inr, fmtD } from '../../domain/utils'
-import { tdsQuarters } from '../../domain/tds'
+import { useTdsReport } from './useTdsReport'
 import { Btn, Empty, TableCard } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
@@ -32,8 +32,8 @@ function IssueForm({ q, oid }) {
 
 export default function Tds16Drawer({ d }) {
   useStore()
-  const f = tdsv().fy; const Q = tdsQuarters(f).find(x => x.q === +d.q)
-  if (!Q) return <DrawerLayout title="Form 16A"><Empty>Not found.</Empty></DrawerLayout>
+  const f = tdsv().fy; const { report, isLoading } = useTdsReport(f); const Q = report?.quarters.find(x => x.q === +d.q)
+  if (!Q) return <DrawerLayout title="Form 16A"><Empty>{isLoading ? 'Loading…' : 'Not found.'}</Empty></DrawerLayout>
   return (
     <DrawerLayout title={`Form 16A · FY ${f} Q${d.q}`} sub={`Due ${fmtD(Q.f16)} · ${Q.issued} of ${Q.owners.length} issued${Q.st !== 'Filed' ? ' · file the return first' : ''}`}>
       <TableCard>

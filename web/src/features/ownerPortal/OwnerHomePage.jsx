@@ -2,7 +2,8 @@
 import { S, role, owner, inScope, scopeProps, prop, openProp, useStore } from '../../store/store'
 import { newTicket, newInvoice, openInsp } from '../../store/actions'
 import { inr, fy, fmtD, perLabel, TODAY, CUR } from '../../domain/utils'
-import { leaseOf, leaseState, rentFor, invState, depAdjs, isMulti, ownerShare, obOutstanding, OB_DATE } from '../../domain/lease'
+import { leaseOf, leaseState, rentFor, invState, depAdjs, isMulti, ownerShare, OB_DATE } from '../../domain/lease'
+import { useOpening } from '../opening/useOpening'
 import { IN_KIND } from '../../domain/constants'
 import { PageHead, Panel, Btn, Banner, Kpis, Kpi } from '../../components/ui/Layout'
 import { Legend } from '../../components/ui/Status'
@@ -13,13 +14,14 @@ import PropertyCard from '../properties/PropertyCard'
 
 export default function OwnerHomePage() {
   useStore()
+  const { opening } = useOpening() // the owner's own opening-balance arrears, computed by the API
   const r = role(); const O = owner(r.ownerId); const props = scopeProps()
   const inv = S.invoices.filter(inScope)
   const pend = inv.filter(i => !['Paid', 'Rejected'].includes(i.status))
   const fyNow = fy(TODAY)
   const paidFY = inv.filter(i => i.status === 'Paid' && fy(i.paidDate || i.date) === fyNow)
   const leases = props.map(p => leaseOf(p.id)).filter(Boolean)
-  const obOwn = obOutstanding(leases, null, r.ownerId)
+  const obOwn = opening?.totals.outstanding || 0
   const openT = S.tickets.filter(t => inScope(t) && !['Resolved', 'Closed'].includes(t.status))
   return (
     <>

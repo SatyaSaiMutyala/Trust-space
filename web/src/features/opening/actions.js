@@ -1,7 +1,8 @@
 /* Opening-balance actions (prototype SUBMIT.opening, SUBMIT.obPay, ACT.obUnpay, ACT.obFill). */
 import { S, owner, actor, save, toast, closeDrawer } from '../../store/store'
-import { TODAY, perAdd, perLabel, fmtD, num, newId } from '../../domain/utils'
-import { OB_DATE, obItems, isMulti, schedRow } from '../../domain/lease'
+import { callApi } from '../../app/store'
+import { TODAY, perLabel, fmtD, num, newId } from '../../domain/utils'
+import { OB_DATE, obItems, isMulti } from '../../domain/lease'
 
 /** SUBMIT.opening — read every `.obrow` of the form (period, owner, type, amount, remarks; paid details kept from data-paid). */
 export async function submitOpening(id, f, fd) {
@@ -21,14 +22,10 @@ export async function submitOpening(id, f, fd) {
   await save('leases', L); closeDrawer()
 }
 
-/** ACT.obFill — rent rows from the schedule between `from` and the month before OB_DATE that are not already listed (`have` = 'period|owner|type' keys). */
-export function obFillItems(L, from, have) {
-  from = from || L.start.slice(0, 7); const end = perAdd(OB_DATE.slice(0, 7), -1); const out = []
-  for (let p = from; p <= end; p = perAdd(p, 1)) {
-    const r = schedRow(L, p); if (!r) continue
-    r.split.forEach(x => { const rr = x.rent - x.adj; if (rr <= 0 || have.has(p + '|' + x.ownerId + '|Rent')) return; const gross = rr + (x.mode === 'Forward' ? Math.round(rr * 0.18) : 0); out.push({ period: p, type: 'Rent', ownerId: x.ownerId, amount: gross, note: 'From rent schedule' }) })
-  }
-  return out
+/** ACT.obFill — rent rows from the schedule (GET /api/leases/:id/opening-fill) between `from` and the month before OB_DATE that are not already listed (`have` = 'period|owner|type' keys). */
+export async function obFillItems(L, from, have) {
+  const res = await callApi('openingFill', { id: L.id, from: from || L.start.slice(0, 7) })
+  return res.data.items.filter(x => !have.has(x.period + '|' + x.ownerId + '|' + x.type))
 }
 
 /** SUBMIT.obPay — record the payment against one opening-balance item. */

@@ -160,12 +160,33 @@ test('PUT creates or replaces (the app’s save), PATCH updates', async () => {
   assert.equal(emptyPatch.body.message, 'Nothing to update — send the franchise partner fields to change.')
 })
 
+test('deleting moves a record to Trash; it can be restored or deleted permanently', async () => {
+  const made = await call('POST', '/tickets', { no: 'TKT-TEST-1', propertyId: 'p1', title: 'Trash test ticket', category: 'Other', priority: 'P4', status: 'Open', raisedBy: 'test' })
+  assert.equal(made.status, 201, made.body.message); const id = made.body.data.id
+  let r = await call('DELETE', `/tickets/${id}`); assert.equal(r.status, 200); assert.match(r.body.message, /moved to Trash/)
+  assert.equal((await call('GET', `/tickets/${id}`)).status, 404, 'hidden from get')
+  assert.ok(!(await call('GET', '/tickets?limit=100&search=Trash test')).body.data.some(t => t.id === id), 'hidden from lists')
+  r = await call('GET', '/trash'); assert.equal(r.status, 200); assertEnvelope(r)
+  const cat = r.body.data.categories.find(c => c.resource === 'tickets'); assert.ok(cat && cat.items.some(i => i.id === id && i.label && i.deletedAt && i.sub))
+  r = await call('POST', `/trash/tickets/${id}/restore`); assert.equal(r.status, 200); assert.match(r.body.message, /restored/)
+  assert.equal((await call('GET', `/tickets/${id}`)).status, 200, 'back after restore')
+  await call('DELETE', `/tickets/${id}`)
+  r = await call('DELETE', `/trash/tickets/${id}`); assert.equal(r.status, 200); assert.match(r.body.message, /deleted permanently/)
+  assert.equal((await call('GET', `/trash/tickets/${id}/restore`)).status, 404)
+  assert.ok(!(await call('GET', '/trash')).body.data.categories.some(c => c.items.some(i => i.id === id)))
+  // owners only see their own trashed records; only admins may empty the Trash
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  assert.equal((await call('GET', '/trash', undefined, o1)).status, 200)
+  const { accessToken: staff } = await tokenFor('facilities@trustlab.example')
+  assert.equal((await call('DELETE', '/trash', undefined, staff)).status, 403)
+})
+
 test('delete is blocked while dependents exist, then succeeds', async () => {
   const blocked = await call('DELETE', '/properties/p1')
   assert.equal(blocked.status, 409); assertEnvelope(blocked)
   assert.match(blocked.body.message, /^Property “Begumpet HQ & National Reference Lab” can’t be deleted because it still has 1 lease and 2 tickets and 18 invoices\./)
   const del = await call('DELETE', '/partners/pa9')
-  assert.equal(del.status, 200); assert.equal(del.body.message, 'Franchise partner “Test Partner LLP” deleted.')
+  assert.equal(del.status, 200); assert.equal(del.body.message, 'Franchise partner “Test Partner LLP” moved to Trash.')
   const gone = await call('DELETE', '/partners/pa9')
   assert.equal(gone.status, 404)
 })
@@ -460,6 +481,148 @@ test('leases: co-owner shares, deposit adjustments and opening balances are vali
   assert.equal(notOnLease.status, 400); assert.equal(notOnLease.body.message, 'Owner “o8” is not an owner on lease TDPL-FAC-LSE-001, so this invoice can’t be raised in their name.')
   const cert = await call('PATCH', '/owners/o2', { tdsCert: { type: 'Lower', rate: 15, from: '2026-04-01', to: '2027-03-31' } })
   assert.equal(cert.status, 400); assert.equal(cert.body.message, 'Certificate TDS rate must be between 0% and 10%.')
+})
+
+test('invoice amounts are computed by the server from the lease and owner, whatever the client sends', async () => {
+  const inv = { number: 'TEST/26-27/901', propertyId: 'p2', leaseId: 'l2', ownerId: 'o2', type: 'Rent', period: '2026-11', date: '2026-11-01', dueDate: '2026-11-07', base: 231525, gst: 1, rcm: 99, tds: 1, total: 1, net: 1, status: 'Submitted', source: 'Generated' }
+  // 10% TDS with a valid PAN; GST 18% because the owner is registered and the form ticked GST
+  let r = await call('PUT', '/invoices/t-inv-901', inv)
+  assert.equal(r.status, 201, r.body.message)
+  assert.deepEqual([r.body.data.gst, r.body.data.rcm, r.body.data.tds, r.body.data.total, r.body.data.net, r.body.data.tdsRate, r.body.data.computedBy], [41675, 0, 23153, 273200, 250047, 10, 'server'])
+  // GST unticked → no GST; electricity never attracts TDS
+  r = await call('PUT', '/invoices/t-inv-902', { ...inv, number: 'TEST/26-27/902', type: 'Electricity', base: 10000, gst: 0 })
+  assert.deepEqual([r.body.data.gst, r.body.data.tds, r.body.data.net], [0, 0, 10000])
+  // owner loses their valid PAN → a NEW invoice gets 20%, but a status change on the existing one keeps its 10%
+  const o2 = (await call('GET', '/owners/o2')).body.data
+  r = await call('PATCH', '/owners/o2', { panStatus: 'Inoperative' }); assert.equal(r.status, 200, r.body.message)
+  r = await call('PUT', '/invoices/t-inv-903', { ...inv, number: 'TEST/26-27/903' })
+  assert.deepEqual([r.body.data.tds, r.body.data.tdsRate, r.body.data.net], [46305, 20, 226895])
+  r = await call('PUT', '/invoices/t-inv-901', { ...inv, status: 'Verified' })
+  assert.equal(r.status, 200); assert.deepEqual([r.body.data.status, r.body.data.tds, r.body.data.net], ['Verified', 23153, 250047])
+  // changing the amount recomputes again, now at 20%
+  r = await call('PATCH', '/invoices/t-inv-901', { base: 100000 })
+  assert.deepEqual([r.body.data.gst, r.body.data.tds, r.body.data.net], [18000, 20000, 98000])
+  await call('PATCH', '/owners/o2', { panStatus: o2.panStatus ?? null })
+  // an invoice recorded before this rule existed (no computedBy) keeps its amounts on a status-only save, and is only recomputed when an input changes
+  const { models } = await import('../src/models/index.js')
+  await models.invoices.create({ _id: 't-inv-904', ...inv, number: 'TEST/26-27/904', gst: 5, rcm: 0, tds: 5, total: 5, net: 5 })
+  r = await call('PUT', '/invoices/t-inv-904', { ...inv, number: 'TEST/26-27/904', gst: 5, rcm: 0, tds: 5, total: 5, net: 5, status: 'Paid', paidAmount: 5 })
+  assert.deepEqual([r.body.data.status, r.body.data.tds, r.body.data.net, r.body.data.computedBy], ['Paid', 5, 5, undefined])
+  r = await call('PATCH', '/invoices/t-inv-904', { period: '2026-12' })
+  assert.deepEqual([r.body.data.tds, r.body.data.net, r.body.data.computedBy], [23153, 250047, 'server'])
+  for (const id of ['t-inv-901', 't-inv-902', 't-inv-903', 't-inv-904']) await call('DELETE', '/invoices/' + id)
+})
+
+test('deposit held, candidates and settlement are computed by the server; TDS on a deposit adjustment is derived on save', async () => {
+  let r = await call('GET', '/leases/l5/deposit'); assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  let d = r.body.data
+  assert.equal(d.deposit, 228000); assert.equal(d.held, d.deposit - d.adjusted); assert.equal(d.owners.length, 1)
+  assert.equal(d.owners[0].available, d.owners[0].held - d.owners[0].proposed); assert.ok(d.candidates.length)
+  assert.equal(d.settlement.refund, d.held - d.settlement.deductions); assert.equal(d.settlement.rows[0].due, d.settlement.refund)
+  d = (await call('GET', '/leases/l3/deposit')).body.data
+  assert.deepEqual(d.owners.map(o => [o.ownerId, o.share]), [['o3', 306000], ['o8', 204000]]); assert.equal(d.multi, true)
+  assert.equal((await call('GET', '/leases/nope/deposit')).status, 404)
+  r = await call('GET', '/deposits'); assert.equal(r.status, 200); assert.ok(r.body.data.held > 0); assert.ok(!r.body.data.leases.some(l => l.leaseId === 'l6'))
+  // a new adjustment arrives with a made-up TDS: the server replaces it with the schedule's figure (10% of the net rent for that month)
+  const L = (await call('GET', '/leases/l1')).body.data
+  const adj = { id: 't-adj-1', period: '2026-11', ownerId: 'o1', amount: 100000, tds: 999, status: 'Proposed', note: 'test', createdAt: new Date().toISOString(), createdBy: 'test' }
+  r = await call('PUT', '/leases/l1', { ...L, depAdj: (L.depAdj || []).concat(adj) }); assert.equal(r.status, 200, r.body.message)
+  const saved = r.body.data.depAdj.find(a => a.id === 't-adj-1'); assert.equal(saved.tds, 7360, '2% — the owner’s lower-deduction certificate applies from Nov 2026'); assert.equal(saved.amount, 100000)
+  // a status change alone keeps it; a changed month recomputes it
+  r = await call('PUT', '/leases/l1', { ...r.body.data, depAdj: r.body.data.depAdj.map(a => a.id === 't-adj-1' ? { ...a, status: 'Cancelled', tds: 5 } : a) })
+  assert.equal(r.body.data.depAdj.find(a => a.id === 't-adj-1').tds, 5)
+  await call('PUT', '/leases/l1', L)
+})
+
+test('opening balances, schedule pre-fill and payment defaults are computed by the server', async () => {
+  let r = await call('GET', '/opening'); assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const d = r.body.data
+  assert.equal(d.asOf, '2026-04-01'); assert.ok(d.leases.length >= 5); assert.ok(!d.leases.some(l => l.leaseId === 'l6'))
+  assert.equal(d.totals.due, d.leases.reduce((a, l) => a + l.total, 0)); assert.equal(d.totals.outstanding, d.leases.reduce((a, l) => a + l.outstanding, 0))
+  assert.ok(d.leases.every(l => l.items.every(it => it.out === Math.max(0, (+it.amount || 0) - (+it.paidAmount || 0) - (+it.tds || 0)))))
+  const l3 = d.leases.find(l => l.leaseId === 'l3'); assert.ok(l3.items.some(it => it.ownerId === 'o8') && l3.items.some(it => it.ownerId === 'o3'))
+  // an owner sees their own items only
+  const { accessToken: o8 } = await tokenFor('sravani.pydi@example.com')
+  const mine = (await call('GET', '/opening', undefined, o8)).body.data.leases.find(l => l.leaseId === 'l3')
+  assert.ok(mine.items.length && mine.items.every(it => it.ownerId === 'o8'))
+  // pre-fill from the schedule: Nov 2025 – Mar 2026 for the co-owned lease, two rows a month
+  r = await call('GET', '/leases/l3/opening-fill?from=2025-11'); assert.equal(r.status, 200)
+  assert.equal(r.body.data.items.length, 10); assert.deepEqual(r.body.data.items[0], { period: '2025-11', type: 'Rent', ownerId: 'o3', amount: 40800, note: 'From rent schedule' }) // 60% of ₹85,000 less the ₹10,200 advance adjustment
+  assert.equal((await call('GET', '/leases/l3/opening-fill?from=nov')).status, 400)
+  // payment defaults: TDS at the owner's rate on the rent part of the amount
+  const it = l3.items.find(x => x.ownerId === 'o3' && x.type === 'Rent')
+  r = await call('GET', `/leases/l3/opening-pay/${it.id}`); assert.equal(r.status, 200)
+  assert.equal(r.body.data.rate, 10); assert.equal(r.body.data.tds, Math.round(it.amount * 0.1)); assert.equal(r.body.data.paid, it.amount - r.body.data.tds)
+  assert.equal((await call('GET', '/leases/l3/opening-pay/nope')).status, 404)
+})
+
+test('ledgers, rent roll and rent status are computed by the server', async () => {
+  // Rent ledger for TrustLab's whole scope, current FY — the figures the Owner ledgers page shows
+  let r = await call('GET', '/ledgers?tab=Rent&fy=26-27')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  let d = r.body.data
+  assert.deepEqual([d.opening, d.totals.dr, d.totals.cr - d.totals.tds, d.totals.tds, d.totals.closing], [693950, 5283760, 4192940, 326380, 1458390])
+  assert.ok(d.rows.length && d.rows.every(x => x.d >= '2026-04-01')); assert.ok(d.recon.rows.length); assert.ok(d.fys.includes('26-27'))
+  // one property, one co-owner
+  d = (await call('GET', '/ledgers?tab=Rent&fy=26-27&propertyId=p3&ownerId=o8')).body.data
+  assert.deepEqual([d.opening, d.totals.dr, d.totals.closing, d.ownerId], [71400, 214200, 71400, 'o8'])
+  assert.ok((await call('GET', '/ledgers?tab=Other&fy=all')).body.data.deposits.length)
+  assert.equal((await call('GET', '/ledgers?tab=Rent&fy=2026')).status, 400)
+  assert.equal((await call('GET', '/ledgers?propertyId=nope')).status, 400)
+  const csv = await fetch(base + '/ledgers.csv?tab=Rent', { headers: { Authorization: 'Bearer ' + token } })
+  assert.equal(csv.status, 200); assert.ok((await csv.text()).startsWith('"Date","Particulars"'))
+  // an owner gets their own rows only, whatever ownerId they pass
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  d = (await call('GET', '/ledgers?tab=Rent&fy=26-27&ownerId=o3', undefined, o1)).body.data
+  assert.deepEqual([d.ownerId, d.opening, d.totals.dr, d.totals.tds, d.totals.closing], ['o1', 0, 2605440, 184000, 434240])
+  // rent roll: 7 months around today, cells per lease, no drafts
+  r = await call('GET', '/rent-roll?months=7'); d = r.body.data
+  assert.equal(d.periods.length, 7); assert.equal(d.periods[5], d.cur); assert.ok(!d.leases.some(l => l.leaseId === 'l6'), 'draft lease excluded')
+  const l1 = d.leases.find(l => l.leaseId === 'l1'); assert.ok(l1); assert.ok(['paid', 'late', 'process', 'missing', 'upcoming', 'free', 'na'].includes(l1.cells[d.cur].k)); assert.equal(l1.rentNow, 368000)
+  const l3 = (await call('GET', '/rent-roll', undefined, (await tokenFor('sravani.pydi@example.com')).accessToken)).body.data.leases.find(l => l.leaseId === 'l3')
+  assert.equal(l3.rentNow, 35700, 'co-owner sees their share'); assert.equal(l3.cells[d.cur].multi, false)
+  // rent status per property
+  d = (await call('GET', '/rent-status')).body.data
+  assert.equal(d.byProperty.p1.v, 'Overdue'); assert.match(d.byProperty.p1.note, /₹3,97,440 · 1 month unpaid/); assert.equal(d.byProperty.p6.v, '—')
+})
+
+test('rent schedule is computed by the server and scoped like the lease', async () => {
+  const r = await call('GET', '/leases/l3/schedule')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const sc = r.body.data
+  assert.equal(sc.leaseId, 'l3'); assert.equal(sc.tot.months, 60)
+  assert.deepEqual([sc.tot.rent, sc.tot.maint, sc.tot.rcm, sc.tot.tds, sc.tot.net], [5519516, 360000, 1027713, 320971, 5388545])
+  assert.deepEqual(sc.owners.map(o => [o.ownerId, o.rent, o.deposit]), [['o3', 3311710, 306000], ['o8', 2207806, 204000]])
+  assert.equal(sc.rows[0].notes[0], 'Rent-free'); assert.equal(sc.upfront.advTds, 10200)
+  assert.equal((await call('GET', '/leases/l5/schedule')).body.data.end, '2026-12-01', 'stops at the exit date')
+  assert.equal((await call('GET', '/leases/nope/schedule')).status, 404)
+  const csv = await fetch(base + '/leases/l1/schedule.csv', { headers: { Authorization: 'Bearer ' + token } })
+  assert.equal(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv/); assert.ok((await csv.text()).startsWith('"Month","Lease year"'))
+  const { accessToken: o8 } = await tokenFor('sravani.pydi@example.com')
+  assert.equal((await call('GET', '/leases/l3/schedule', undefined, o8)).status, 200, 'co-owner sees the shared lease')
+  assert.equal((await call('GET', '/leases/l1/schedule', undefined, o8)).status, 404, 'not another owner’s lease')
+})
+
+test('TDS report, return CSV and owner Form 16A are computed by the server', async () => {
+  const r = await call('GET', '/tds/report?fy=26-27')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const R = r.body.data
+  assert.equal(R.fy, '26-27'); assert.equal(R.ws, 'tdpl'); assert.equal(R.rows.length, 12); assert.equal(R.quarters.length, 4)
+  assert.equal(R.rows.reduce((a, x) => a + x.ded, 0), 352030); assert.equal(R.rows.reduce((a, x) => a + x.dep, 0), 305505)
+  const sep = R.rows.find(x => x.m === '2026-09'); assert.equal(sep.st, 'Overdue'); assert.equal(sep.bal, 46525)
+  assert.equal(R.quarters[0].st, 'Filed'); assert.equal(R.challans.length, 5); assert.ok(R.fys.includes('26-27'))
+  assert.equal((await call('GET', '/tds/report?fy=2026')).status, 400)
+  const csv = await fetch(base + '/tds/return.csv?fy=26-27&q=1', { headers: { Authorization: 'Bearer ' + token } })
+  assert.equal(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv/); assert.ok((await csv.text()).startsWith('"Deductee PAN"'))
+  const f16 = await call('GET', '/tds/owner/o1/f16')
+  assert.equal(f16.status, 200); assert.ok(f16.body.data.quarters.length); assert.equal(f16.body.data.pan, 'ABCPK1234F')
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  assert.equal((await call('GET', '/tds/report', undefined, o1)).status, 403)
+  assert.equal((await call('GET', '/tds/owner/o1/f16', undefined, o1)).status, 200)
+  assert.equal((await call('GET', '/tds/owner/o3/f16', undefined, o1)).status, 403)
+  const { accessToken: fr } = await tokenFor('medpoint@example.com')
+  const fx = await call('GET', '/tds/report?fy=26-27', undefined, fr)
+  assert.equal(fx.status, 200); assert.equal(fx.body.data.ws, 'pa2'); assert.equal(fx.body.data.rows.reduce((a, x) => a + x.dep, 0), 0)
 })
 
 test('TDS records: challans and returns per workspace; owners only read their own Form 16A', async () => {

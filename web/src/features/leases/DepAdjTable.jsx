@@ -6,7 +6,8 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, S, isOwner, role, owner } from '../../store/store'
 import { fmtD, inr, perLabel } from '../../domain/utils'
-import { isMulti, depAdjs, depHeld, depShareAmt } from '../../domain/lease'
+import { isMulti, depAdjs } from '../../domain/lease'
+import { useLeaseDeposit } from './useLeaseDeposit'
 import { Btn } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { depAgree, depDecline, depCancel } from './actions'
@@ -16,7 +17,8 @@ const SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head':
 
 export default function DepAdjTable({ L, heading = true }) {
   useStore()
-  const me = isOwner() ? role().ownerId : null
+  const me = isOwner() ? role().ownerId : null; const { dep } = useLeaseDeposit(L.id)
+  const mine = me ? dep?.owners.find(o => o.ownerId === me) : null
   const rows = depAdjs(L, me, true).concat((L.depAdj || []).filter(a => ['Declined', 'Cancelled'].includes(a.status) && (!me || a.ownerId === me))).sort((a, b) => a.period.localeCompare(b.period))
   if (!rows.length) return null
   const multi = isMulti(L) && !me
@@ -24,7 +26,7 @@ export default function DepAdjTable({ L, heading = true }) {
     <div>
       <div className="filters" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
         {heading ? <div className="eyebrow">Security deposit adjusted against rent</div> : <span />}
-        <span className="small">Held now {me ? inr(depHeld(L, me)) : inr(depHeld(L))} of {me ? inr(depShareAmt(L, me)) : inr(L.deposit)}</span>
+        <span className="small">{dep ? <>Held now {inr(me ? mine?.held || 0 : dep.held)} of {inr(me ? mine?.share || 0 : dep.deposit)}</> : null}</span>
       </div>
       <div className="tbl-wrap">
         <Table size="small" className="otable" sx={SX}>

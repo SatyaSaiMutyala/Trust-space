@@ -6,6 +6,10 @@ import healthRouter from './routes/health.js'
 import authRouter from './routes/auth.js'
 import usersRouter from './routes/users.js'
 import resourceRouter from './routes/resources.js'
+import tdsRouter from './routes/tds.js'
+import leasesRouter from './routes/leases.js'
+import reportsRouter from './routes/reports.js'
+import trashRouter from './routes/trash.js'
 import assetRouter from './routes/assets.js'
 import { notFoundRoute, errorHandler } from './middleware/errors.js'
 
@@ -26,6 +30,10 @@ app.use('/api/auth', authRouter)
 // Signed-in users only
 app.use('/api/users', usersRouter)
 app.use('/api/assets', assetRouter)
+app.use('/api/tds', tdsRouter) // /tds/report etc. — before the generic /tds/:id routes
+app.use('/api/leases', leasesRouter) // /leases/:id/schedule
+app.use('/api', reportsRouter) // /ledgers, /rent-roll, /rent-status
+app.use('/api/trash', trashRouter)
 app.use('/api', resourceRouter)
 
 app.use(notFoundRoute)

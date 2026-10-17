@@ -37,10 +37,11 @@ const MIN_GAP = 10000 // ms between refreshes — quick clicks between pages don
 
 /** Re-fetch every collection in the background and swap it in — skipped while a drawer is open or a save is in flight,
  *  so nothing the user is editing gets replaced under them. Silent on failure (the next tick tries again). */
-export async function refreshPortfolio() {
+export async function refreshPortfolio({ force = false } = {}) {
   const st = getState()
   if (st.auth.status !== 'signedIn' || st.entities.status !== 'ready') return
-  if (refreshing || APP.drawer || APP.pending > 0 || Date.now() - lastRefresh < MIN_GAP) return
+  if (refreshing || APP.pending > 0) return
+  if (!force && (APP.drawer || Date.now() - lastRefresh < MIN_GAP)) return
   refreshing = true
   try {
     const results = await Promise.all(COLS.map(async col => [col, await fetchAll(col)]))

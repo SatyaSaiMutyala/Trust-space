@@ -5,7 +5,8 @@ import Box from '@mui/material/Box'
 import { useStore, S, UI, isOwner, role, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
 import { fmtD, pctLabel, daysTo, inr, CUR } from '../../domain/utils'
-import { leaseOf, frontOf, occStatus, rentStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState, rentFor } from '../../domain/lease'
+import { leaseOf, frontOf, occStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState, rentFor } from '../../domain/lease'
+import { useRentStatus } from '../shared/useLedgerReports'
 import { fileUrl } from '../../services/files'
 import { Btn, PageHead, Panel, Facts, Cols, Empty } from '../../components/ui/Layout'
 import { StatusChip, Badge } from '../../components/ui/Status'
@@ -122,10 +123,11 @@ function Summary({ P }) {
 
 export default function PropertyDetailPage() {
   useStore()
+  const { byProperty } = useRentStatus()
   const P = prop(UI.sel)
   if (!P || !inScope({ propertyId: P.id })) { UI.route = isOwner() ? 'o-home' : 'properties'; return isOwner() ? <OwnerHomePage /> : <PropertiesPage /> }
   const L = leaseOf(P.id); const tab = UI.tab; const o = isOwner()
-  const occ = occStatus(P), rs = rentStatus(P), rp = repairStatus(P), ll = leaseLeft(L)
+  const occ = occStatus(P), rs = byProperty?.[P.id] || { v: '…', k: 'idle', note: '' }, rp = repairStatus(P), ll = leaseLeft(L)
   const openTickets = S.tickets.filter(t => t.propertyId === P.id && !['Resolved', 'Closed'].includes(t.status)).length
   let body = null
   if (tab === 'summary') body = <Summary P={P} />

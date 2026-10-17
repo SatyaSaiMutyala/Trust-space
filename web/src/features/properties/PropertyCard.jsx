@@ -1,7 +1,8 @@
 /* Property card — port of pcard + statusRows (reference/TruSpace.html). Props: { P } */
 import { useStore, owner, role, isOwner, openProp } from '../../store/store'
 import { CUR, inr, fmtD, daysTo } from '../../domain/utils'
-import { leaseOf, leaseState, rentFor, frontOf, occStatus, rentStatus, repairStatus, ownersLabel, ownerShare, isMulti, noticeBy } from '../../domain/lease'
+import { leaseOf, leaseState, rentFor, frontOf, occStatus, repairStatus, ownersLabel, ownerShare, isMulti, noticeBy } from '../../domain/lease'
+import { useRentStatus } from '../shared/useLedgerReports'
 import { fileUrl } from '../../services/files'
 import { StatusChip } from '../../components/ui/Status'
 import { Facade } from '../../components/ui/Media'
@@ -22,9 +23,10 @@ function noticeStatus(P) {
 }
 
 /** The independent statuses of a property: occupancy, rent, repairs and the notice-period countdown. */
+const LOADING = { v: '…', k: 'idle', note: '' }
 export function StatusRows({ P }) {
-  const ns = noticeStatus(P)
-  return <div className="srows"><SRow l="Status" x={occStatus(P)} /><SRow l="Rent" x={rentStatus(P)} /><SRow l="Repairs & maintenance" x={repairStatus(P)} />{ns ? <SRow l="Notice period" x={ns} /> : null}</div>
+  const ns = noticeStatus(P); const { byProperty } = useRentStatus()
+  return <div className="srows"><SRow l="Status" x={occStatus(P)} /><SRow l="Rent" x={byProperty?.[P.id] || LOADING} /><SRow l="Repairs & maintenance" x={repairStatus(P)} />{ns ? <SRow l="Notice period" x={ns} /> : null}</div>
 }
 
 export default function PropertyCard({ P }) {

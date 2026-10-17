@@ -20,11 +20,11 @@ export const PRI_K = { P1: 'bad', P2: 'warn', P3: 'info', P4: 'idle' }
 /* Navigation */
 export const NAV_TDPL = [
   ['overview', 'Overview'], ['sites', 'Site scouting'], ['properties', 'Properties'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['opening', 'Opening balances'], ['tds', 'TDS'],
-  ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners'], ['access', 'Portal access'],
+  ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners'], ['access', 'Portal access'], ['trash', 'Trash'],
 ]
-export const NAV_OWNER = [['o-home', 'My properties'], ['o-me', 'My details'], ['o-docs', 'Agreements'], ['ledgers', 'Ledgers'], ['invoices', 'Invoices & payments'], ['tickets', 'Repairs & tickets'], ['inspections', 'Inspections'], ['messages', 'Messages']]
+export const NAV_OWNER = [['o-home', 'My properties'], ['o-me', 'My details'], ['o-docs', 'Agreements'], ['ledgers', 'Ledgers'], ['invoices', 'Invoices & payments'], ['tickets', 'Repairs & tickets'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['trash', 'Trash']]
 export const NAV_FR = [['sites', 'My locations']]
-export const NAV_FR_FULL = [['sites', 'My locations'], ['overview', 'Premises overview'], ['properties', 'Premises'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['opening', 'Opening balances'], ['tds', 'TDS'], ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners']]
+export const NAV_FR_FULL = [['sites', 'My locations'], ['overview', 'Premises overview'], ['properties', 'Premises'], ['leases', 'Leases & contracts'], ['inspections', 'Take-over & handover'], ['invoices', 'Rent & invoices'], ['ledgers', 'Owner ledgers'], ['opening', 'Opening balances'], ['tds', 'TDS'], ['tickets', 'Repairs & tickets'], ['messages', 'Owner messages'], ['exits', 'Exits & terminations'], ['owners', 'Owners'], ['trash', 'Trash']]
 
 /* Exits */
 export const EXIT_STEPS = ['Notice served', 'Joint inspection', 'Handover', 'Final settlement', 'Deposit refunded']

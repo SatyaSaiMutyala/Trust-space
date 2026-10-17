@@ -8,6 +8,7 @@
     "seed": "node src/seed/seed.js",
     "create-admin": "node src/seed/create-admin.js",
     "test": "node --test test/",
+    "test:calc": "node --test ../shared/calc/test/",
     "dev:memory": "node src/dev-memory.js"
   },
   "dependencies": {

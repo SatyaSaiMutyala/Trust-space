@@ -6,7 +6,10 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, isOwner, role, owner } from '../../store/store'
 import { CUR, inr, pctLabel } from '../../domain/utils'
-import { schedule, rentFor, depAdjusted, depHeld, maskAcct, tdsPerOwner, tdsRate, panValid, certFor } from '../../domain/lease'
+import { rentFor, maskAcct, tdsPerOwner, tdsRate, panValid, certFor } from '../../domain/lease'
+import { TableSkeleton } from '../../components/ui/Skeletons'
+import { useLeaseSchedule } from './useLeaseSchedule'
+import { useLeaseDeposit } from './useLeaseDeposit'
 import { StatusChip } from '../../components/ui/Status'
 import { BankChip } from '../owners/OwnerProfile'
 
@@ -15,7 +18,8 @@ const SX = { '& .MuiTableCell-root': { fontSize: 12.5 }, '& .MuiTableCell-head':
 
 export default function OwnersBlock({ L, heading = true }) {
   useStore()
-  const sc = schedule(L); const me = isOwner() ? role().ownerId : null
+  const { sc } = useLeaseSchedule(L.id); const { dep } = useLeaseDeposit(L.id); const me = isOwner() ? role().ownerId : null
+  if (!sc) return <TableSkeleton rows={2} cols={9} panel={false} />
   return (
     <div>
       {heading ? <div className="eyebrow" style={{ marginBottom: 6 }}>Owners &amp; share of payments</div> : null}
@@ -32,7 +36,7 @@ export default function OwnersBlock({ L, heading = true }) {
                   <TableCell><b>{O?.name || '—'}</b>{me === x.ownerId ? <> <StatusChip label="You" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
                   <TableCell className="num">{inr(Math.round((+L.rent || 0) * sh.rent / 100))}<div className="small muted">{pctLabel(sh.rent)}</div></TableCell>
                   <TableCell className="num">{inr(Math.round((+L.maint || 0) * sh.maint / 100))}<div className="small muted">{pctLabel(sh.maint)}</div></TableCell>
-                  <TableCell className="num">{inr(x.deposit)}<div className="small muted">{pctLabel(sh.dep)}{depAdjusted(L, x.ownerId) ? ` · held ${inr(depHeld(L, x.ownerId))}` : ''}</div></TableCell>
+                  <TableCell className="num">{inr(x.deposit)}<div className="small muted">{pctLabel(sh.dep)}{(() => { const o = dep?.owners.find(w => w.ownerId === x.ownerId); return o && o.adjusted ? ` · held ${inr(o.held)}` : '' })()}</div></TableCell>
                   <TableCell className="num">{x.adv ? inr(x.adv) : '—'}<div className="small muted">{pctLabel(sh.adv)}</div></TableCell>
                   <TableCell className="small">{G[x.mode] || x.mode}</TableCell>
                   <TableCell className="small">{x.tdsOn ? (!panValid(O) ? <span style={{ color: 'var(--bad)' }}>{tdsRate(x.ownerId, CUR + '-01')}% — no valid PAN</span> : certFor(O, CUR + '-01') ? `${tdsRate(x.ownerId, CUR + '-01')}% (certificate)` : `${tdsRate(x.ownerId, CUR + '-01')}%`) : 'Below threshold'}</TableCell>

@@ -3,7 +3,8 @@
 import { S, UI, prop, owner, save, toast, emit, openDrawer, actor, side } from '../../store/store'
 import { newInsp, settleWithDeposit } from '../../store/actions'
 import { addDays, addMonths, num, inr, perLabel, newId, nowISO, TODAY } from '../../domain/utils'
-import { rentFor, scheduleCsv, leaseOwners, isMulti, depHeld, depAdjs, splitAmt } from '../../domain/lease'
+import { rentFor, leaseOwners, isMulti, splitAmt } from '../../domain/lease'
+import { callApi } from '../../app/store'
 import { inspOf } from '../../domain/inspection'
 import { offerDownload } from '../../services/files'
 
@@ -20,7 +21,7 @@ export async function activateLease(id) {
 
 export function schedMode(m) { UI.schedMode = m; emit() }
 
-export function schedCsv(id) { const L = S.leases.find(l => l.id === id); offerDownload(`${L.ref}-rent-schedule.csv`, scheduleCsv(L)) }
+export async function schedCsv(id) { const L = S.leases.find(l => l.id === id); try { offerDownload(`${L.ref}-rent-schedule.csv`, await callApi('leaseScheduleCsv', id)) } catch (e) { toast(e.message, 'error') } }
 
 /*
  * Co-owner shares are ENTERED as ₹ amounts per column (rent, maintenance, deposit, advance) but STORED as % shares on the
@@ -114,17 +115,18 @@ export function depDecline(leaseId, id) {
 export async function depCancel(leaseId, id) { const [L, a] = adjOf(leaseId, id); a.status = 'Cancelled'; await save('leases', L) }
 
 /** SUBMIT.depAdj */
-export async function submitDepAdj(fd, leaseId) {
+export async function submitDepAdj(fd, leaseId, dep) {
   const L = S.leases.find(l => l.id === leaseId); const how = fd.get('how') || 'portal'; const picks = []
   for (const [k] of fd.entries()) { if (!k.startsWith('on_')) continue; const i = k.slice(3); const [period, ownerId, tds] = fd.get('key_' + i).split('|'); const amount = num(fd.get('amt_' + i)); if (amount > 0) picks.push({ period, ownerId, tds: +tds || 0, amount }) }
   if (!picks.length) { toast('Tick at least one month.', 'warning'); return }
-  for (const o of leaseOwners(L)) { const want = picks.filter(x => x.ownerId === o.ownerId).reduce((a, x) => a + x.amount, 0); const avail = depHeld(L, o.ownerId) - depAdjs(L, o.ownerId, true).filter(a => a.status === 'Proposed').reduce((a, x) => a + (+x.amount || 0), 0); if (want > avail) { toast(`${isMulti(L) ? (owner(o.ownerId)?.name || '') + '’s' : 'The'} deposit held (${inr(avail)}) is less than ${inr(want)}.`, 'warning'); return } }
+  const depOf = oid => dep.owners.find(o => o.ownerId === oid) || { held: 0, available: 0 }
+  for (const o of leaseOwners(L)) { const want = picks.filter(x => x.ownerId === o.ownerId).reduce((a, x) => a + x.amount, 0); const avail = depOf(o.ownerId).available; if (want > avail) { toast(`${isMulti(L) ? (owner(o.ownerId)?.name || '') + '’s' : 'The'} deposit held (${inr(avail)}) is less than ${inr(want)}.`, 'warning'); return } }
   if (how === 'recorded' && !(fd.get('ref') || '').trim()) { toast('Add the reference for the owner’s agreement.', 'warning'); return }
   const consent = how === 'recorded' ? { how: fd.get('how2'), on: fd.get('on'), ref: fd.get('ref'), by: actor() } : null
   L.depAdj = (L.depAdj || []).concat(picks.map(x => Object.assign({ id: newId(), status: consent ? 'Agreed' : 'Proposed', consent, note: fd.get('note') || '', createdAt: nowISO(), createdBy: actor() }, x)))
   if (consent) await settleWithDeposit(L)
   await save('leases', L)
   const byOwner = {}; picks.forEach(x => (byOwner[x.ownerId] = byOwner[x.ownerId] || []).push(x))
-  for (const [oid, xs] of Object.entries(byOwner)) await save('messages', { propertyId: L.propertyId, ownerId: oid, from: side(), by: actor(), kind: consent ? 'Notice' : 'Approval request', text: `${consent ? 'As agreed' : 'TrustLab proposes'} to settle rent for ${xs.map(x => perLabel(x.period)).join(', ')} from the security deposit held${isMulti(L) ? ' (your share)' : ''}: ${inr(xs.reduce((a, x) => a + x.amount, 0))} in total, with TDS deducted and deposited as usual. Deposit held after this: ${inr(depHeld(L, oid) - (consent ? 0 : xs.reduce((a, x) => a + x.amount, 0)))}.${consent ? '' : ' Please agree or decline under Lease in your portal.'}`, at: nowISO(), files: [], read: { [side()]: true } }, true)
+  for (const [oid, xs] of Object.entries(byOwner)) await save('messages', { propertyId: L.propertyId, ownerId: oid, from: side(), by: actor(), kind: consent ? 'Notice' : 'Approval request', text: `${consent ? 'As agreed' : 'TrustLab proposes'} to settle rent for ${xs.map(x => perLabel(x.period)).join(', ')} from the security deposit held${isMulti(L) ? ' (your share)' : ''}: ${inr(xs.reduce((a, x) => a + x.amount, 0))} in total, with TDS deducted and deposited as usual. Deposit held after this: ${inr(depOf(oid).held - xs.reduce((a, x) => a + x.amount, 0))}.${consent ? '' : ' Please agree or decline under Lease in your portal.'}`, at: nowISO(), files: [], read: { [side()]: true } }, true)
   toast(consent ? 'Recorded — those months are settled from the deposit' : 'Sent to the owner for agreement', 'success'); openDrawer({ kind: 'leaseView', id: L.id })
 }

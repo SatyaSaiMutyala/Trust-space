@@ -78,7 +78,59 @@ export const api = createApi({
     }),
     removeRecord: b.mutation({
       query: ({ resource, id }) => ({ url: `/${resource}/${encodeURIComponent(id)}`, method: 'DELETE' }),
-      invalidatesTags: (r, e, { resource }) => [{ type: 'List', id: resource }],
+      invalidatesTags: (r, e, { resource }) => [{ type: 'List', id: resource }, { type: 'List', id: 'trash' }],
+    }),
+
+    /* trash */
+    trash: b.query({ query: () => '/trash', providesTags: [{ type: 'List', id: 'trash' }] }),
+    trashRestore: b.mutation({ query: ({ resource, id }) => ({ url: `/trash/${resource}/${encodeURIComponent(id)}/restore`, method: 'POST' }), invalidatesTags: (r, e, { resource }) => [{ type: 'List', id: 'trash' }, { type: 'List', id: resource }] }),
+    trashDestroy: b.mutation({ query: ({ resource, id }) => ({ url: `/trash/${resource}/${encodeURIComponent(id)}`, method: 'DELETE' }), invalidatesTags: [{ type: 'List', id: 'trash' }] }),
+    trashEmpty: b.mutation({ query: () => ({ url: '/trash', method: 'DELETE' }), invalidatesTags: [{ type: 'List', id: 'trash' }] }),
+
+    /* server-computed reports (shared/calc on the API) — refetched when the records they depend on are saved */
+    tdsReport: b.query({
+      query: ({ fy }) => `/tds/report${qs({ fy })}`,
+      providesTags: ['tds', 'invoices', 'leases', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    ownerF16: b.query({
+      query: ownerId => `/tds/owner/${encodeURIComponent(ownerId)}/f16`,
+      providesTags: ['tds', 'invoices', 'leases', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    tdsReturnCsv: b.query({ query: ({ fy, q }) => ({ url: `/tds/return.csv${qs({ fy, q })}`, responseHandler: 'text' }) }),
+    leaseSchedule: b.query({
+      query: id => `/leases/${encodeURIComponent(id)}/schedule`,
+      providesTags: ['leases', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    leaseScheduleCsv: b.query({ query: id => ({ url: `/leases/${encodeURIComponent(id)}/schedule.csv`, responseHandler: 'text' }) }),
+    ledger: b.query({
+      query: p => `/ledgers${qs(p)}`,
+      providesTags: ['invoices', 'leases', 'owners', 'properties'].map(id => ({ type: 'List', id })),
+    }),
+    ledgerCsv: b.query({ query: p => ({ url: `/ledgers.csv${qs(p)}`, responseHandler: 'text' }) }),
+    rentRoll: b.query({
+      query: ({ months }) => `/rent-roll${qs({ months })}`,
+      providesTags: ['invoices', 'leases', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    rentStatus: b.query({
+      query: () => '/rent-status',
+      providesTags: ['invoices', 'leases', 'owners', 'properties'].map(id => ({ type: 'List', id })),
+    }),
+    opening: b.query({
+      query: () => '/opening',
+      providesTags: ['invoices', 'leases', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    openingFill: b.query({ query: ({ id, from }) => `/leases/${encodeURIComponent(id)}/opening-fill${qs({ from })}` }),
+    leaseDeposit: b.query({
+      query: id => `/leases/${encodeURIComponent(id)}/deposit`,
+      providesTags: ['leases', 'invoices', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    deposits: b.query({
+      query: () => '/deposits',
+      providesTags: ['leases', 'invoices', 'owners'].map(id => ({ type: 'List', id })),
+    }),
+    openingPay: b.query({
+      query: ({ id, itemId }) => `/leases/${encodeURIComponent(id)}/opening-pay/${encodeURIComponent(itemId)}`,
+      providesTags: ['leases', 'owners'].map(id => ({ type: 'List', id })),
     }),
 
     /* uploads */

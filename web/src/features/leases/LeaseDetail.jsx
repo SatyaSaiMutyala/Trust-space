@@ -9,7 +9,10 @@ import TableCell from '@mui/material/TableCell'
 import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
 import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
-import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, schedule, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, depAdjusted, depHeld, tdsRate, panValid } from '../../domain/lease'
+import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, tdsRate, panValid } from '../../domain/lease'
+import { useLeaseDeposit } from './useLeaseDeposit'
+import { TableSkeleton } from '../../components/ui/Skeletons'
+import { useLeaseSchedule } from './useLeaseSchedule'
 import { Btn, Panel, FactGrid, Kpis, Kpi, Banner, Section } from '../../components/ui/Layout'
 import { StatusChip, Seg } from '../../components/ui/Status'
 import LeaseInspections from '../inspections/LeaseInspections'
@@ -186,10 +189,13 @@ export function ScheduleTable({ sc, L, mode }) {
 /** One-line description of the schedule: term, escalation, payment timing. */
 const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}`
 
-/** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). headerless: the caller shows the title. */
+/** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). headerless: the caller shows the title.
+    The schedule comes from the API (useLeaseSchedule). */
 export function SchedulePanel({ L, headerless }) {
   useStore()
-  const sc = schedule(L); if (!sc.rows.length) return null
+  const { sc } = useLeaseSchedule(L.id)
+  if (!sc) return <TableSkeleton rows={6} cols={8} panel={false} />
+  if (!sc.rows.length) return null
   const mode = UI.schedMode || 'month'
   return (
     <div>
@@ -216,7 +222,7 @@ const GST_TXT = { Forward: '18% charged by owner (forward charge)', RCM: '18% pa
 export default function LeaseDetail({ L }) {
   useStore()
   const st = leaseState(L); const le = lockEnd(L); const ne = nextEsc(L); const o = isOwner()
-  const sc = schedule(L)
+  const { sc } = useLeaseSchedule(L.id); const { dep } = useLeaseDeposit(L.id)
   return (
     <Panel
       title={<h2>{L.ref}</h2>}
@@ -232,7 +238,7 @@ export default function LeaseDetail({ L }) {
         <Section title="Lease terms"><FactGrid items={[
           ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span><span className="muted small">/mo</span></>, `Base rent ${inr(L.rent)}`],
           ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None', L.escPct ? `${L.escType === 'Simple' ? 'Simple, on base rent' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}${ne ? ' · next ' + fmtD(ne) : ''}` : null],
-          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, depAdjusted(L) ? `${inr(depAdjusted(L))} adjusted against rent · ${inr(depHeld(L))} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'],
+          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, dep?.adjusted ? `${inr(dep.adjusted)} adjusted against rent · ${inr(dep.held)} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'],
           ['Lock-in', L.lockIn ? `${L.lockIn} months` : 'None', L.lockIn ? `Ends ${fmtD(le)}` : null],
           ['Notice period', `${L.notice} months`, `Serve by ${fmtD(noticeBy(L))}`],
           ['Rent payment', L.payTiming === 'Arrears' ? 'In arrears' : 'In advance', `By the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
@@ -251,7 +257,8 @@ export default function LeaseDetail({ L }) {
         {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}
         <Section title="Key clauses"><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></Section>
         <Section title="Joint inspections"><LeaseInspections L={L} /></Section>
-        {sc.rows.length ? <Section title="Rent schedule — full term" sub={schedSub(L, sc)} actions={<Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>}><SchedulePanel L={L} headerless /></Section> : null}
+        {!sc ? <Section title="Rent schedule — full term"><TableSkeleton rows={6} cols={8} panel={false} /></Section>
+          : sc.rows.length ? <Section title="Rent schedule — full term" sub={schedSub(L, sc)} actions={<Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>}><SchedulePanel L={L} headerless /></Section> : null}
       </Box>
     </Panel>
   )

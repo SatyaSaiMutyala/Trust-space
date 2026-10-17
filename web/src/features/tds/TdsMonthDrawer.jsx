@@ -6,15 +6,17 @@ import TableCell from '../invoices/TableCell'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { owner, prop, isOwner, useStore } from '../../store/store'
 import { inr, fmtD, perLabel, fy } from '../../domain/utils'
-import { TST, tdsMonthRows } from '../../domain/tds'
+import { TST } from '../../domain/tds'
+import { useTdsReport } from './useTdsReport'
 import { Btn, Empty, TableCard } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { tdsChallan } from './actions'
 
 export default function TdsMonthDrawer({ d }) {
   useStore()
-  const r = d.m ? tdsMonthRows(fy(d.m + '-01')).find(x => x.m === d.m) : null
-  if (!r) return <DrawerLayout title="TDS"><Empty>Not found.</Empty></DrawerLayout>
+  const { report, isLoading } = useTdsReport(d.m ? fy(d.m + '-01') : null)
+  const r = report?.rows.find(x => x.m === d.m)
+  if (!r) return <DrawerLayout title="TDS"><Empty>{isLoading ? 'Loading…' : 'Not found.'}</Empty></DrawerLayout>
   return (
     <DrawerLayout title={`TDS · ${perLabel(d.m)}`} sub={<>Deducted {inr(r.ded)} · deposited {inr(r.dep)} · due {fmtD(r.due)} · <StatusChip label={r.st} k={TST[r.st]} /></>}
       footer={r.bal > 0 && !isOwner() ? <Btn primary onClick={() => tdsChallan(d.m)}>Record challan for {inr(r.bal)}</Btn> : null}>

@@ -1,4 +1,5 @@
-/* TDS (prototype viewTds): monthly register, challans, returns & Form 16A, owner certificates & PAN. */
+/* TDS (prototype viewTds): monthly register, challans, returns & Form 16A, owner certificates & PAN.
+   Register, returns, deductions and challans come from the API (GET /api/tds/report — computed on the server). */
 import Box from '@mui/material/Box'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
@@ -9,16 +10,18 @@ import TableFooter from '@mui/material/TableFooter'
 import TableCell from '../invoices/TableCell'
 import { Fragment } from 'react'
 import { S, isOwner, useStore } from '../../store/store'
-import { TODAY, CUR, inr, fmtD, perLabel, fy, by, daysTo } from '../../domain/utils'
+import { TODAY, CUR, inr, fmtD, perLabel, fy, daysTo } from '../../domain/utils'
 import { leaseOwners, panValid, tdsRate } from '../../domain/lease'
-import { tdsDocs, tdsDue, daysBetween, fmtCinDate, TST, tdsEntries, tdsMonthRows, tdsQuarters } from '../../domain/tds'
+import { tdsDue, daysBetween, fmtCinDate, TST } from '../../domain/tds'
 import { PageHead, Kpis, Kpi, Panel, Banner, Btn, TableCard, ClickRow, Stack } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { FileLinks } from '../../components/ui/Media'
 import { SelectInput } from '../../components/form/Fields'
 import { SampleBanner } from '../../components/app/Banners'
+import { KpiSkeleton, TableSkeleton, Refreshing } from '../../components/ui/Skeletons'
 import SrLabel from '../invoices/SrLabel'
 import { tdsv, tdsTab, setTdsFy, tdsMonth, tdsChallan, tdsReturn, tds16, tdsCert, tdsQcsv } from './actions'
+import { useTdsReport } from './useTdsReport'
 
 const TABS = [['register', 'Monthly register'], ['challans', 'Challans'], ['returns', 'Returns & Form 16A'], ['certs', 'Owner certificates & PAN']]
 const NW = { whiteSpace: 'nowrap' }
@@ -55,8 +58,7 @@ function Register({ rows, f, ded, dep }) {
   )
 }
 
-function Challans({ f }) {
-  const cs = tdsDocs('challan').filter(c => fy(c.month + '-01') === f).sort(by('paidOn', -1))
+function Challans({ cs }) {
   return (
     <>
       <div className="filters" style={{ justifyContent: 'flex-end' }}><Btn primary onClick={() => tdsChallan()}>Record challan</Btn></div>
@@ -113,9 +115,8 @@ function Returns({ qs }) {
   )
 }
 
-function Certs() {
+function Certs({ ent }) {
   const os = S.owners.filter(o => S.leases.some(L => L.tds && leaseOwners(L).some(x => x.ownerId === o.id)))
-  const ent = tdsEntries()
   return (
     <>
       <TableCard>
@@ -145,28 +146,33 @@ function Certs() {
 export default function TdsPage() {
   useStore()
   const U = tdsv(); const f = U.fy
-  const rows = tdsMonthRows(f), qs = tdsQuarters(f)
+  const { report: R, isFetching } = useTdsReport(f)
+  const head = fys => (
+    <PageHead title="TDS" sub="Tax deducted from rent paid to owners — month-wise deposit tracking, challans, quarterly returns, Form 16A and owner certificates."
+      actions={<><SrLabel htmlFor="tdsFy">Financial year</SrLabel><SelectInput grid={false} sx={fsx} id="tdsFy" aria-label="Financial year" value={f} onChange={e => setTdsFy(e.target.value)} options={fys.map(x => [x, `FY 20${x}`])} /></>} />
+  )
+  if (!R) return <Stack>{head([f])}<SampleBanner /><KpiSkeleton count={5} /><TableSkeleton rows={6} cols={8} /></Stack>
+  const rows = R.rows, qs = R.quarters, ent = R.entries
   const ded = rows.reduce((a, r) => a + r.ded, 0), dep = rows.reduce((a, r) => a + r.dep, 0)
   const od = rows.filter(r => r.st === 'Overdue'); const next = rows.find(r => r.bal > 0 && ['Overdue', 'Due'].includes(r.st))
-  const ent = tdsEntries()
-  const fys = [...new Set([fy(TODAY), ...ent.map(x => fy(x.date))])].sort().reverse()
   let body = null
   if (U.tab === 'register') body = <Register rows={rows} f={f} ded={ded} dep={dep} />
-  if (U.tab === 'challans') body = <Challans f={f} />
+  if (U.tab === 'challans') body = <Challans cs={R.challans} />
   if (U.tab === 'returns') body = <Returns qs={qs} />
-  if (U.tab === 'certs') body = <Certs />
+  if (U.tab === 'certs') body = <Certs ent={ent} />
   return (
     <Stack>
-      <PageHead title="TDS" sub="Tax deducted from rent paid to owners — month-wise deposit tracking, challans, quarterly returns, Form 16A and owner certificates."
-        actions={<><SrLabel htmlFor="tdsFy">Financial year</SrLabel><SelectInput grid={false} sx={fsx} id="tdsFy" aria-label="Financial year" value={f} onChange={e => setTdsFy(e.target.value)} options={fys.map(x => [x, `FY 20${x}`])} /></>} />
+      {head(R.fys)}
       <SampleBanner />
-      <Kpis>
-        <Kpi label="TDS deducted" value={inr(ded)} sub={`FY ${f} · ${ent.filter(x => fy(x.date) === f).length} entries`} />
-        <Kpi label="Deposited" value={inr(dep)} sub={`${tdsDocs('challan').filter(c => fy(c.month + '-01') === f).length} challans`} />
-        <Kpi label="Overdue" value={inr(od.reduce((a, r) => a + r.bal, 0))} sub={od.length ? od.map(r => perLabel(r.m)).join(', ') : 'Nothing overdue'} alert={!!od.length} />
-        <Kpi label="Next deposit" value={next ? inr(next.bal) : '—'} sub={next ? `${perLabel(next.m)} · ${next.st === 'Overdue' ? 'was due' : 'by'} ${fmtD(next.due)}` : 'Nothing pending'} alert={!!(next && next.st === 'Overdue')} />
-        <Kpi label="Returns filed" value={`${qs.filter(q => q.st === 'Filed').length} / ${qs.filter(q => q.es.length).length}`} sub={`Form 16A issued ${qs.reduce((a, q) => a + q.issued, 0)} / ${qs.reduce((a, q) => a + q.owners.length, 0)}`} alert={qs.some(q => q.st === 'Overdue')} />
-      </Kpis>
+      <Refreshing on={isFetching}>
+        <Kpis>
+          <Kpi label="TDS deducted" value={inr(ded)} sub={`FY ${f} · ${ent.filter(x => fy(x.date) === f).length} entries`} />
+          <Kpi label="Deposited" value={inr(dep)} sub={`${R.challans.length} challans`} />
+          <Kpi label="Overdue" value={inr(od.reduce((a, r) => a + r.bal, 0))} sub={od.length ? od.map(r => perLabel(r.m)).join(', ') : 'Nothing overdue'} alert={!!od.length} />
+          <Kpi label="Next deposit" value={next ? inr(next.bal) : '—'} sub={next ? `${perLabel(next.m)} · ${next.st === 'Overdue' ? 'was due' : 'by'} ${fmtD(next.due)}` : 'Nothing pending'} alert={!!(next && next.st === 'Overdue')} />
+          <Kpi label="Returns filed" value={`${qs.filter(q => q.st === 'Filed').length} / ${qs.filter(q => q.es.length).length}`} sub={`Form 16A issued ${qs.reduce((a, q) => a + q.issued, 0)} / ${qs.reduce((a, q) => a + q.owners.length, 0)}`} alert={qs.some(q => q.st === 'Overdue')} />
+        </Kpis>
+      </Refreshing>
       <Tabs value={U.tab} onChange={(e, v) => tdsTab(v)} variant="scrollable" scrollButtons={false}
         sx={{ '& .MuiTab-root': { color: 'var(--muted)', px: 1.5, minWidth: 0 }, '& .MuiTab-root.Mui-selected': { color: 'var(--ink)' }, '& .MuiTabs-indicator': { bgcolor: 'var(--accent)' }, '@media (max-width:760px)': { '& .MuiTab-root': { px: 1.75 } } }}>
         {TABS.map(([k, l]) => <Tab key={k} value={k} label={l} disableRipple />)}

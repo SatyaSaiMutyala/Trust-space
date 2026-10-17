@@ -3,7 +3,7 @@ import { useState } from 'react'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { S, remove, closeDrawer, useStore } from '../../store/store'
 import { TODAY, CUR, inr, fmtD, perAdd, fy } from '../../domain/utils'
-import { tdsMonthRows } from '../../domain/tds'
+import { useTdsReport } from './useTdsReport'
 import { Btn, Empty } from '../../components/ui/Layout'
 import { ConfirmButton } from '../../components/ui/Status'
 import { FormGrid, TextInput, SelectInput, FileInput } from '../../components/form/Fields'
@@ -13,8 +13,10 @@ export default function TdsChallanDrawer({ d }) {
   useStore()
   const [busy, setBusy] = useState(false)
   const c = d.id ? S.tds.find(x => x.id === d.id) : { month: d.m || perAdd(CUR, -1), paidOn: TODAY, mode: 'Net banking (e-Pay Tax)' }
+  const { report } = useTdsReport(c ? fy(c.month + '-01') : null)
   if (!c) return <DrawerLayout title="Edit TDS challan"><Empty>Removed.</Empty></DrawerLayout>
-  const r = tdsMonthRows(fy(c.month + '-01')).find(x => x.m === c.month)
+  if (!report) return <DrawerLayout title={d.id ? 'Edit TDS challan' : 'Record TDS challan'}><Empty>Loading…</Empty></DrawerLayout>
+  const r = report.rows.find(x => x.m === c.month)
   const onSubmit = async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
     try { await submitTdsChallan(d.id, new FormData(e.currentTarget)) } finally { setBusy(false) }

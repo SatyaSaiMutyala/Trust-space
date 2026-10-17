@@ -13,6 +13,7 @@
 import { models, toApi } from '../models/index.js'
 import { byPath, FIELD_LABELS } from '../resources/config.js'
 import { CHECKS } from '../resources/checks.js'
+import { DERIVE } from '../resources/derive.js'
 import { buildListQuery, pageInfo } from '../utils/listQuery.js'
 import { ApiError, badRequest, notFound, conflict } from '../utils/ApiError.js'
 import { ok, created } from '../utils/respond.js'
@@ -51,6 +52,12 @@ async function deepCheck(cfg, rec) {
   const list = Object.values(errors)
   if (list.length === 1) throw badRequest(list[0] + '.', errors)
   if (list.length > 1) throw badRequest(`Please fix ${list.length} fields: ${list.join('; ')}.`, errors)
+}
+
+/** Server-computed fields (resources/derive.js) — e.g. invoice GST/TDS/net from the lease, whatever the client sent. */
+async function derive(cfg, rec, existing) {
+  const fn = DERIVE[cfg.path]
+  return fn ? fn(rec, existing, { models }) : rec
 }
 
 /** Linked records (propertyId, leaseId…) must exist. */
@@ -124,7 +131,7 @@ export function crudController(cfg) {
       if (await Model.exists({ _id: id })) throw conflict(`${cap(article(cfg.singular))} with id “${id}” already exists.`)
       if (!inScope({ _id: id, ...body }, await scopeFor(req.user, true))) throw outOfScope()
       validate(cfg, body); await checkRefs(cfg, body); await deepCheck(cfg, body); await checkUnique(cfg, body, id)
-      const rec = stamp(body)
+      const rec = stamp(await derive(cfg, body, null))
       await Model.create({ _id: id, ...rec })
       return created(res, `${nameOf(rec)} created.`, { id, ...rec })
     },
@@ -139,7 +146,7 @@ export function crudController(cfg) {
       if (existing && !inScope(existing, scope)) throw outOfScope()
       if (!inScope({ _id: id, ...body }, scope)) throw outOfScope()
       validate(cfg, body); await checkRefs(cfg, body); await deepCheck(cfg, body); await checkUnique(cfg, body, id)
-      const rec = stamp(body, existing)
+      const rec = stamp(await derive(cfg, body, existing), existing)
       if (existing) {
         await Model.replaceOne({ _id: id }, rec)
         return ok(res, `${nameOf(rec)} updated.`, { id, ...rec })
@@ -161,7 +168,7 @@ export function crudController(cfg) {
       const merged = { ...current, ...body }
       if (!inScope({ _id: id, ...merged }, scope)) throw outOfScope()
       validate(cfg, body, { partial: true }); validate(cfg, merged); await checkRefs(cfg, body); await deepCheck(cfg, merged); await checkUnique(cfg, merged, id)
-      const rec = stamp(merged, existing)
+      const rec = stamp(await derive(cfg, merged, existing), existing)
       await Model.replaceOne({ _id: id }, rec)
       return ok(res, `${nameOf(rec)} updated.`, { id, ...rec })
     },
@@ -178,8 +185,9 @@ export function crudController(cfg) {
         if (n) blockers.push(count(n, byPath[path].singular, byPath[path].plural))
       }
       if (blockers.length) throw new ApiError(409, `${nameOf(rec)} can’t be deleted because it still has ${blockers.join(' and ')}. Delete or move those first.`, { code: 'has_dependents' })
-      await Model.deleteOne({ _id: id })
-      return ok(res, `${nameOf(rec)} deleted.`, { id })
+      // Soft delete: the record goes to Trash (restore or delete permanently from there).
+      await Model.updateOne({ _id: id }, { $set: { deletedAt: new Date().toISOString(), deletedBy: req.user.name || req.user.email || req.user.id } })
+      return ok(res, `${nameOf(rec)} moved to Trash.`, { id })
     },
   }
 }

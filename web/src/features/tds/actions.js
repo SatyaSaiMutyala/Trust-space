@@ -1,8 +1,9 @@
 /* TDS actions (prototype ACT.tdsTab/tdsMonth/tdsChallan/tdsReturn/tds16/tdsCert/tdsQcsv + SUBMIT.tdsChallan/tdsReturn/tds16/tdsCert). */
 import { S, UI, owner, save, toast, emit, openDrawer, closeDrawer } from '../../store/store'
+import { callApi } from '../../app/store'
 import { TODAY, fy, num } from '../../domain/utils'
 import { clearSchedCache } from '../../domain/lease'
-import { tdsWs, tdsDocs, tdsQcsv as qcsv } from '../../domain/tds'
+import { tdsWs, tdsDocs } from '../../domain/tds'
 import { uploadFiles, offerDownload } from '../../services/files'
 
 /** UI.tdsv, initialised like the prototype's viewTds. */
@@ -15,7 +16,7 @@ export const tdsChallan = (m, id) => openDrawer({ kind: 'tdsChallan', m, id })
 export const tdsReturn = q => openDrawer({ kind: 'tdsReturn', q })
 export const tds16 = q => openDrawer({ kind: 'tds16', q })
 export const tdsCert = id => openDrawer({ kind: 'tdsCert', id })
-export const tdsQcsv = q => offerDownload(`TDS-FY${tdsv().fy}-Q${q}-deductees.csv`, qcsv(tdsv().fy, +q))
+export async function tdsQcsv(q) { try { const csv = await callApi('tdsReturnCsv', { fy: tdsv().fy, q: +q }); offerDownload(`TDS-FY${tdsv().fy}-Q${q}-deductees.csv`, csv) } catch (e) { toast(e.message, 'error') } }
 
 /** SUBMIT.tdsChallan */
 export async function submitTdsChallan(id, fd) {

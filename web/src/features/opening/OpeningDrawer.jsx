@@ -58,10 +58,11 @@ export default function OpeningDrawer({ d }) {
 
   const obAdd = () => setRows(r => [...r, { key: newId(), it: { period: perAdd(OB_DATE.slice(0, 7), -1), type: 'Rent', ownerId: leaseOwners(L)[0].ownerId } }])
   const obDel = key => setRows(r => r.filter(x => x.key !== key))
-  const obFill = () => {
+  const obFill = async () => {
     const f = formRef.current
     const have = new Set([...f.querySelectorAll('.obrow')].map(tr => tr.querySelector('.ob-per').value + '|' + (tr.querySelector('.ob-own')?.value || L.ownerId) + '|' + tr.querySelector('.ob-type').value))
-    const add = obFillItems(L, f.querySelector('#ob-from').value, have); const n = add.length
+    let add; try { add = await obFillItems(L, f.querySelector('#ob-from').value, have) } catch (e) { toast(e.message, 'error'); return }
+    const n = add.length
     if (n) setRows(r => [...r, ...add.map(it => ({ key: newId(), it }))])
     toast(n ? `${n} month${n > 1 ? 's' : ''} added from the rent schedule — remove any that were already paid.` : 'Nothing to add for that period.')
   }
