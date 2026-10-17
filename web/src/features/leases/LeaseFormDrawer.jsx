@@ -19,6 +19,13 @@ function initialLease(d) {
   return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, notice: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: 'Advance', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
 }
 
+/** Owner rows for a lease that has none yet: the property's owners with their % shares (one row at 100% otherwise). */
+function ownersFromProperty(pid, fallbackOwnerId) {
+  const P = prop(pid); const os = P && Array.isArray(P.owners) && P.owners.length > 1 ? P.owners : null
+  if (os) return os.map(o => ({ ownerId: o.ownerId, rent: +o.share || 0, maint: +o.share || 0, dep: +o.share || 0, adv: +o.share || 0, gst: '' }))
+  return [{ ownerId: fallbackOwnerId || P?.ownerId || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]
+}
+
 export default function LeaseFormDrawer({ d }) {
   useStore()
   const [L] = useState(() => initialLease(d))
@@ -27,8 +34,10 @@ export default function LeaseFormDrawer({ d }) {
   const [pv, setPv] = useState(null)
   const [sums, setSums] = useState({})
   // Owner shares are entered as ₹ amounts: start from the lease's % shares applied to its own totals.
+  const pctRef = useRef(null) // % shares the rows came from (property co-owners) — used to split a total typed into an empty form
   const [rows, setRows] = useState(() => {
-    const owners = L && L.owners && L.owners.length ? L.owners : [{ ownerId: (L && (L.ownerId || prop(L.propertyId)?.ownerId)) || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]
+    const owners = L && L.owners && L.owners.length ? L.owners : ownersFromProperty(L && (L.propertyId || ''), L && L.ownerId)
+    if (owners.length > 1 && !(L && L.owners && L.owners.length)) pctRef.current = owners.map(o => +o.rent || 0)
     return amountsFromShares(owners, L ? { rent: +L.rent || 0, maint: +L.maint || 0, dep: +L.deposit || 0, adv: +L.advanceRent || 0 } : {}).map(o => ({ key: ++SEQ, o }))
   })
   const [same] = useState(() => !(L && L.owners && L.owners.length) || L.owners.every(o => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
@@ -77,7 +86,8 @@ export default function LeaseFormDrawer({ d }) {
     const f = formRef.current; const T = formTotals(f); const prev = lastTotals.current?.[k]; const trs = orows()
     if (trs.length === 1) { fld(trs[0], k).value = T[k]; return }
     const A = readOwnerAmounts(f); if (A.length !== trs.length) return
-    const base = prev > 0 ? A.map(o => ({ p: o[k] / prev * 100 })) : T.rent > 0 && k !== 'rent' ? A.map(o => ({ p: o.rent / T.rent * 100 })) : A.map(() => ({ p: 100 / A.length }))
+    const pct = pctRef.current && pctRef.current.length === A.length ? pctRef.current : null
+    const base = prev > 0 ? A.map(o => ({ p: o[k] / prev * 100 })) : T.rent > 0 && k !== 'rent' ? A.map(o => ({ p: o.rent / T.rent * 100 })) : pct ? pct.map(p => ({ p })) : A.map(() => ({ p: 100 / A.length }))
     const amt = splitAmt(Math.round(T[k]), base, 'p'); trs.forEach((tr, i) => { fld(tr, k).value = amt[i] })
   }
 
@@ -97,7 +107,15 @@ export default function LeaseFormDrawer({ d }) {
   const onChange = e => {
     const f = formRef.current; const t = e.target
     if (t.name === 'o-id') { const O = owner(t.value); const g = fld(t.closest('.orow'), 'gst'); if (O && orows().length > 1) g.value = O.gstin ? 'Forward' : 'RCM' }
-    if (t.id === 'ls-prop') { const rs = orows(); const P = prop(t.value); if (P && rs.length === 1 && !fld(rs[0], 'id').value) fld(rs[0], 'id').value = P.ownerId }
+    if (t.id === 'ls-prop') {
+      const rs = orows(); const P = prop(t.value)
+      if (P && !d.id && (rs.length === 1 && !fld(rs[0], 'id').value || rs.every(tr => !fld(tr, 'id').value))) {
+        // No owners picked yet: take them from the property (co-owners with their shares, or the single owner).
+        const os = ownersFromProperty(P.id)
+        pctRef.current = os.length > 1 ? os.map(o => +o.rent || 0) : null
+        if (os.length > 1) { setRows(amountsFromShares(os, formTotals(f)).map(o => ({ key: ++SEQ, o }))) } else fld(rs[0], 'id').value = os[0].ownerId
+      }
+    }
     if (f) upd()
   }
   const onSubmit = async e => {

@@ -77,9 +77,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.trustlab.truspace"
+    namespace "com.app.truspace"
     defaultConfig {
-        applicationId "com.trustlab.truspace"
+        applicationId "com.app.truspace"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

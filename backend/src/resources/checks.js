@@ -31,6 +31,26 @@ async function ownerNames(models, ids) {
   return Object.fromEntries(rows.map(o => [o._id, o.name]))
 }
 
+/* ---------- properties: co-owners with their share of the rent ---------- */
+/** `owners` = [{ ownerId, share }] (%). The first owner is the main contact and is mirrored into `ownerId`; shares must total 100. */
+async function checkProperty(P, { models }) {
+  if (P.owners === undefined || P.owners === null) return {}
+  if (!Array.isArray(P.owners)) return { owners: 'Owners must be a list' }
+  if (!P.owners.length) return {}
+  const ids = P.owners.map(o => o && o.ownerId)
+  if (ids.some(id => !id)) return { owners: 'Every co-owner row needs an owner' }
+  if (new Set(ids).size !== ids.length) return { owners: 'The same owner is listed twice' }
+  const found = await models.owners.countDocuments({ _id: { $in: ids } })
+  if (found !== ids.length) return { owners: 'A co-owner does not exist' }
+  if (P.owners.length > 1) {
+    if (P.owners.some(o => !isNum(o.share) || n(o.share) < 0)) return { owners: 'Each co-owner needs a share of the rent (%)' }
+    const total = P.owners.reduce((a, o) => a + n(o.share), 0)
+    if (Math.round(total) !== 100) return { owners: `The owners’ shares add up to ${Math.round(total)}%. They must total 100%` }
+  }
+  if (P.ownerId && P.ownerId !== ids[0]) return { ownerId: 'The main owner must be the first co-owner' }
+  return {}
+}
+
 /* ---------- leases: co-owners, deposit adjustments, opening balances ---------- */
 async function checkLease(L, { models }) {
   const errors = {}
@@ -168,4 +188,4 @@ async function checkTds(t, { models }) {
   return {}
 }
 
-export const CHECKS = { leases: checkLease, invoices: checkInvoice, owners: checkOwner, tds: checkTds }
+export const CHECKS = { properties: checkProperty, leases: checkLease, invoices: checkInvoice, owners: checkOwner, tds: checkTds }

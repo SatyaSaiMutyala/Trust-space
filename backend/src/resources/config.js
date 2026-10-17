@@ -38,6 +38,7 @@ export const RESOURCES = [
     numbers: ['area'],
     refs: { ownerId: 'owners', partnerId: 'partners' },
     unique: [['code']],
+    indexes: ['owners.ownerId'],
     dependents: [['leases', 'propertyId', 'lease'], ['tickets', 'propertyId', 'ticket'], ['invoices', 'propertyId', 'invoice']],
   },
   {

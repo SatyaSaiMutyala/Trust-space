@@ -2,6 +2,7 @@
 import { useStore, owner, role, isOwner, openProp } from '../../store/store'
 import { CUR, inr, fmtD, daysTo } from '../../domain/utils'
 import { leaseOf, leaseState, rentFor, frontOf, occStatus, repairStatus, ownersLabel, ownerShare, isMulti, noticeBy } from '../../domain/lease'
+import { propertyOwners } from './PropertyOwnerRows'
 import { useRentStatus } from '../shared/useLedgerReports'
 import { fileUrl } from '../../services/files'
 import { StatusChip } from '../../components/ui/Status'
@@ -29,6 +30,9 @@ export function StatusRows({ P }) {
   return <div className="srows"><SRow l="Status" x={occStatus(P)} /><SRow l="Rent" x={byProperty?.[P.id] || LOADING} /><SRow l="Repairs & maintenance" x={repairStatus(P)} />{ns ? <SRow l="Notice period" x={ns} /> : null}</div>
 }
 
+/** “Main owner + n co-owners” from the property record (used when there is no lease yet). */
+const propertyOwnersLabel = P => { const n = propertyOwners(P).map(x => owner(x.ownerId)?.name || '—'); return n.length > 1 ? `${n[0]} + ${n.length - 1} co-owner${n.length > 2 ? 's' : ''}` : n[0] || 'Owner not set' }
+
 export default function PropertyCard({ P }) {
   useStore()
   const L = leaseOf(P.id); const ph = frontOf(P)
@@ -38,7 +42,7 @@ export default function PropertyCard({ P }) {
       <div className="pb">
         <div className="code">{P.code}</div>
         <h3>{P.name}</h3>
-        <div className="small muted">{P.city} · {(+P.area || 0).toLocaleString('en-IN')} sq ft · {L ? ownersLabel(L) : owner(P.ownerId)?.name || 'Owner not set'}{L && !['Draft', 'Terminated'].includes(leaseState(L)) ? <> · <span className="mono">{inr(isOwner() ? rentFor(L, CUR) * ownerShare(L, role().ownerId, 'rent') : rentFor(L, CUR))}</span>/mo{isOwner() && isMulti(L) ? ' (your share)' : ''}</> : null}</div>
+        <div className="small muted">{P.city} · {(+P.area || 0).toLocaleString('en-IN')} sq ft · {L ? ownersLabel(L) : propertyOwnersLabel(P)}{L && !['Draft', 'Terminated'].includes(leaseState(L)) ? <> · <span className="mono">{inr(isOwner() ? rentFor(L, CUR) * ownerShare(L, role().ownerId, 'rent') : rentFor(L, CUR))}</span>/mo{isOwner() && isMulti(L) ? ' (your share)' : ''}</> : null}</div>
         <StatusRows P={P} />
       </div>
     </button>

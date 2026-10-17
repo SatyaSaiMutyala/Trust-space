@@ -9,24 +9,42 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-TruSpace.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-TruSpace.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		409D48C3C1ED48DD8DFE45C3 /* IBMPlexMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AE451C4D99CE400DAB423787 /* IBMPlexMono-Medium.ttf */; };
+		40C87577EE2244559806F844 /* IBMPlexMono-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 88E6F5E6E94C4ADF832E3490 /* IBMPlexMono-SemiBold.ttf */; };
+		52501EDC4D1B4C9DA46D0662 /* IBMPlexSans-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E024C31CB9EB4FE6A0B7668F /* IBMPlexSans-Regular.ttf */; };
+		6A3CD95CAA3C4F0E9A9999EB /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3AF44514AC7F4E57A7484474 /* BricolageGrotesque-SemiBold.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		761780EF2CA45674006654EF /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EE2CA45674006654EF /* SceneDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A4D87F32C9834A3B8E516C30 /* IBMPlexSans-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EBDBD1E7B6114C679082CFC5 /* IBMPlexSans-SemiBold.ttf */; };
+		B32A5137B72A4608B4202991 /* IBMPlexSans-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 718AA6F61E6044FB9F4EA463 /* IBMPlexSans-Medium.ttf */; };
+		B400951B44BE4EAE9DA0C25D /* BricolageGrotesque-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0C167FB7108D4BDFBEC84758 /* BricolageGrotesque-Bold.ttf */; };
 		B7BB09158546D25356FC210E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		C102AA7A41FE4772BE70ACBC /* IBMPlexSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E966591B53BB474CBAA89831 /* IBMPlexSans-Bold.ttf */; };
+		E86A93F251C34B18B98D6324 /* IBMPlexMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EEB2BE38DDD544C99C2BAD61 /* IBMPlexMono-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0C167FB7108D4BDFBEC84758 /* BricolageGrotesque-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "BricolageGrotesque-Bold.ttf"; path = "../src/assets/fonts/BricolageGrotesque-Bold.ttf"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* TruSpace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TruSpace.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = TruSpace/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = TruSpace/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = TruSpace/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3AF44514AC7F4E57A7484474 /* BricolageGrotesque-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "BricolageGrotesque-SemiBold.ttf"; path = "../src/assets/fonts/BricolageGrotesque-SemiBold.ttf"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-TruSpace.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TruSpace.debug.xcconfig"; path = "Target Support Files/Pods-TruSpace/Pods-TruSpace.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-TruSpace.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TruSpace.release.xcconfig"; path = "Target Support Files/Pods-TruSpace/Pods-TruSpace.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-TruSpace.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TruSpace.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		718AA6F61E6044FB9F4EA463 /* IBMPlexSans-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSans-Medium.ttf"; path = "../src/assets/fonts/IBMPlexSans-Medium.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = TruSpace/AppDelegate.swift; sourceTree = "<group>"; };
 		761780EE2CA45674006654EF /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = TruSpace/SceneDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = TruSpace/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		88E6F5E6E94C4ADF832E3490 /* IBMPlexMono-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexMono-SemiBold.ttf"; path = "../src/assets/fonts/IBMPlexMono-SemiBold.ttf"; sourceTree = "<group>"; };
+		AE451C4D99CE400DAB423787 /* IBMPlexMono-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexMono-Medium.ttf"; path = "../src/assets/fonts/IBMPlexMono-Medium.ttf"; sourceTree = "<group>"; };
+		E024C31CB9EB4FE6A0B7668F /* IBMPlexSans-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSans-Regular.ttf"; path = "../src/assets/fonts/IBMPlexSans-Regular.ttf"; sourceTree = "<group>"; };
+		E966591B53BB474CBAA89831 /* IBMPlexSans-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSans-Bold.ttf"; path = "../src/assets/fonts/IBMPlexSans-Bold.ttf"; sourceTree = "<group>"; };
+		EBDBD1E7B6114C679082CFC5 /* IBMPlexSans-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexSans-SemiBold.ttf"; path = "../src/assets/fonts/IBMPlexSans-SemiBold.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EEB2BE38DDD544C99C2BAD61 /* IBMPlexMono-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "IBMPlexMono-Regular.ttf"; path = "../src/assets/fonts/IBMPlexMono-Regular.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +96,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				A06B499B8D8D4491B62241D2 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -90,6 +109,23 @@
 				13B07F961A680F5B00A75B9A /* TruSpace.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A06B499B8D8D4491B62241D2 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				718AA6F61E6044FB9F4EA463 /* IBMPlexSans-Medium.ttf */,
+				AE451C4D99CE400DAB423787 /* IBMPlexMono-Medium.ttf */,
+				EEB2BE38DDD544C99C2BAD61 /* IBMPlexMono-Regular.ttf */,
+				3AF44514AC7F4E57A7484474 /* BricolageGrotesque-SemiBold.ttf */,
+				EBDBD1E7B6114C679082CFC5 /* IBMPlexSans-SemiBold.ttf */,
+				0C167FB7108D4BDFBEC84758 /* BricolageGrotesque-Bold.ttf */,
+				88E6F5E6E94C4ADF832E3490 /* IBMPlexMono-SemiBold.ttf */,
+				E024C31CB9EB4FE6A0B7668F /* IBMPlexSans-Regular.ttf */,
+				E966591B53BB474CBAA89831 /* IBMPlexSans-Bold.ttf */,
+			);
+			name = Resources;
+			path = "";
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -164,6 +200,15 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				B7BB09158546D25356FC210E /* PrivacyInfo.xcprivacy in Resources */,
+				B32A5137B72A4608B4202991 /* IBMPlexSans-Medium.ttf in Resources */,
+				409D48C3C1ED48DD8DFE45C3 /* IBMPlexMono-Medium.ttf in Resources */,
+				E86A93F251C34B18B98D6324 /* IBMPlexMono-Regular.ttf in Resources */,
+				6A3CD95CAA3C4F0E9A9999EB /* BricolageGrotesque-SemiBold.ttf in Resources */,
+				A4D87F32C9834A3B8E516C30 /* IBMPlexSans-SemiBold.ttf in Resources */,
+				B400951B44BE4EAE9DA0C25D /* BricolageGrotesque-Bold.ttf in Resources */,
+				40C87577EE2244559806F844 /* IBMPlexMono-SemiBold.ttf in Resources */,
+				52501EDC4D1B4C9DA46D0662 /* IBMPlexSans-Regular.ttf in Resources */,
+				C102AA7A41FE4772BE70ACBC /* IBMPlexSans-Bold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,7 +322,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.trustlab.truspace;
+				PRODUCT_BUNDLE_IDENTIFIER = com.app.truspace;
 				PRODUCT_NAME = TruSpace;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -306,7 +351,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.trustlab.truspace;
+				PRODUCT_BUNDLE_IDENTIFIER = com.app.truspace;
 				PRODUCT_NAME = TruSpace;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

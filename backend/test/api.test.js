@@ -458,6 +458,21 @@ test('co-owners see the shared premises and lease, but only their own invoices a
   assert.equal(forOther.status, 403)
 })
 
+test('properties: co-owners with shares are validated, and a co-owner on the property sees it before any lease', async () => {
+  const bad = await call('PUT', '/properties/p-co', { name: 'Jubilee CC', code: 'HYD-JUB-01', address: '1 Road', city: 'Hyderabad', ownerId: 'o3', owners: [{ ownerId: 'o3', share: 60 }, { ownerId: 'o8', share: 30 }] })
+  assert.equal(bad.status, 400); assert.match(bad.body.message, /add up to 90%/)
+  const dup = await call('PUT', '/properties/p-co', { name: 'Jubilee CC', code: 'HYD-JUB-01', address: '1 Road', city: 'Hyderabad', ownerId: 'o3', owners: [{ ownerId: 'o3', share: 50 }, { ownerId: 'o3', share: 50 }] })
+  assert.equal(dup.status, 400); assert.match(dup.body.message, /listed twice/)
+  const wrongMain = await call('PUT', '/properties/p-co', { name: 'Jubilee CC', code: 'HYD-JUB-01', address: '1 Road', city: 'Hyderabad', ownerId: 'o8', owners: [{ ownerId: 'o3', share: 60 }, { ownerId: 'o8', share: 40 }] })
+  assert.equal(wrongMain.status, 400); assert.match(wrongMain.body.message, /first co-owner/)
+  const ok = await call('PUT', '/properties/p-co', { name: 'Jubilee CC', code: 'HYD-JUB-01', address: '1 Road', city: 'Hyderabad', ownerId: 'o3', owners: [{ ownerId: 'o3', share: 60 }, { ownerId: 'o8', share: 40 }] })
+  assert.equal(ok.status, 201)
+  const { accessToken: t } = await tokenFor('sravani.pydi@example.com') // o8
+  assert.ok((await call('GET', '/properties?limit=100', undefined, t)).body.data.some(p => p.id === 'p-co'), 'co-owner on the property sees it without a lease')
+  assert.ok((await call('GET', '/owners', undefined, t)).body.data.some(o => o.id === 'o3'), 'and the co-owner\'s fellow owner')
+  await call('DELETE', '/properties/p-co'); await call('DELETE', '/trash/properties/p-co')
+})
+
 test('leases: co-owner shares, deposit adjustments and opening balances are validated', async () => {
   const L = (await call('GET', '/leases/l3')).body.data
   assert.equal(L.owners.length, 2)

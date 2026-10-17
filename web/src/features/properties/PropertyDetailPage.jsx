@@ -22,6 +22,7 @@ import ExitPanel from '../exits/ExitPanel'
 import OwnersBlock from '../leases/OwnersBlock'
 import OwnerHomePage from '../ownerPortal/OwnerHomePage'
 import PropertiesPage from './PropertiesPage'
+import { propertyOwners } from './PropertyOwnerRows'
 
 const TABS = [['summary', 'Summary'], ['lease', 'Lease'], ['contracts', 'Contracts'], ['ledger', 'Ledgers'], ['tickets', 'Repairs'], ['inspections', 'Inspections'], ['messages', 'Messages'], ['exit', 'Exit']]
 
@@ -89,9 +90,32 @@ function CoOwnerCards({ L }) {
   )
 }
 
+/** Co-owners recorded on the property itself (before a lease exists): one card each with their share of the rent. */
+function PropertyCoOwnerCards({ P }) {
+  const me = isOwner() ? role().ownerId : null
+  return (
+    <Box sx={{ display: 'grid', gap: 1.5 }}>
+      {propertyOwners(P).map(x => {
+        const O = owner(x.ownerId); if (!O) return null
+        return (
+          <Box key={x.ownerId} sx={{ border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, px: 1.5, py: 1, bgcolor: 'var(--sunk)', borderBottom: '1px solid var(--line)' }}>
+              <Box aria-hidden="true" sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: 'var(--accent)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, flex: 'none' }}>{(O.name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}</Box>
+              <b>{O.name}</b><span className="small muted">{O.kind}</span>
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.75 }}><StatusChip label={`${pctLabel(x.share)} of rent`} k="info" />{me === x.ownerId ? <StatusChip label="You" k="ok" /> : null}</Box>
+            </Box>
+            <Box sx={{ p: 1.5, '& .facts': { gridTemplateColumns: 'repeat(2,minmax(0,1fr))' }, '@media (max-width:600px)': { '& .facts': { gridTemplateColumns: '1fr' } } }}><Facts items={ownerFacts(O, false)} /></Box>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
 function Summary({ P }) {
   const O = owner(P.ownerId); const o = isOwner(); const fv = frontOf(P); const L = leaseOf(P.id)
   const multi = !!(L && isMulti(L))
+  const pMulti = !multi && propertyOwners(P).length > 1 // co-owners recorded on the property, no co-owned lease yet
   return (
     <>
       <Cols n={2}>
@@ -108,10 +132,10 @@ function Summary({ P }) {
           </Box>
         </Panel>
         {/* Same height as the Premises card beside it: the panel takes the row height and its body scrolls when there are many co-owners. */}
-        <Panel title={multi ? `Owners · ${leaseOwners(L).length} co-owners` : 'Owner'} sub={multi ? 'Each co-owner invoices and is paid separately — shares are in Co-owners & shares below' : null} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}
+        <Panel title={multi ? `Owners · ${leaseOwners(L).length} co-owners` : pMulti ? `Owners · ${propertyOwners(P).length} co-owners` : 'Owner'} sub={multi ? 'Each co-owner invoices and is paid separately — shares are in Co-owners & shares below' : pMulti ? 'Shares as recorded on the property — they pre-fill the lease’s owner amounts' : null} actions={o ? null : <Btn sm onClick={() => openConv(P.id)}>Message</Btn>}
           body={false} sx={{ display: 'flex', flexDirection: 'column', height: 0, minHeight: '100%', '@media (max-width:900px)': { height: 'auto', minHeight: 0 } }}>
           <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, py: 1.75, '@media (max-width:760px)': { p: 1.5 } }}>
-            {multi ? <CoOwnerCards L={L} /> : O ? <Facts items={ownerFacts(O, true)} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
+            {multi ? <CoOwnerCards L={L} /> : pMulti ? <PropertyCoOwnerCards P={P} /> : O ? <Facts items={ownerFacts(O, true)} /> : <div className="facts"><span className="muted">No owner linked</span></div>}
           </Box>
         </Panel>
       </Cols>

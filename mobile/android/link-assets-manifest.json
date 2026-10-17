@@ -1,0 +1,41 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/BricolageGrotesque-Bold.ttf",
+      "sha1": "ea5d69e24da79db36506e01789bd1983dded8919"
+    },
+    {
+      "path": "src/assets/fonts/BricolageGrotesque-SemiBold.ttf",
+      "sha1": "299fddbc5d83a89f329fd2d3c0a0d5099c881e49"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexMono-Medium.ttf",
+      "sha1": "1c911f685c78098d488ea378f14bd64ab36f4ec2"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexMono-Regular.ttf",
+      "sha1": "bfdbfbc2fae12a3faadee40dbfc56017f1806c0c"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexMono-SemiBold.ttf",
+      "sha1": "da8b79da6a1cd9725dd2ddacebdc6ca605c4705a"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexSans-Bold.ttf",
+      "sha1": "cba9b3a7e84e2a4fd0a2028299143978f35009a9"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexSans-Medium.ttf",
+      "sha1": "abc71ed4f93b8d4814f7a9cf7543375b3a07eb78"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexSans-Regular.ttf",
+      "sha1": "7254ac11e47b53022a452bc4c3727d394e25e493"
+    },
+    {
+      "path": "src/assets/fonts/IBMPlexSans-SemiBold.ttf",
+      "sha1": "cade310bd2965eca4fecaa942fba35d03fbe5115"
+    }
+  ]
+}

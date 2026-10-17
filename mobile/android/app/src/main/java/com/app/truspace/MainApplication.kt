@@ -1,4 +1,4 @@
-package com.trustlab.truspace
+package com.app.truspace
 
 import android.app.Application
 import com.facebook.react.PackageList

@@ -2,7 +2,7 @@
  * Which records a signed-in user may see and change.
  *   admin, staff      TrustLab's workspace: everything except premises managed by franchise partners (and records
  *                     linked to them); scouting, requirements, partners and all owners not tied to a partner
- *   owner             the properties they own or co-own (a co-owner is listed in a lease's `owners`), the leases,
+ *   owner             the properties they own or co-own (a co-owner is listed in the property's or a lease's `owners`), the leases,
  *                     tickets, messages and inspections linked to them, their own invoices, their own owner record and
  *                     the names of their co-owners, and Form 16A on TDS returns (read-only)
  *   franchisee        their partner record, the franchise premises they manage (and linked records), their owners,
@@ -21,12 +21,13 @@ async function ctx(user) {
   let propFilter
   if (user.role === 'owner') {
     const coOwned = await models.leases.find({ 'owners.ownerId': user.ownerId }).distinct('propertyId')
-    propFilter = coOwned.length ? { $or: [{ ownerId: user.ownerId }, { _id: { $in: coOwned } }] } : { ownerId: user.ownerId }
+    propFilter = { $or: [{ ownerId: user.ownerId }, { 'owners.ownerId': user.ownerId }, ...(coOwned.length ? [{ _id: { $in: coOwned } }] : [])] }
   } else propFilter = { managedBy: 'franchise', partnerId: user.partnerId }
-  const props = await models.properties.find(propFilter, { _id: 1, ownerId: 1, partnerId: 1 }).lean()
+  const props = await models.properties.find(propFilter, { _id: 1, ownerId: 1, owners: 1, partnerId: 1 }).lean()
   const propIds = props.map(p => p._id)
   const coOwners = await models.leases.find({ propertyId: { $in: propIds } }).distinct('owners.ownerId')
-  return { propFilter, propIds, ownerIds: [...new Set(props.map(p => p.ownerId).concat(coOwners).filter(Boolean))], partnerIds: [...new Set(props.map(p => p.partnerId).filter(Boolean))] }
+  const propOwners = props.flatMap(p => (Array.isArray(p.owners) ? p.owners.map(o => o.ownerId) : []))
+  return { propFilter, propIds, ownerIds: [...new Set(props.map(p => p.ownerId).concat(propOwners, coOwners).filter(Boolean))], partnerIds: [...new Set(props.map(p => p.partnerId).filter(Boolean))] }
 }
 
 const NOT_FRANCHISE = { managedBy: { $ne: 'franchise' } }

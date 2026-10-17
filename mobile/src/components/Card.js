@@ -1,14 +1,23 @@
-/* White panel with a border — the app's main container for groups of content. Pressable when onPress is given. */
+/* White card. borderColor for the outlined message cards (deep teal notice, blue approval request); tone for tinted ones. */
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, ms, s, vs, shadows } from '../theme';
 
-export default function Card({ children, onPress, style }) {
-  if (onPress) return <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed, style]}>{children}</Pressable>;
-  return <View style={[styles.card, style]}>{children}</View>;
+const BG = { white: colors.white, mist: colors.tealTint, amber: colors.amberTint, coral: colors.coralTint, blue: colors.blueTint, grey: colors.sunk, dark: colors.darkCard };
+
+export default function Card({ children, tone = 'white', borderColor, outlined, shadow, onPress, style, padding = true, radius = 20 }) {
+  const Wrap = onPress ? Pressable : View;
+  const cardStyle = [styles.card, { backgroundColor: BG[tone] || tone, borderRadius: ms(radius) }, padding && styles.pad, (borderColor || outlined) && { borderWidth: 2, borderColor: borderColor || colors.line }, shadow && shadows.card, style];
+  return (
+    <Wrap onPress={onPress} accessibilityRole={onPress ? 'button' : undefined}
+      style={onPress ? ({ pressed }) => [...cardStyle, pressed && styles.pressed] : cardStyle}>
+      {children}
+    </Wrap>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.lg, gap: spacing.sm },
-  pressed: { borderColor: colors.muted },
+  card: { overflow: 'hidden' },
+  pad: { paddingHorizontal: s(18), paddingVertical: vs(16) },
+  pressed: { opacity: 0.9 },
 });

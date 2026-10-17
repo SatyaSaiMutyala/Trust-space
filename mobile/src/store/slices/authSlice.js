@@ -1,7 +1,10 @@
-/* Signed-in user and tokens. Filled in when the sign-in screen and API are wired up. Roles: admin, staff, owner, franchisee. */
+/* Signed-in user. status: checking | signedOut | signedIn. role: staff | owner | franchise (admin behaves as staff).
+   Until the API is wired, signIn fills a sample user for the chosen role. */
 import { createSlice } from '@reduxjs/toolkit';
+import { staffUser, ownerUser, franchiseUser } from '../../mock/data';
 
-const initialState = { status: 'signedOut', user: null, accessToken: null }; // status: checking | signedOut | signedIn
+const SAMPLE = { staff: staffUser, owner: ownerUser, franchise: franchiseUser };
+const initialState = { status: 'signedOut', user: null, role: null, accessToken: null, remember: true };
 
 const authSlice = createSlice({
   name: 'auth',
@@ -9,14 +12,18 @@ const authSlice = createSlice({
   reducers: {
     signedIn(state, { payload }) {
       state.status = 'signedIn';
-      state.user = payload.user;
-      state.accessToken = payload.accessToken;
+      state.role = payload.role || 'staff';
+      state.user = payload.user || SAMPLE[state.role];
+      state.accessToken = payload.accessToken || null;
     },
-    signedOut() {
-      return initialState;
+    switchRole(state, { payload }) {
+      state.role = payload;
+      state.user = SAMPLE[payload];
     },
+    setRemember(state, { payload }) { state.remember = !!payload; },
+    signedOut() { return initialState; },
   },
 });
 
-export const { signedIn, signedOut } = authSlice.actions;
+export const { signedIn, signedOut, switchRole, setRemember } = authSlice.actions;
 export default authSlice.reducer;
