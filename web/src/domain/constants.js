@@ -32,103 +32,11 @@ export const EXIT_STEPS = ['Notice served', 'Joint inspection', 'Handover', 'Fin
 /* Ledgers */
 export const LED_TABS = [['Rent', 'Rent'], ['Electricity', 'Electricity'], ['Maintenance', 'Maintenance'], ['Other', 'Other payments']]
 
-/* Joint inspections — [key, label, type, photo required] */
-export const CHECK = [
-  { s: 'Keys & access', items: [['k_main', 'Main entrance keys (count)', 'count', 1], ['k_shutter', 'Rolling shutter keys (count)', 'count', 1], ['k_internal', 'Internal door keys — all rooms (count)', 'count', 0], ['k_cards', 'Access cards / remotes (count)', 'count', 0]] },
-  { s: 'Meters & utility dues', items: [['m_elec', 'Electricity meter reading (kWh)', 'reading', 1], ['m_load', 'Sanctioned load as per latest bill (kW)', 'reading', 0], ['m_water', 'Water meter reading', 'reading', 0], ['u_supply', 'Water supply — municipal / borewell working', 'cond', 0], ['u_tank', 'Sump and overhead tank clean, lids intact', 'cond', 1], ['u_dues', 'Electricity and water bills paid to date (bill copy photographed)', 'cond', 1]] },
-  { s: 'Structure & civil', items: [['c_walls', 'Walls — no cracks, dampness or seepage', 'cond', 1], ['c_ceiling', 'Ceiling and slab — no cracks or leakage marks', 'cond', 1], ['c_floor', 'Flooring and tiles — no cracked, hollow or loose tiles', 'cond', 1], ['c_terrace', 'Terrace waterproofing and rainwater outlets', 'cond', 1], ['c_stairs', 'Staircase, railings and ramps', 'cond', 0], ['c_ext', 'External façade and compound wall', 'cond', 1]] },
-  { s: 'Doors, windows & shutters', items: [['d_main', 'Main door, frame and locks', 'cond', 1], ['d_int', 'Internal doors, handles and stoppers', 'cond', 0], ['d_win', 'Windows, glass panes and mesh', 'cond', 0], ['d_grill', 'Grills and safety bars', 'cond', 0], ['d_shutter', 'Rolling shutter — operates smoothly, locks', 'cond', 1]] },
-  { s: 'Electrical — building wiring', items: [['e_db', 'Main distribution board, MCBs and RCCB', 'cond', 1], ['e_earth', 'Earthing — earth pit and continuity', 'cond', 0], ['e_points', 'Switches, sockets and light points', 'cond', 0], ['e_wiring', 'Wiring concealed — no exposed joints or burn marks', 'cond', 1]] },
-  { s: 'Plumbing & sanitary', items: [['p_wash', 'Washrooms — WC, flush, washbasin', 'cond', 1], ['p_taps', 'Taps and fittings — no leaks', 'cond', 0], ['p_drain', 'Drains and floor traps flowing freely', 'cond', 0], ['p_lines', 'Visible water lines and valves — no leaks', 'cond', 0]] },
-  { s: 'Finish & cleanliness', items: [['f_paint_in', 'Interior paint', 'cond', 1], ['f_paint_out', 'Exterior paint and signage area', 'cond', 0], ['f_clean', 'Premises clean, debris removed', 'cond', 1], ['f_pest', 'No pest or termite activity', 'cond', 0]] },
-  { s: 'Safety & common areas', items: [['s_exit', 'Fire exit / escape route clear', 'cond', 0], ['s_parking', 'Allotted parking as per lease', 'cond', 0], ['s_common', 'Common area and lobby access', 'cond', 0]] },
-]
-export const FIX_SEC = 'Fixtures & fittings provided by owner'
-export const CONDS = ['Good', 'Minor issue', 'Damaged', 'Missing', 'N/A']
-export const BADC = c => ['Minor issue', 'Damaged', 'Missing'].includes(c)
-export const IN_KIND = { 'Move-in': 'Take-over inspection', 'Move-out': 'Handover inspection' }
-export const condK = c => ({ Good: 'ok', 'Minor issue': 'warn', Damaged: 'bad', Missing: 'bad', 'N/A': 'idle' }[c] || 'idle')
-export const inspStatusK = s => ({ Signed: 'ok', 'Awaiting owner sign-off': 'warn', Disputed: 'bad', 'Not started': 'idle' }[s] || 'info')
+/* Joint inspections — checklist and helpers shared with the API and the phone app */
+export { CHECK, FIX_SEC, CONDS, BADC, IN_KIND, condK, inspStatusK } from '@calc/inspection.js'
 
 /* Site scouting — [key, label, critical, photo required] */
-export const SITE_CHECK = [
-  { s: 'Location & catchment', items: [
-    ['l_cluster', 'Within reach of hospitals, nursing homes and doctor clinics (referral cluster)', 0, 0],
-    ['l_road', 'Main-road frontage and visibility from passing traffic', 0, 1],
-    ['l_sign', 'Façade signage and glow-sign allowed by owner and society', 0, 1],
-    ['l_transport', 'Public transport and auto access for patients', 0, 0],
-    ['l_competition', 'Competing labs and collection centres nearby — name them in remarks', 0, 0],
-    ['l_flood', 'No waterlogging or flooding history in monsoon (ask neighbours)', 1, 0]] },
-  { s: 'Access & parking', items: [
-    ['a_ground', 'Ground floor, or lift with ramp / wheelchair access for patients', 1, 1],
-    ['a_parking', 'Patient parking and two-wheeler parking for phlebotomists', 0, 1],
-    ['a_vehicle', 'Sample pick-up and courier vehicle access at all hours', 1, 0],
-    ['a_247', '24×7 operation permitted by owner and society — no night restrictions', 1, 0],
-    ['a_service', 'Separate service entry for samples, supplies and biomedical waste', 0, 1]] },
-  { s: 'Building & structure', items: [
-    ['b_use', 'Commercial use permitted — zoning, occupancy certificate or approved plan', 1, 0],
-    ['b_struct', 'Structurally sound — no major cracks or settlement', 1, 1],
-    ['b_damp', 'No seepage, dampness or roof leakage', 1, 1],
-    ['b_height', 'Clear ceiling height of at least 10 ft for ducting and false ceiling', 0, 0],
-    ['b_load', 'Floor can take analysers, UPS batteries and cold-storage load', 0, 0],
-    ['b_fire', 'Fire exit / staircase and space for extinguishers', 1, 1],
-    ['b_termite', 'No termite or pest infestation', 0, 0]] },
-  { s: 'Electrical & earthing', items: [
-    ['e_load', 'Sanctioned load adequate or enhancement possible (processing lab ≥ 25 kW, collection centre ≥ 5 kW)', 1, 1],
-    ['e_3ph', 'Three-phase supply available (mandatory for processing labs)', 1, 1],
-    ['e_earth', 'Dedicated earth pits possible; earth resistance under 1 Ω and neutral–earth voltage under 2 V', 1, 1],
-    ['e_pitspace', 'Open soil (not concrete or paved) for at least 2 additional earth pits', 1, 1],
-    ['e_soil', 'Soil type suits earthing, or chemical / bore earthing is planned (see Earthing assessment)', 0, 0],
-    ['e_maint', 'Earth pits accessible for watering and periodic testing (inspection chambers)', 0, 1],
-    ['e_meter', 'Separate energy meter for TrustLab premises', 0, 1],
-    ['e_quality', 'Stable voltage and few power cuts in the area', 0, 0],
-    ['e_backup', 'Space for DG (or building DG share) and a ventilated UPS-battery area', 1, 1],
-    ['e_wiring', 'Existing wiring and distribution board in good condition, or owner to rewire', 0, 1]] },
-  { s: 'Water & plumbing', items: [
-    ['w_supply', '24×7 water supply — municipal and/or borewell', 1, 0],
-    ['w_quality', 'Water quality fit as RO feed for analysers (TDS checked, value in remarks)', 0, 0],
-    ['w_storage', 'Sump and overhead tank capacity adequate', 0, 1],
-    ['w_points', 'Plumbing points possible at lab sinks, RO plant and phlebotomy hand-wash', 0, 0],
-    ['w_drain', 'Drainage can take lab wash water; no blocked or back-flowing lines', 1, 1]] },
-  { s: 'Toilets & hygiene', items: [
-    ['t_patient', 'Patient toilet close to the collection area (urine / stool sample collection)', 1, 1],
-    ['t_staff', 'Separate staff toilets, gender-segregated', 0, 1],
-    ['t_access', 'Accessible toilet for elderly and wheelchair users', 0, 0],
-    ['t_vent', 'Toilets ventilated with exhaust; no odour into patient areas', 0, 0]] },
-  { s: 'A/C & ventilation', items: [
-    ['h_outdoor', 'Space for A/C outdoor units — terrace, ledge or wall — with owner and society permission', 1, 1],
-    ['h_access', 'Safe access to outdoor units for servicing, without going through a neighbour’s premises', 1, 1],
-    ['h_pipe', 'Copper piping route within 15 m and core-cutting permitted', 0, 0],
-    ['h_drain', 'Route available for A/C condensate drain', 0, 0],
-    ['h_heat', 'Lab area can be cooled 24×7 (heat load, west-facing glass, insulation)', 0, 0],
-    ['h_exhaust', 'Exhaust and fresh-air provision for lab and biomedical-waste room', 0, 0]] },
-  { s: 'Space & layout', items: [
-    ['s_area', 'Measured carpet area matches the quoted area (record measured area in remarks)', 1, 1],
-    ['s_flow', 'Layout fits reception, waiting, phlebotomy, processing, store and cold room', 1, 0],
-    ['s_segregate', 'Patient areas can be separated from lab and sample processing', 0, 0],
-    ['s_bmw', 'Space for a biomedical-waste storage room with separate access', 1, 1],
-    ['s_light', 'Natural light and ventilation in patient areas', 0, 0]] },
-  { s: 'IT & connectivity', items: [
-    ['n_fibre', 'Two broadband / fibre providers available', 0, 0],
-    ['n_mobile', 'Good mobile signal for phlebotomy apps and payment terminals', 0, 0],
-    ['n_rack', 'Space for network rack and CCTV recorder', 0, 0]] },
-  { s: 'Statutory & neighbourhood', items: [
-    ['r_noc', 'Society and neighbours have no objection to a diagnostic centre', 1, 0],
-    ['r_pcb', 'Pollution board consent and biomedical-waste authorisation feasible at this address', 1, 0],
-    ['r_firenoc', 'Fire NOC feasible for the built-up area and use', 0, 0]] },
-  { s: 'Title & owner', items: [
-    ['o_title', 'Title verified — sale deed, encumbrance certificate, mutation', 1, 0],
-    ['o_tax', 'Property tax and utility bills paid to date', 0, 1],
-    ['o_loan', 'No disputes; a mortgaged property has the bank’s NOC for leasing', 1, 0],
-    ['o_coowners', 'All co-owners willing to sign; power of attorney verified if a representative signs', 1, 0],
-    ['o_register', 'Owner willing to register the lease', 0, 0],
-    ['o_works', 'Owner agrees to finish agreed civil and electrical works before handover', 0, 0]] },
-  { s: 'Commercials', items: [
-    ['c_rent', 'Rent per sq ft within market range for the locality', 1, 0],
-    ['c_deposit', 'Deposit, lock-in and escalation acceptable under TrustLab policy', 0, 0],
-    ['c_fitout', 'Rent-free fit-out period offered', 0, 0]] },
-]
-export const SITE_ITEMS = SITE_CHECK.flatMap(sec => sec.items.map(([k, label, crit, ph]) => ({ k, label, crit: !!crit, ph: !!ph, sec: sec.s })))
+export { SITE_CHECK, SITE_ITEMS } from '@calc/site.js' // shared with the API and the phone app
 export const SV = ['Pass', 'Concern', 'Fail', 'N/A']
 export const svK = v => ({ Pass: 'ok', Concern: 'warn', Fail: 'bad', 'N/A': 'idle' }[v] || 'idle')
 export const SITE_STAGES = ['Scouted', 'Scrutiny', 'Shortlisted', 'Negotiation', 'Acceptance', 'Approved', 'Agreement', 'Take-over', 'Operational']

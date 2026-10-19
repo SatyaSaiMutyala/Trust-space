@@ -7,13 +7,13 @@
 import { notFound } from '../utils/ApiError.js'
 import { ok } from '../utils/respond.js'
 import { reportContext } from './reportContext.js'
-import { leaseOwners, isMulti, splitAmt, depAdjs, depShareAmt, depAdjusted, depHeld, depAdjCandidates, invState, leaseState, inr } from '../../../shared/calc/index.js'
+import { depositOwners, isMulti, splitAmt, depAdjs, depShareAmt, depAdjusted, depHeld, depAdjCandidates, invState, leaseState, inr } from '../../../shared/calc/index.js'
 
 export async function leaseDeposit(req, res) {
   const R = await reportContext(req.user)
   const L = R.leases.find(l => l.id === req.params.id)
   if (!L) throw notFound(`No lease found with id “${req.params.id}”. It may have been deleted.`)
-  const os = leaseOwners(L)
+  const os = depositOwners(L)
   const owners = os.map(o => {
     const held = depHeld(L, o.ownerId); const proposed = depAdjs(L, o.ownerId, true).filter(a => a.status === 'Proposed').reduce((s, a) => s + (+a.amount || 0), 0)
     return { ownerId: o.ownerId, sharePct: +o.dep || 0, share: depShareAmt(L, o.ownerId), adjusted: depAdjusted(L, o.ownerId), held, proposed, available: held - proposed }

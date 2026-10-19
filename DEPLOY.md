@@ -74,6 +74,22 @@ Edit `backend/.env`:
 | `JWT_SECRET` | a new long random value: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` — **not** the one from your laptop |
 | `STORAGE_DRIVER` | `s3` (recommended — give the EC2 instance an IAM role with the policy in [backend/API.md](backend/API.md) and leave the AWS keys empty), or `local` (files in `backend/uploads` — include that folder in your backups) |
 | `SEED_PASSWORD` | delete the line — not used in production |
+| `MAIL_HOST` … `MAIL_FROM_NAME` | your SMTP account (sign-up codes, password resets, approval mails). Same values as on your laptop; with `MAIL_HOST` empty, mails are only logged and nobody can sign up |
+| `MAIL_CONTACT` | how owners reach the facilities team, shown in the emails (a phone number or address) |
+| `FIREBASE_ADMIN_FILE` | `firebase-admin.json` (push notifications, see below). Leave empty to run without push |
+
+Push notifications need the Firebase **service-account** key on the server. It is not in git (`.gitignore`), so copy it
+from your laptop, or download a fresh one from the Firebase console (Project settings → Service accounts → Generate new
+private key) and name it `firebase-admin.json`:
+
+```bash
+scp backend/firebase-admin.json ubuntu@<server>:/opt/truspace/backend/firebase-admin.json
+ssh ubuntu@<server> chmod 600 /opt/truspace/backend/firebase-admin.json
+```
+
+Without it the API starts normally and prints `Push notifications off`; everything else works, only the phones get no
+pushes. The phone apps and the web each carry their own Firebase config (`google-services.json`,
+`GoogleService-Info.plist`, `web/src/config/firebase.js`) — nothing else to copy for them.
 
 Create the first administrator (the database is empty, so this is the only way in):
 
@@ -120,6 +136,18 @@ server {
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # Live updates (Socket.IO): the connection is upgraded to a WebSocket and stays open
+  location /socket.io/ {
+    proxy_pass http://127.0.0.1:5001;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 3600s;
   }
 
   location / {

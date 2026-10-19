@@ -5,14 +5,16 @@ import { FloatingTabBar } from '../components';
 import MyLocationsScreen from '../screens/franchise/MyLocationsScreen';
 import MessagesScreen from '../screens/shared/MessagesScreen';
 import MoreScreen from '../screens/shared/MoreScreen';
+import useTabBadges from './useTabBadges';
 
 const Tab = createBottomTabNavigator();
 
 export default function FranchiseTabs() {
+  const b = useTabBadges();
   return (
     <Tab.Navigator tabBar={p => <FloatingTabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: '#FFFFFF' } }}>
       <Tab.Screen name="Locations" component={MyLocationsScreen} options={{ title: 'My locations', icon: 'map-pin' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages', icon: 'message', badge: 1 }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages', icon: 'message', badge: b.messages }} />
       <Tab.Screen name="More" component={MoreScreen} options={{ title: 'More', icon: 'menu' }} />
     </Tab.Navigator>
   );

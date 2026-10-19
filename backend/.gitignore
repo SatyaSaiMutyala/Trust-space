@@ -3,3 +3,6 @@ node_modules
 logs
 *.log
 uploads
+
+# Firebase service-account key (push notifications) — never commit
+firebase-admin.json

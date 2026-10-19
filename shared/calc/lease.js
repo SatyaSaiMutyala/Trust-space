@@ -34,10 +34,31 @@ export function rentFor(L, period) { if (!L) return 0; const d = period + '-01';
 export function nextEsc(L, today) { if (!L.escEvery || !L.escPct) return null; const a = escAnchor(L).slice(0, 7) + '-01'; let n = 1; while (n < 200 && addMonths(a, L.escEvery * n) <= today) n++; const d = addMonths(a, L.escEvery * n); return d <= L.end ? d : null }
 
 /* ---------- co-owners: each with a % share of rent, maintenance, deposit and advance, and their own GST status ---------- */
-export function leaseOwners(L) { if (L && Array.isArray(L.owners) && L.owners.length) return L.owners; return L ? [{ ownerId: L.ownerId, rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }] : [] }
-export const isMulti = L => leaseOwners(L).length > 1
-export const ownerShare = (L, ownerId, k) => { const o = leaseOwners(L).find(x => x.ownerId === ownerId); return o ? (+o[k] || 0) / 100 : 0 }
-export const ownerGstMode = (L, ownerId) => { if (!L || L.gstMode === 'None') return 'None'; const o = leaseOwners(L).find(x => x.ownerId === ownerId); return (o && o.gst) || L.gstMode || 'None' }
+/* `L.owners` is the split in force now. When a co-owner is deactivated, added or reactivated, the split that applied
+   until then is kept in `L.ownerHistory` = [{ until: 'YYYY-MM', owners: [...] }] (the last month it applied), so every
+   earlier month keeps its own split. `L.ownerChanges` is the log of those changes. */
+const curOwners = L => (L && Array.isArray(L.owners) && L.owners.length ? L.owners : L ? [{ ownerId: L.ownerId, rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }] : [])
+const history = L => (L && Array.isArray(L.ownerHistory) ? L.ownerHistory.filter(h => h && h.until && Array.isArray(h.owners) && h.owners.length).slice().sort((a, b) => a.until.localeCompare(b.until)) : [])
+/** Owners with their % shares — the current split, or the split in force in month p ('YYYY-MM') when given. */
+export function leaseOwners(L, p) { if (p) { const h = history(L).find(x => x.until >= p); if (h) return h.owners } return curOwners(L) }
+/** The owners who received the security deposit and advance rent: the split at the start of the lease. */
+export const depositOwners = L => leaseOwners(L, L && L.start ? L.start.slice(0, 7) : undefined)
+export const isMulti = L => curOwners(L).length > 1 || history(L).some(h => h.owners.length > 1)
+export const ownerShare = (L, ownerId, k, p) => { const o = leaseOwners(L, p).find(x => x.ownerId === ownerId); return o ? (+o[k] || 0) / 100 : 0 }
+export const ownerGstMode = (L, ownerId, p) => { if (!L || L.gstMode === 'None') return 'None'; const o = leaseOwners(L, p).find(x => x.ownerId === ownerId); return (o && o.gst) || L.gstMode || 'None' }
+/** Everyone who has ever been an owner on the lease, in order of first appearance:
+    [{ ownerId, active, share (current, or the last one they had), since: 'YYYY-MM', until: 'YYYY-MM' | null }] */
+export function allLeaseOwners(L) {
+  const hs = history(L); const startP = L && L.start ? L.start.slice(0, 7) : ''
+  const splits = hs.map((h, i) => ({ from: i ? perAdd(hs[i - 1].until, 1) : startP, until: h.until, owners: h.owners })).concat([{ from: hs.length ? perAdd(hs[hs.length - 1].until, 1) : startP, until: null, owners: curOwners(L) }])
+  const out = []
+  splits.forEach(sp => sp.owners.forEach(o => {
+    let x = out.find(y => y.ownerId === o.ownerId)
+    if (!x) { x = { ownerId: o.ownerId, active: false, share: o, since: sp.from, until: null }; out.push(x) }
+    x.share = o; x.until = sp.until; x.active = sp.until === null
+  }))
+  return out
+}
 export const tdsPerOwner = L => isMulti(L) && L.tdsPerOwner !== false
 /** Split a total by % shares in whole rupees; the last owner with a share absorbs the rounding so the parts add up exactly. */
 export function splitAmt(total, owners, k) { const parts = owners.map(o => Math.round(total * (+o[k] || 0) / 100)); const last = owners.map((o, i) => +o[k] > 0 ? i : -1).filter(i => i >= 0).pop(); if (last !== undefined) parts[last] += total - parts.reduce((a, b) => a + b, 0); return parts }
@@ -45,7 +66,7 @@ export function splitAmt(total, owners, k) { const parts = owners.map(o => Math.
 /* ---------- security deposit adjusted against rent (owner-agreed) ---------- */
 export const depAdjs = (L, ownerId, all) => ((L && L.depAdj) || []).filter(a => (all ? a.status !== 'Declined' && a.status !== 'Cancelled' : a.status === 'Agreed') && (!ownerId || a.ownerId === ownerId))
 export const adjFor = (L, period, ownerId) => depAdjs(L).find(a => a.period === period && a.ownerId === ownerId)
-export const depShareAmt = (L, ownerId) => { const os = leaseOwners(L); const i = os.findIndex(o => o.ownerId === ownerId); return i < 0 ? 0 : splitAmt(+L.deposit || 0, os, 'dep')[i] }
+export const depShareAmt = (L, ownerId) => { const os = depositOwners(L); const i = os.findIndex(o => o.ownerId === ownerId); return i < 0 ? 0 : splitAmt(+L.deposit || 0, os, 'dep')[i] }
 export const depAdjusted = (L, ownerId, all) => depAdjs(L, ownerId, all).reduce((a, x) => a + (+x.amount || 0), 0)
 export const depHeld = (L, ownerId) => ownerId ? depShareAmt(L, ownerId) - depAdjusted(L, ownerId) : (+L.deposit || 0) - depAdjusted(L)
 
@@ -56,7 +77,7 @@ export function certFor(O, date) { const c = O && O.tdsCert; return c && c.rate 
 /** Rate for an owner record on a date. */
 export function tdsRateOf(O, date) { if (!O) return TDS_BASE; if (!panValid(O)) return TDS_NOPAN; const c = certFor(O, date); return c ? +c.rate : TDS_BASE }
 export const tdsRate = (ownerId, date, ctx) => tdsRateOf(ctx.ownerOf(ownerId), date || ctx.today)
-const tdsKey = (L, ctx) => leaseOwners(L).map(o => { const O = ctx.ownerOf(o.ownerId); return O ? [O.pan, O.panStatus, O.tdsCert] : null })
+const tdsKey = (L, ctx) => allLeaseOwners(L).map(o => { const O = ctx.ownerOf(o.ownerId); return O ? [O.pan, O.panStatus, O.tdsCert] : null })
 
 /* ---------- opening balances: dues to owners outstanding when TruSpace went live (as on 01 Apr 2026), per lease and month ---------- */
 export const OB_DATE = '2026-04-01'
@@ -80,7 +101,7 @@ export const clearSchedCache = id => (id === undefined ? SCHED.clear() : SCHED.d
 /* Month-by-month rent for the whole term: pro-rata first/last month, rent-free period, escalation, advance-rent adjustment, maintenance, GST/RCM, TDS and due dates (advance or arrears). */
 export function schedule(L, ctx) {
   const end = L.exit?.effective && L.exit.effective < L.end ? L.exit.effective : L.end
-  const key = JSON.stringify([L.start, end, L.rent, L.escPct, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.owners || null, L.tdsPerOwner, tdsKey(L, ctx)])
+  const key = JSON.stringify([L.start, end, L.rent, L.escPct, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.owners || null, L.ownerHistory || null, L.tdsPerOwner, tdsKey(L, ctx)])
   const c = SCHED.get(L.id || '_'); if (c && c.key === key) return c.v
   const rows = []; const out = { rows, years: [], tot: {}, end }
   if (!L.start || !end || end < L.start || !(+L.rent >= 0)) { return out }
@@ -96,9 +117,9 @@ export function schedule(L, ctx) {
     const mRate = L.maintType === 'Fixed monthly' ? (L.maintEsc ? escAmt(L, L.maint, ch ? cS : oS) : (+L.maint || 0)) : 0
     const maint = Math.round(mRate * occ / D)
     let adj = 0; if (advLeft > 0 && rent > 0) { adj = Math.min(advLeft, advPer, rent); advLeft -= adj }
-    const os = leaseOwners(L); const rp = splitAmt(rent, os, 'rent'), mp = splitAmt(maint, os, 'maint'), ap = splitAmt(adj, os, 'adv')
+    const os = leaseOwners(L, p); const rp = splitAmt(rent, os, 'rent'), mp = splitAmt(maint, os, 'maint'), ap = splitAmt(adj, os, 'adv')
     const split = os.map((o, i) => {
-      const a = Math.min(ap[i], rp[i]); const mode = ownerGstMode(L, o.ownerId); const rr = rp[i] - a; const tx = rr + mp[i]
+      const a = Math.min(ap[i], rp[i]); const mode = ownerGstMode(L, o.ownerId, p); const rr = rp[i] - a; const tx = rr + mp[i]
       const oRate = Math.round(rate * (+o.rent || 0) / 100); const tdsOn = L.tds && (tdsPerOwner(L) ? oRate > 50000 : rate > 50000)
       const tr = tdsOn ? tdsRate(o.ownerId, p + '-01', ctx) / 100 : 0
       const g2 = mode === 'Forward' ? Math.round(tx * 0.18) : 0, rc = mode === 'RCM' ? Math.round(tx * 0.18) : 0, t = tdsOn ? Math.round((rr + (L.tdsOnMaint ? mp[i] : 0)) * tr) : 0
@@ -116,16 +137,25 @@ export function schedule(L, ctx) {
     rows.push({ p, D, occ, ch, rate, rent, adj, maint, gst, rcm, tds, net, due, esc, notes, split, y: Math.floor(perDiff(L.start.slice(0, 7), p) / 12) + 1 })
     if (ch) prevRate = rate; p = perAdd(p, 1)
   }
-  const F = ['rent', 'adj', 'maint', 'gst', 'rcm', 'tds', 'net']
+  /* Billing month and cash flow. In advance: a month's rent is billed and paid in that month, nothing is owed at month-end.
+     In arrears: it becomes a liability at month-end (liab), is billed next month (billIn) and paid then (cash = previous month's net);
+     the last month is paid after the term ends (tail). */
+  const arr = L.payTiming === 'Arrears'
+  rows.forEach((r, i) => { r.billIn = arr ? perAdd(r.p, 1) : r.p; r.liab = arr ? r.net : 0; r.cash = arr ? (i ? rows[i - 1].net : 0) : r.net; r.cashFor = arr ? (i ? rows[i - 1].p : null) : r.p })
+  out.arrears = arr; out.timingSet = L.payTiming === 'Advance' || arr
+  out.tail = arr && rows.length ? { p: perAdd(rows[rows.length - 1].p, 1), net: rows[rows.length - 1].net, forP: rows[rows.length - 1].p, due: rows[rows.length - 1].due } : null
+  const F = ['rent', 'adj', 'maint', 'gst', 'rcm', 'tds', 'net', 'cash']
   const tot = Object.fromEntries(F.map(f => [f, rows.reduce((a, r) => a + r[f], 0)])); tot.months = rows.length
-  const ys = {}; rows.forEach(r => { const y = ys[r.y] = ys[r.y] || { y: r.y, from: r.p, to: r.p, lo: Infinity, hi: 0, ...Object.fromEntries(F.map(f => [f, 0])) }; y.to = r.p; F.forEach(f => y[f] += r[f]); if (r.ch) { y.lo = Math.min(y.lo, r.rate); y.hi = Math.max(y.hi, r.rate) } })
+  const ys = {}; rows.forEach(r => { const y = ys[r.y] = ys[r.y] || { y: r.y, from: r.p, to: r.p, lo: Infinity, hi: 0, ...Object.fromEntries(F.map(f => [f, 0])) }; y.to = r.p; F.forEach(f => y[f] += r[f]); y.liab = r.liab; if (r.ch) { y.lo = Math.min(y.lo, r.rate); y.hi = Math.max(y.hi, r.rate) } })
   out.years = Object.values(ys); out.tot = tot
-  const adv = +L.advanceRent || 0; const os = leaseOwners(L)
-  const dp = splitAmt(+L.deposit || 0, os, 'dep'), avp = splitAmt(adv, os, 'adv')
-  out.owners = os.map((o, i) => {
-    const m = ownerGstMode(L, o.ownerId); const oRate = (+L.rent || 0) * (+o.rent || 0) / 100; const tdsOn = L.tds && (tdsPerOwner(L) ? oRate > 50000 : +L.rent > 50000)
-    const sum = k => rows.reduce((a2, r) => a2 + (r.split[i]?.[k] || 0), 0)
-    return { ownerId: o.ownerId, share: o, mode: m, tdsOn, rent: sum('rent'), adj: sum('adj'), maint: sum('maint'), gst: sum('gst'), rcm: sum('rcm'), tds: sum('tds'), net: sum('net'), deposit: dp[i], adv: avp[i], advGst: m === 'Forward' ? Math.round(avp[i] * 0.18) : 0, advTds: tdsOn ? Math.round(avp[i] * tdsRate(o.ownerId, L.start, ctx) / 100) : 0 }
+  // per-owner totals over the term: everyone who was ever an owner; deposit and advance belong to the owners at signing
+  const adv = +L.advanceRent || 0; const dos = depositOwners(L)
+  const dp = splitAmt(+L.deposit || 0, dos, 'dep'), avp = splitAmt(adv, dos, 'adv')
+  out.owners = allLeaseOwners(L).map(ao => {
+    const o = ao.share; const di = dos.findIndex(x => x.ownerId === ao.ownerId); const dep = di < 0 ? 0 : dp[di], av = di < 0 ? 0 : avp[di]
+    const m = ownerGstMode(L, ao.ownerId, ao.active ? undefined : ao.until); const oRate = (+L.rent || 0) * (+o.rent || 0) / 100; const tdsOn = L.tds && (tdsPerOwner(L) ? oRate > 50000 : +L.rent > 50000)
+    const sum = k => rows.reduce((a2, r) => a2 + (r.split.find(x => x.ownerId === ao.ownerId)?.[k] || 0), 0)
+    return { ownerId: ao.ownerId, active: ao.active, since: ao.since, until: ao.until, share: o, mode: m, tdsOn, rent: sum('rent'), adj: sum('adj'), maint: sum('maint'), gst: sum('gst'), rcm: sum('rcm'), tds: sum('tds'), net: sum('net'), deposit: dep, adv: av, advGst: m === 'Forward' ? Math.round(av * 0.18) : 0, advTds: tdsOn ? Math.round(av * tdsRate(ao.ownerId, L.start, ctx) / 100) : 0 }
   })
   out.upfront = { deposit: +L.deposit || 0, adv, advGst: out.owners.reduce((a2, x) => a2 + x.advGst, 0), advTds: out.owners.reduce((a2, x) => a2 + x.advTds, 0), brokerage: +L.brokerage || 0, stamp: +L.stamp || 0 }
   out.unadjusted = advLeft
@@ -134,7 +164,16 @@ export function schedule(L, ctx) {
 }
 export const schedRow = (L, p, ctx) => schedule(L, ctx).rows.find(r => r.p === p)
 export const lockEnd = L => L.lockIn ? addMonths(L.start, L.lockIn) : null
-export const noticeBy = L => addMonths(L.end, -(L.notice || 0))
+/* Notice periods: the lessee (tenant) and the lessor (owner) may have to give different notice. `notice` is the
+   lessee's; `noticeLessor` the owner's, falling back to the lessee's on older leases that had one figure. */
+export const noticeLessee = L => +L.notice || 0
+export const noticeLessor = L => (L.noticeLessor === undefined || L.noticeLessor === null || L.noticeLessor === '' ? noticeLessee(L) : +L.noticeLessor || 0)
+/** Months of notice the party serving it must give: by = 'Owner' (lessor) or anything else (lessee). */
+export const noticeOf = (L, by) => (by === 'Owner' ? noticeLessor(L) : noticeLessee(L))
+/** Last date for the lessee to serve renewal/exit notice before the lease ends. */
+export const noticeBy = L => addMonths(L.end, -noticeLessee(L))
+/** Last date for the lessor to serve notice before the lease ends. */
+export const noticeByLessor = L => addMonths(L.end, -noticeLessor(L))
 export function leaseState(L, today) {
   if (!L) return 'No lease'
   if (L.status === 'Draft') return 'Draft'
@@ -149,11 +188,11 @@ export function leaseState(L, today) {
 /* ---------- one invoice: GST, RCM, TDS and net payable ---------- */
 export function calc(L, type, base, period, gstOverride, ownerId, ctx) {
   base = +base || 0
-  const oid = ownerId || L?.ownerId; const mode = L ? ownerGstMode(L, oid) : 'None'
+  const oid = ownerId || L?.ownerId; const mode = L ? ownerGstMode(L, oid, period || cur(ctx)) : 'None'
   const gstOn = gstOverride !== undefined ? gstOverride : (mode === 'Forward' && type !== 'Electricity')
   const gst = gstOn ? Math.round(base * 0.18) : 0
   const rcm = (mode === 'RCM' && type !== 'Electricity') ? Math.round(base * 0.18) : 0
-  const monthly = L ? rentFor(L, period || cur(ctx)) * (tdsPerOwner(L) ? ownerShare(L, oid, 'rent') : 1) : 0
+  const monthly = L ? rentFor(L, period || cur(ctx)) * (tdsPerOwner(L) ? ownerShare(L, oid, 'rent', period || cur(ctx)) : 1) : 0
   const tdsOn = !!(L && L.tds && (type === 'Rent' || (type === 'Maintenance' && L.tdsOnMaint)) && monthly > 50000)
   const rateT = tdsOn ? tdsRate(oid, (period || cur(ctx)) + '-01', ctx) : 0
   const tds = tdsOn ? Math.round(base * rateT / 100) : 0
@@ -244,9 +283,10 @@ export function depAdjCandidates(L, ctx) {
 /* ---------- CSV exports ---------- */
 export function scheduleCsv(L, ctx) {
   const sc = schedule(L, ctx); const os = isMulti(L) ? sc.owners : []
-  const rows = [['Month', 'Lease year', 'Days charged', 'Monthly rate', 'Rent', 'Advance adjusted', 'Maintenance', 'GST', 'GST under RCM', 'TDS', 'Net payable to owner(s)', 'Due by', 'Note'].concat(os.flatMap(x => { const n = ctx.ownerName(x.ownerId) || x.ownerId; return [n + ' rent', n + ' TDS', n + ' net'] }))]
-    .concat(sc.rows.map(r => [r.p, r.y, r.ch, r.rate, r.rent, r.adj, r.maint, r.gst, r.rcm, r.tds, r.net, r.due, r.notes.join('; ')].concat(os.length ? r.split.flatMap(x => [x.rent - x.adj, x.tds, x.net]) : [])))
-  rows.push(['Total', '', '', '', sc.tot.rent, sc.tot.adj, sc.tot.maint, sc.tot.gst, sc.tot.rcm, sc.tot.tds, sc.tot.net, '', ''])
+  const rows = [['Month', 'Lease year', 'Days charged', 'Monthly rate', 'Rent', 'Advance adjusted', 'Maintenance', 'GST', 'GST under RCM', 'TDS', 'Net payable to owner(s)', 'Billed in', 'Due by', 'Liability at month-end', 'Paid this month', 'Paid for month', 'Note'].concat(os.flatMap(x => { const n = ctx.ownerName(x.ownerId) || x.ownerId; return [n + ' rent', n + ' TDS', n + ' net'] }))]
+    .concat(sc.rows.map(r => [r.p, r.y, r.ch, r.rate, r.rent, r.adj, r.maint, r.gst, r.rcm, r.tds, r.net, r.billIn, r.due, r.liab, r.cash, r.cashFor || '', r.notes.join('; ')].concat(os.length ? r.split.flatMap(x => [x.rent - x.adj, x.tds, x.net]) : [])))
+  if (sc.tail) rows.push([sc.tail.p, '', '', '', '', '', '', '', '', '', '', sc.tail.p, sc.tail.due, 0, sc.tail.net, sc.tail.forP, 'After term — last month paid in arrears'])
+  rows.push(['Total', '', '', '', sc.tot.rent, sc.tot.adj, sc.tot.maint, sc.tot.gst, sc.tot.rcm, sc.tot.tds, sc.tot.net, '', '', '', sc.tot.cash + (sc.tail ? sc.tail.net : 0), '', ''])
   return toCsv(rows)
 }
 export function statementCsv(inv, ctx) {

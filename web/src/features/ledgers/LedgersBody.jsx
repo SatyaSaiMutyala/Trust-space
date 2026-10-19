@@ -10,7 +10,7 @@ import { S, UI, prop, owner, isOwner, scopeProps, emit, useStore } from '../../s
 import { openInv, obPay } from '../../store/actions'
 import { callApi } from '../../app/store'
 import { inr, fmtD, perLabel, fy, by, TODAY } from '../../domain/utils'
-import { invState, ledTypes, fyStart, leaseOwners } from '../../domain/lease'
+import { invState, ledTypes, fyStart, allLeaseOwners } from '../../domain/lease'
 import { LED_TABS } from '../../domain/constants'
 import { offerDownload } from '../../services/files'
 import { Btn, Panel, Kpis, Kpi, TableCard, ClickRow, Stack } from '../../components/ui/Layout'
@@ -117,7 +117,7 @@ export default function LedgersBody({ fixedPid }) {
   const o = isOwner(); const U = UI.led = UI.led || { tab: 'Rent', prop: '', fy: fy(TODAY) }
   const props = fixedPid ? [prop(fixedPid)] : scopeProps(); const pids = new Set((U.prop && !fixedPid ? [U.prop] : props.map(p => p.id)))
   const leases = S.leases.filter(l => pids.has(l.propertyId) && l.status !== 'Draft')
-  const ownerOpts = o ? [] : [...new Set(leases.flatMap(L => leaseOwners(L).map(x => x.ownerId)))]
+  const ownerOpts = o ? [] : [...new Set(leases.flatMap(L => allLeaseOwners(L).map(x => x.ownerId)))]
   if (U.owner && !ownerOpts.includes(U.owner)) U.owner = ''
   const fyF = U.fy || 'all'
   const params = { tab: U.tab, propertyId: fixedPid || U.prop || '', ownerId: o ? '' : (U.owner || ''), fy: fyF }

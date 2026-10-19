@@ -1,12 +1,12 @@
-/* Staff home (design p.2): who/date, hero rent roll with donut, four tiles, "Needs you today" list.
-   Shows the loading skeleton layout (design p.21) for the first moment. */
-import React, { useEffect, useState } from 'react';
+/* Staff home (design p.2): who/date, hero rent roll with donut, four tiles, "Needs you today" — from GET /mobile/overview.
+   Shows the skeleton layout (design p.21) while loading and the error state with Try again if the call fails. */
+import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, ms, s, vs } from '../../theme';
-import { Screen, AppText, Avatar, IconButton, HeroCard, Donut, Tile, ListRow, CountBadge, SectionHeader, Skeleton } from '../../components';
-import { overview, staffUser } from '../../mock/data';
+import { Screen, AppText, Avatar, IconButton, HeroCard, Donut, Tile, ListRow, CountBadge, SectionHeader, Skeleton, ErrorState } from '../../components';
 import { useAppSelector } from '../../store/hooks';
+import { useOverviewQuery, errorMessage, inr } from '../../store/api';
 
 function Legend({ color, label }) {
   return (
@@ -20,54 +20,55 @@ function Legend({ color, label }) {
 function LoadingBody() {
   return (
     <View>
-      <Skeleton h={190} r={24} tone="mist" style={styles.hero} />
-      <View style={styles.tiles}><Skeleton h={112} r={20} style={styles.half} /><Skeleton h={112} r={20} style={styles.half} /></View>
-      <View style={styles.tiles}><Skeleton h={112} r={20} style={styles.half} /><Skeleton h={112} r={20} style={styles.half} /></View>
+      <Skeleton h={170} r={22} tone="mist" style={styles.hero} />
+      <View style={styles.tiles}><Skeleton h={96} r={18} style={styles.half} /><Skeleton h={96} r={18} style={styles.half} /></View>
+      <View style={styles.tiles}><Skeleton h={96} r={18} style={styles.half} /><Skeleton h={96} r={18} style={styles.half} /></View>
       {[0, 1].map(i => (
         <View key={i} style={styles.skelRow}>
-          <Skeleton circle size={44} />
+          <Skeleton circle size={40} />
           <View style={styles.flex}><Skeleton w="70%" h={14} /><Skeleton w="45%" h={12} style={styles.skelGap} /></View>
         </View>
       ))}
-      <AppText variant="small" color="muted" center style={styles.updating}>Updating. Showing figures from 08:14 today.</AppText>
     </View>
   );
 }
 
 export default function OverviewScreen() {
   const nav = useNavigation();
-  const user = useAppSelector(st => st.auth.user) || staffUser;
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 900); return () => clearTimeout(t); }, []);
-  const r = overview.rentRoll;
+  const user = useAppSelector(st => st.auth.user);
+  const { data, isLoading, isFetching, error, refetch } = useOverviewQuery();
+  const r = data?.data?.rentRoll; const t = data?.data?.tiles;
+  const openNeed = it => nav.navigate(it.to, it.id ? { id: it.id } : undefined);
   return (
     <Screen tabs>
       <View style={styles.top}>
-        <Pressable style={styles.who} accessibilityRole="button" accessibilityLabel="Profile">
-          <Avatar initials={user.initials || 'RT'} tone="mist" size={34} />
-          <AppText variant="body" color="muted" style={styles.whoText} numberOfLines={1}>{user.name}, {user.team || 'Facilities'}</AppText>
+        <Pressable style={styles.who} accessibilityRole="button" accessibilityLabel="Profile" onPress={() => nav.navigate('More')}>
+          <Avatar initials={user?.initials || '?'} tone="mist" size={34} />
+          <AppText variant="body" color="muted" style={styles.whoText} numberOfLines={1}>{user?.name}{user?.team ? `, ${user.team}` : ''}</AppText>
         </Pressable>
         <View style={styles.topRight}>
           <IconButton name="search" onPress={() => nav.navigate('Search')} iconSize={24} accessibilityLabel="Search" />
           <View>
             <IconButton name="bell" onPress={() => nav.navigate('Notifications')} iconSize={24} accessibilityLabel="Notifications" />
-            <View style={styles.bellDot} />
+            {data?.data?.needsTotal ? <View style={styles.bellDot} /> : null}
           </View>
         </View>
       </View>
-      <AppText variant="body" color="muted" style={styles.date}>{overview.date}</AppText>
+      <AppText variant="body" color="muted" style={styles.date}>{data?.data?.dateLabel || ' '}</AppText>
       <AppText variant="display">Overview</AppText>
 
-      {loading ? <LoadingBody /> : (
+      {isLoading ? <LoadingBody /> : error ? (
+        <ErrorState title="Couldn't load the overview" body={errorMessage(error)} action="Try again" onAction={refetch} />
+      ) : (
         <>
           <HeroCard style={styles.hero}>
             <View style={styles.heroRow}>
               <View style={styles.flex}>
                 <AppText variant="body" color={colors.onTealMuted} style={styles.heroLabel}>{r.month} rent roll</AppText>
-                <AppText variant="monoXl" color="white" style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit>{r.amount}</AppText>
-                <AppText variant="body" color={colors.onTealMuted}>{r.leases} leases, {r.sqft} sq ft</AppText>
+                <AppText variant="monoXl" color="white" style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit>{inr(r.amount)}</AppText>
+                <AppText variant="body" color={colors.onTealMuted}>{r.leases} lease{r.leases === 1 ? '' : 's'}, {r.sqft.toLocaleString('en-IN')} sq ft</AppText>
               </View>
-              <Donut size={70} stroke={8} segments={[{ value: r.paidPct, color: colors.white }, { value: r.processPct, color: '#8FD3C7' }, { value: r.overduePct, color: '#E8956B' }]} track="rgba(255,255,255,0.18)">
+              <Donut size={70} stroke={8} segments={[{ value: r.paidPct, color: colors.white }, { value: r.processPct, color: '#8FD3C7' }, { value: r.overduePct, color: '#E8956B' }, { value: Math.max(0, 100 - r.paidPct - r.processPct - r.overduePct), color: 'rgba(255,255,255,0.18)' }]} track="rgba(255,255,255,0.18)">
                 <AppText variant="title" color="white" style={styles.donutText}>{r.paidPct}%</AppText>
               </Donut>
             </View>
@@ -80,18 +81,18 @@ export default function OverviewScreen() {
           </HeroCard>
 
           <View style={styles.tiles}>
-            <Tile {...overview.tiles[0]} onPress={() => nav.navigate('Invoices')} />
-            <Tile {...overview.tiles[1]} onPress={() => nav.navigate('Repairs')} />
+            <Tile tone="amber" label="Payable to owners" value={inr(t.payable.amount)} sub={t.payable.overdue ? `${inr(t.payable.overdue)} overdue` : `${t.payable.invoices} invoice${t.payable.invoices === 1 ? '' : 's'} open`} subTone={t.payable.overdue ? 'coral' : undefined} onPress={() => nav.navigate('Invoices')} />
+            <Tile tone="coral" label="Open repairs" value={String(t.repairs.open)} sub={t.repairs.pastSla ? `${t.repairs.pastSla} past SLA` : t.repairs.critical ? `${t.repairs.critical} critical` : 'None past SLA'} subTone={t.repairs.pastSla ? 'coral' : undefined} onPress={() => nav.navigate('Repairs')} />
           </View>
           <View style={styles.tiles}>
-            <Tile {...overview.tiles[2]} onPress={() => nav.navigate('Deposits')} />
-            <Tile {...overview.tiles[3]} onPress={() => nav.navigate('SiteScouting')} />
+            <Tile tone="mist" label="Deposits held" value={inr(t.deposits.held)} sub={`${t.deposits.leases} lease${t.deposits.leases === 1 ? '' : 's'}`} onPress={() => nav.navigate('Deposits')} />
+            <Tile tone="blue" label="Site pipeline" value={String(t.pipeline.sites)} sub={t.pipeline.waiting ? `${t.pipeline.waiting} waiting for approval` : 'None waiting'} onPress={() => nav.navigate('SiteScouting')} />
           </View>
 
-          <SectionHeader title="Needs you today" action={`All ${overview.needsTotal}`} onAction={() => {}} />
-          {overview.needs.map((it, i) => (
-            <ListRow key={i} left={<CountBadge n={it.n} tone={it.tone} />} title={it.title} sub={it.sub} chevron onPress={() => nav.navigate(it.to)} divider={i < overview.needs.length - 1} />
-          ))}
+          <SectionHeader title="Needs you today" action={data.data.needsTotal ? `All ${data.data.needsTotal}` : undefined} actionColor="muted" />
+          {data.data.needs.length ? data.data.needs.map((it, i) => (
+            <ListRow key={it.key} left={<CountBadge n={it.n} tone={it.tone} />} title={it.title} sub={it.sub} chevron onPress={() => openNeed(it)} divider={i < data.data.needs.length - 1} />
+          )) : <AppText variant="body" color="muted" style={styles.none}>Nothing is waiting for you. {isFetching ? 'Refreshing…' : ''}</AppText>}
         </>
       )}
     </Screen>
@@ -120,5 +121,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   skelRow: { flexDirection: 'row', gap: s(14), alignItems: 'center', marginTop: vs(26) },
   skelGap: { marginTop: vs(10) },
-  updating: { marginTop: vs(40) },
+  none: { paddingVertical: vs(12) },
 });

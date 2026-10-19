@@ -5,10 +5,10 @@ import { createSlice } from '@reduxjs/toolkit';
 export const SIGNUP_STEPS = 7;
 
 const initialState = {
-  // 1 mobile
-  phone: '', whatsappSame: true, whatsapp: '', otpVerified: false,
+  // 1 sign-in details
+  email: '', password: '', password2: '', emailVerified: false, signupToken: '', devCode: '',
   // 2 about you
-  kind: 'Individual', name: '', email: '', altPhone: '', prefContact: 'WhatsApp', callHours: 'Morning, 9–12',
+  kind: 'Individual', name: '', phone: '', whatsappSame: true, whatsapp: '', altPhone: '', prefContact: 'WhatsApp', callHours: 'Morning, 9–12',
   // 3 address
   addrLine: '', addrCity: '', addrState: 'Telangana', addrPin: '', noticeSame: true, nAttn: '', nLine: '', nCity: '', nState: 'Telangana', nPin: '', noticeEmail: '',
   // 4 PAN and GST
@@ -17,9 +17,10 @@ const initialState = {
   bankName: '', bankBranch: '', ifsc: '', acctHolder: '', acctNo: '', acctNo2: '', acctType: 'Savings', upi: '', chequeFile: null,
   // 6 property and people
   propertyCode: '', propertyName: '', propertyTown: '', coOwners: '', repName: '', repRel: '', repPhone: '', repEmail: '', poaFile: null,
-  // 7 password
-  password: '', password2: '', agree: false,
+  // 7 consent
+  agree: false,
   status: 'draft', // draft | submitting | pending
+  message: '', // the server's reply after submit
 };
 
 const signupSlice = createSlice({

@@ -1,6 +1,7 @@
 /* Joint inspections (take-over / handover) — ported verbatim from reference/TruSpace.html. */
 import { S, owner, prop, actor, save } from '../store/store'
 import { CHECK, FIX_SEC, BADC, IN_KIND } from './constants'
+import { inspectionItems, inspProblems as sharedProblems, inspSummary as sharedSummary, inspLocked as sharedLocked } from '@calc/inspection.js'
 import { by, nowISO, fmtD, fmtDT, inr, esc, daysTo } from './utils'
 import { leaseState } from './lease'
 import { fileUrl } from '../services/files'
@@ -29,32 +30,12 @@ export const SKIP_NOTE_MIN = 30
 export const inspOf = (leaseId, kind) => S.inspections.filter(i => i.leaseId === leaseId && i.kind === kind).sort(by('createdAt', -1))[0]
 export function buildInspection(L, kind) {
   const prev = kind === 'Move-out' ? inspOf(L.id, 'Move-in') : null
-  const pm = {}; (prev?.items || []).forEach(it => pm[it.k] = it)
-  const items = []
-  CHECK.forEach(sec => sec.items.forEach(([k, label, type, req]) => { const p = pm[k]; items.push({ k, sec: sec.s, label, type, req: !!req, cond: '', val: '', remark: '', photos: [], prev: p ? { cond: p.cond, val: p.val, remark: p.remark, photos: (p.photos || []).slice(0, 3) } : null }) }))
-  ;(prev?.items || []).filter(it => it.type === 'fixture').forEach(p => items.push({ k: p.k, sec: FIX_SEC, label: p.label, type: 'fixture', req: false, qty: p.qty, cond: '', remark: '', photos: [], prev: { cond: p.cond, val: p.qty, remark: p.remark, photos: (p.photos || []).slice(0, 3) } }))
-  return { kind, propertyId: L.propertyId, leaseId: L.id, ownerId: L.ownerId, date: '', inspector: '', ownerRep: owner(L.ownerId)?.name || '', items, roomPhotos: [], status: 'Not started', log: [{ at: nowISO(), by: actor(), text: `${IN_KIND[kind]} record created` }] }
+  return { kind, propertyId: L.propertyId, leaseId: L.id, ownerId: L.ownerId, date: '', inspector: '', ownerRep: owner(L.ownerId)?.name || '', items: inspectionItems(prev?.items), roomPhotos: [], status: 'Not started', log: [{ at: nowISO(), by: actor(), text: `${IN_KIND[kind]} record created` }] }
 }
 /** Everything still missing before the TrustLab side can sign: [anchorKey, message][] */
-export function inspProblems(I) {
-  const out = []
-  if (!I.date) out.push(['__head', 'Inspection date'])
-  if (!(I.inspector || '').trim()) out.push(['__head', (prop(I.propertyId)?.managedBy === 'franchise' ? 'Franchise partner' : 'TrustLab') + ' inspector name'])
-  if (!(I.ownerRep || '').trim()) out.push(['__head', 'Owner / representative name'])
-  for (const it of I.items) {
-    const bad = BADC(it.cond)
-    if (it.type === 'cond' || it.type === 'fixture') { if (!it.cond) out.push([it.k, `${it.label}: condition not recorded`]); else if (bad && !(it.remark || '').trim()) out.push([it.k, `${it.label}: describe the issue`]) }
-    if (it.type === 'fixture' && !(it.label || '').trim()) out.push([it.k, 'Fixture: name it'])
-    if ((it.type === 'count' || it.type === 'reading') && String(it.val ?? '').trim() === '') out.push([it.k, `${it.label}: value not recorded`])
-    if ((it.req || bad) && it.cond !== 'N/A' && !(it.photos || []).length) out.push([it.k, `${it.label}: photo required`])
-    if (I.kind === 'Move-out' && bad && !it.resp) out.push([it.k, `${it.label}: choose who bears the cost`])
-  }
-  if ((I.roomPhotos || []).length < 4) out.push(['__room', `Area-wise photos: ${(I.roomPhotos || []).length} of minimum 4`])
-  if (!I.tdplVideo) out.push(['__vid', 'Confirmation video by TrustLab employee'])
-  return out
-}
-export const inspLocked = I => ['Awaiting owner sign-off', 'Signed'].includes(I.status)
-export function inspSummary(I) { const flagged = I.items.filter(it => BADC(it.cond)); const ded = I.items.reduce((s, it) => s + (it.resp === 'TrustLab' ? (+it.deduct || 0) : 0), 0); return { flagged, ded } }
+export const inspProblems = I => sharedProblems(I, { tenant: prop(I.propertyId)?.managedBy === 'franchise' ? 'Franchise partner' : 'TrustLab' })
+export const inspLocked = sharedLocked
+export const inspSummary = sharedSummary
 
 /** Owner signs: lock the record and, for a handover, carry agreed deductions into the exit settlement. */
 export async function inspFinalise(I, name, method, paper) {

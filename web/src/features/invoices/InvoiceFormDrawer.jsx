@@ -38,7 +38,7 @@ export default function InvoiceFormDrawer({ d }) {
   const props = scopeProps().filter(x => leaseOf(x.id))
   const pid = p.prop || (p.lease ? S.leases.find(l => l.id === p.lease)?.propertyId : '') || props[0]?.id || ''
   const mode = p.mode || 'generate'; const type = p.type || 'Rent'; const period = p.period || CUR
-  const L = leaseOf(pid); const oid = isOwner() ? role().ownerId : (p.owner && leaseOwners(L).some(o => o.ownerId === p.owner) ? p.owner : L?.ownerId); const O = owner(oid)
+  const L = leaseOf(pid); const oid = isOwner() ? role().ownerId : (p.owner && leaseOwners(L, p.period || CUR).some(o => o.ownerId === p.owner) ? p.owner : leaseOwners(L, p.period || CUR)[0]?.ownerId || L?.ownerId); const O = owner(oid)
   const seq = ALL.invoices.filter(i => i.ownerId === O?.id && fy(i.date) === fy(TODAY)).length + 1
   const number = p.number ?? (O ? `${O.invPrefix || 'INV'}/${fy(TODAY)}/${String(seq).padStart(3, '0')}` : '')
   let base = p.base
@@ -87,7 +87,7 @@ export default function InvoiceFormDrawer({ d }) {
             <SelectInput id="iv-mode" name="mode" label="How" defaultValue={mode} options={[['generate', 'Generate in TruSpace'], ['upload', 'Upload my own invoice']]} />
             <SelectInput id="iv-prop" name="propertyId" label="Property" defaultValue={pid} options={props.map(x => [x.id, `${x.name} (${x.code})`])} />
             {!o && isMulti(L)
-              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${pctLabel(x.rent)}`])} hint="Each co-owner raises their own invoice for their share" />
+              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L, period).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${pctLabel(x.rent)}`])} hint="Each co-owner raises their own invoice for their share" />
               : o && isMulti(L) ? <Cell full><Banner>You own {pctLabel(ownerShare(L, oid, 'rent') * 100)} of the rent and {pctLabel(ownerShare(L, oid, 'maint') * 100)} of maintenance. Invoice your share only.</Banner></Cell> : null}
             <SelectInput id="iv-type" name="type" label="Invoice for" defaultValue={type} options={INV_TYPES} />
             <TextInput id="iv-per" name="period" label="Billing month" type="month" defaultValue={period} required />

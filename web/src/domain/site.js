@@ -20,15 +20,7 @@ export function earthPlan(st) {
     text: `${lab ? '3 dedicated pits: 2 for analysers / instruments and 1 for UPS neutral' : '2 dedicated pits: 1 for equipment and 1 for UPS neutral'}, plus the building body earth. Target under 1 Ω with neutral–earth voltage under 2 V.`,
   }
 }
-export function catchIndex(st) {
-  const c = st.catch || {}; const n = k => +c[k] || 0
-  const filled = ['hosp3', 'clin1', 'res1', 'comp1'].every(k => c[k] !== undefined && c[k] !== '')
-  if (!filled) return { idx: 0, filled: false, parts: {} }
-  const cap = (v, m) => Math.min(1, v / m)
-  const parts = { Medical: Math.round(30 * (0.5 * cap(n('hosp3'), 5) + 0.2 * cap(n('hosp1') + n('nh1'), 3) + 0.3 * cap(n('clin1'), 20))), Residential: Math.round(30 * (0.75 * cap(n('res1'), 5000) + 0.25 * cap(n('gated1'), 5))), Corporate: Math.round(10 * cap(n('offices1'), 5)), Visibility: Math.round(15 * cap(n('footfall'), 3000)), Competition: Math.max(0, 15 - 3 * n('comp1')) }
-  return { idx: Object.values(parts).reduce((a, b) => a + b, 0), filled: true, parts }
-}
-export const CATCH_MAX = { Medical: 30, Residential: 30, Corporate: 10, Visibility: 15, Competition: 15 }
+export { catchIndex, CATCH_MAX, siteScore } from '@calc/site.js'
 
 export const reqLoc = r => `${r.city} – ${r.area}`
 export const reqOf = st => S.reqs.find(r => r.id === st.reqId)
@@ -39,17 +31,6 @@ export function siteStage(st) {
   if (st.stage === 'Rejected' || st.stage === 'On hold') return st.stage
   if (st.leaseId && !isFr(st)) { const L = S.leases.find(l => l.id === st.leaseId); if (!L || L.status === 'Draft') return 'Agreement'; const mi = inspOf(L.id, 'Move-in'); return mi && mi.status === 'Signed' ? 'Operational' : 'Take-over' }
   return st.stage || 'Scouted'
-}
-export function siteScore(st) {
-  const ch = st.checks || {}; let got = 0, max = 0, done = 0, conc = 0; const crit = [], secs = {}
-  SITE_ITEMS.forEach(it => {
-    const v = ch[it.k]?.v; const w = it.crit ? 2 : 1; const sc = secs[it.sec] = secs[it.sec] || { got: 0, max: 0 }
-    if (v) done++; if (!v || v === 'N/A') return; max += w; sc.max += w; const g = v === 'Pass' ? w : v === 'Concern' ? w / 2 : 0; got += g; sc.got += g
-    if (v === 'Fail' && it.crit) crit.push(it); if (v === 'Concern') conc++
-  })
-  const pct = max ? Math.round(got / max * 100) : 0
-  const verdict = crit.length ? 'Deal-breaker' : !done ? 'Not assessed' : pct >= 80 ? 'Recommended' : pct >= 60 ? 'Conditional' : 'Not recommended'
-  return { pct, done, total: SITE_ITEMS.length, crit, conc, secs, verdict }
 }
 /** Everything still missing before a site can be shortlisted: [anchorKey, message][] */
 export function siteProblems(st) {

@@ -2,6 +2,7 @@ import app from './app.js'
 import { env } from './config/env.js'
 import { connectDb } from './config/db.js'
 import { startInvoiceScheduler } from './services/invoiceGenerator.js'
+import { attachRealtime } from './services/realtime.js'
 
 try {
   await connectDb(env.mongoUri)
@@ -12,5 +13,6 @@ try {
   process.exit(1)
 }
 
-app.listen(env.port, () => console.log(`TruSpace API running on http://localhost:${env.port}/api`))
+const server = app.listen(env.port, () => console.log(`TruSpace API running on http://localhost:${env.port}/api`))
+attachRealtime(server) // live updates (Socket.IO on /socket.io)
 startInvoiceScheduler() // rent invoices on the 1st of every month

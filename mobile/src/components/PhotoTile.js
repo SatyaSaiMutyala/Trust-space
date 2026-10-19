@@ -1,17 +1,17 @@
 /* Rounded photo tile (not an arch): gradient placeholder, caption chip bottom-left, optional play button and duration.
    state="capture" draws the dashed "After photo" tile. */
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { colors, ms, s, vs } from '../theme';
 import AppText from './AppText';
 import Icon from './Icon';
 import { PhotoGradient } from './Arch';
 
-export default function PhotoTile({ label, play, duration, state = 'photo', height = 130, onPress, style, radius = 20 }) {
+export default function PhotoTile({ label, play, duration, state = 'photo', height = 130, onPress, style, radius = 20, uri }) {
   const capture = state === 'capture';
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={[styles.tile, { height: vs(height), borderRadius: ms(radius) }, capture && styles.capture, style]}>
-      {!capture ? <PhotoGradient /> : null}
+      {!capture ? (uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <PhotoGradient />) : null}
       {capture ? (
         <View style={styles.center}>
           <Icon name="camera" size={30} color={colors.teal} strokeWidth={1.6} />

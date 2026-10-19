@@ -24,6 +24,21 @@ export const env = {
     /** Status a generated invoice starts in: Verified (ready to approve) or Submitted (staff verify first). */
     autoStatus: ['Submitted', 'Verified'].includes(process.env.INVOICE_AUTO_STATUS) ? process.env.INVOICE_AUTO_STATUS : 'Verified',
   },
+  /** Outgoing mail over SMTP; with no host, mails are logged instead of sent (development, tests). */
+  mail: {
+    host: process.env.NODE_ENV === 'test' ? '' : (process.env.MAIL_HOST || ''),
+    port: Number(process.env.MAIL_PORT) || 587,
+    username: process.env.MAIL_USERNAME || '',
+    password: process.env.MAIL_PASSWORD || '',
+    encryption: process.env.MAIL_ENCRYPTION || 'STARTTLS',
+    from: process.env.MAIL_FROM_ADDRESS || process.env.MAIL_USERNAME || 'no-reply@example.com',
+    fromName: process.env.MAIL_FROM_NAME || 'TruSpace',
+    codeMinutes: Number(process.env.SIGNUP_CODE_MINUTES) || 10, // sign-up email code lifetime
+    contact: process.env.MAIL_CONTACT || '', // how to reach the facilities team, shown in emails (e.g. a phone number or email)
+  },
+  appName: process.env.APP_NAME || 'TruSpace',
+  /** Push notifications: path of the Firebase service-account JSON (empty = off, notifications only logged). */
+  push: { adminFile: process.env.FIREBASE_ADMIN_FILE || '' },
   /** 's3' (AWS S3) or 'local' (backend/uploads) */
   storageDriver: (process.env.STORAGE_DRIVER || 'local').toLowerCase(),
   uploadDir: path.resolve(process.env.UPLOAD_DIR || 'uploads'),

@@ -17,7 +17,9 @@ import { FormGrid, Cell, TextInput, SelectInput } from '../../components/form/Fi
 import { TableSkeleton, Refreshing } from '../../components/ui/Skeletons'
 import { useServerList } from '../../components/list/useServerList'
 import { ListToolbar, ListFilter, Pager } from '../../components/list/ListControls'
-import { ROLE_LABEL, ROLE_CHIP, isStaffRole, createAccount, setAccountStatus, unlockAccount, resetAccountPassword, deleteAccount } from './actions'
+import { ROLE_LABEL, ROLE_CHIP, isStaffRole, createAccount, setAccountStatus, unlockAccount, resetAccountPassword, deleteAccount, approveSignup, declineSignup } from './actions'
+import { api } from '../../app/api'
+import { maskAcct } from '../../domain/lease'
 
 const NW = { whiteSpace: 'nowrap' }
 /** Field error from the API, shown as the field's helper text. */
@@ -88,6 +90,35 @@ function AccessForm({ isAdmin, onIssued }) {
   )
 }
 
+/** Owner sign-ups from the app waiting for approval: what they told us, with Approve / Decline. */
+function PendingSignups() {
+  const q = api.usePendingSignupsQuery()
+  const [busy, setBusy] = useState('')
+  const rows = q.data?.data || []
+  if (!rows.length) return null
+  const go = (id, fn) => async () => { if (busy) return; setBusy(id); try { await fn() } finally { setBusy('') } }
+  return (
+    <Panel title={`Owner sign-ups waiting for approval · ${rows.length}`} sub="Check the PAN, the bank account (cancelled cheque) and link the property before approving. Approving emails the owner that they can sign in.">
+      <Box sx={{ display: 'grid', gap: 1.5 }}>
+        {rows.map(u => { const o = u.owner || {}; const sg = u.signup || o.signup || {}; return (
+          <Box key={u.id} sx={{ border: '1px solid var(--line)', borderLeft: '4px solid var(--warn)', borderRadius: 'var(--r)', p: { xs: 1.5, sm: 2 }, display: 'grid', gap: 1 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+              <b>{u.name}</b><span className="small muted">{o.kind || ''} · signed up {fmtDT(u.createdAt)}</span>
+              <Box sx={{ ml: 'auto', display: 'flex', gap: .75 }}>
+                <Btn primary sm disabled={!!busy} onClick={go(u.id, () => approveSignup(u))}>Approve</Btn>
+                <ConfirmButton sm disabled={!!busy} label="Decline" confirmLabel="Click again to decline" onConfirm={go(u.id, () => declineSignup(u))} />
+              </Box>
+            </Box>
+            <div className="facts">
+              {[['Email', u.email], ['Mobile', u.phone], ['Property', sg.propertyCode || [sg.propertyName, sg.propertyTown].filter(Boolean).join(', ') || '—'], ['PAN', <span key="p" className="mono">{o.pan || '—'}</span>], ['GSTIN', <span key="g" className="mono">{o.gstin || 'Unregistered'}</span>], ['Bank', `${o.bankName || '—'} ${maskAcct(o.acctNo)} · ${o.ifsc || ''}`], ['Address', o.address || '—'], ['Co-owners', o.coOwners || '—']].map(([l, v]) => <div key={l} className="fact"><div className="l">{l}</div><div className="v">{v}</div></div>)}
+            </div>
+            <div className="small muted">Documents: {[o.panFile && 'PAN card', o.gstFile && 'GST certificate', o.chequeFile && 'cancelled cheque', o.rep?.poa && 'PoA'].filter(Boolean).join(', ') || 'none uploaded'} — open the owner record under Owners to view them and verify the PAN and bank before approving.</div>
+          </Box>) })}
+      </Box>
+    </Panel>
+  )
+}
+
 /** Row actions: disable / enable, unlock, reset password, delete. */
 function RowActions({ u, me, isAdmin, onIssued }) {
   const [busy, setBusy] = useState(false)
@@ -96,8 +127,8 @@ function RowActions({ u, me, isAdmin, onIssued }) {
   const go = fn => async () => { if (busy) return; setBusy(true); try { await fn() } finally { setBusy(false) } }
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: .75, justifyContent: 'flex-end', minWidth: 220 }}>
-      {self ? null : u.status === 'disabled'
-        ? <Btn sm disabled={busy} onClick={go(() => setAccountStatus(u, 'active'))}>Enable</Btn>
+      {self ? null : u.status === 'disabled' || u.status === 'pending'
+        ? <Btn sm primary={u.status === 'pending'} disabled={busy} onClick={go(() => setAccountStatus(u, 'active'))}>{u.status === 'pending' ? 'Approve' : 'Enable'}</Btn>
         : <Btn sm disabled={busy} onClick={go(() => setAccountStatus(u, 'disabled'))}>Disable</Btn>}
       {u.locked ? <Btn sm disabled={busy} onClick={go(() => unlockAccount(u))}>Unlock</Btn> : null}
       <Btn sm disabled={busy} onClick={go(async () => { const res = await resetAccountPassword(u); if (res?.data?.temporaryPassword) onIssued({ name: u.name, login: loginOf(u), password: res.data.temporaryPassword }) })}>Reset password</Btn>
@@ -122,11 +153,12 @@ export default function AccessPage() {
         <AccessForm isAdmin={isAdmin} onIssued={showIssued} />
       </Panel>
       {issued ? <div id="issued"><IssuedPassword key={issued.password} issued={issued} onClose={() => setIssued(null)} /></div> : null}
+      <PendingSignups />
       <section style={{ display: 'grid', gap: 10 }}>
         <h2>Accounts</h2>
         <ListToolbar list={L} searchPlaceholder="Search name, email or mobile" dateLabel="Created">
           <ListFilter list={L} name="role" label="Role" allLabel="Any role" options={Object.entries(ROLE_LABEL)} />
-          <ListFilter list={L} name="status" label="Status" allLabel="Any status" width={140} options={[['active', 'Active'], ['disabled', 'Disabled']]} />
+          <ListFilter list={L} name="status" label="Status" allLabel="Any status" width={140} options={[['active', 'Active'], ['pending', 'Waiting for approval'], ['disabled', 'Disabled']]} />
         </ListToolbar>
         {!L.rows.length && L.isFetching ? <TableSkeleton rows={6} cols={6} /> : L.rows.length ? (
           <Refreshing on={L.isFetching}><TableCard>
@@ -140,7 +172,7 @@ export default function AccessPage() {
                   <TableCell sx={NW}><StatusChip label={ROLE_LABEL[u.role] || u.role} k={ROLE_CHIP[u.role]} /></TableCell>
                   <TableCell sx={{ minWidth: 140 }}>{linkedName(u)}</TableCell>
                   <TableCell sx={NW}>
-                    {u.status === 'disabled' ? <StatusChip label="Disabled" k="idle" /> : <StatusChip label="Active" k="ok" />}
+                    {u.status === 'disabled' ? <StatusChip label="Disabled" k="idle" /> : u.status === 'pending' ? <StatusChip label="Waiting for approval" k="warn" /> : <StatusChip label="Active" k="ok" />}
                     {u.locked ? <> <StatusChip label="Locked" k="bad" /></> : null}
                   </TableCell>
                   <TableCell className="small" sx={NW}>{u.lastLoginAt ? fmtDT(u.lastLoginAt) : 'Never'}<div className="muted">Added {fmtD(u.createdAt)}</div></TableCell>

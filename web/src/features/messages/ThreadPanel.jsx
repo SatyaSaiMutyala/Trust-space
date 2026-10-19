@@ -11,6 +11,7 @@ import { Btn } from '../../components/ui/Layout'
 import { Avatar, Bubble, DateDivider, SendIcon, ClipIcon, ChatIcon } from './chatParts'
 import { dayOf } from './chatUtils'
 import { sendMessage, markRead, convBack } from './actions'
+import { joinThread, leaveThread, sendTyping, onTyping } from '../../app/realtime'
 
 const HINT = 'Photos, videos and PDFs can be attached'
 const KINDS = ['Message', 'Notice', 'Approval request']
@@ -27,6 +28,9 @@ export default function ThreadPanel({ pid, embedded }) {
   const [busy, setBusy] = useState(false)
   const threadRef = useRef(null)
   const formRef = useRef(null)
+  const [typing, setTyping] = useState(null) // { by, at } from the other side
+  useEffect(() => { joinThread(pid); const off = onTyping(t => { if (t.propertyId === pid && t.side !== s) setTyping({ by: t.by, at: Date.now() }) }); return () => { off(); leaveThread(pid) } }, [pid, s])
+  useEffect(() => { if (!typing) return undefined; const t = setTimeout(() => setTyping(null), 4000); return () => clearTimeout(t) }, [typing])
 
   useEffect(() => {
     if (!unreadKey) return
@@ -76,7 +80,7 @@ export default function ThreadPanel({ pid, embedded }) {
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Box component="h2" sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</Box>
           <Box className="small muted" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Conversation with {withWhom}{P?.code ? <> · <span className="mono">{P.code}</span></> : null}
+            {typing ? <span style={{ color: 'var(--accent)' }}>{typing.by} is typing…</span> : <>Conversation with {withWhom}{P?.code ? <> · <span className="mono">{P.code}</span></> : null}</>}
           </Box>
         </Box>
         {embedded ? <Btn sm onClick={() => openProp(pid)} sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>Open property</Btn> : null}
@@ -107,7 +111,7 @@ export default function ThreadPanel({ pid, embedded }) {
             <input type="file" name="files" id="msgFiles" multiple accept="image/*,video/*,application/pdf" aria-label="Attach photos, videos or PDF" hidden onChange={e => setFiles(e.target.files.length)} />
           </Box>
           <InputBase name="text" id="msgText" placeholder={`Message ${withWhom}…`} required multiline maxRows={6}
-            value={text} onChange={e => setText(e.target.value)} onKeyDown={onKey}
+            value={text} onChange={e => { setText(e.target.value); if (e.target.value) sendTyping(pid) }} onKeyDown={onKey}
             inputProps={{ 'aria-label': 'Message' }} sx={{ flex: 1, py: 1, fontSize: 14.5, '@media (max-width:760px)': { fontSize: 16 } }} />
           <Box component="button" type="submit" aria-label="Send" disabled={busy || !text.trim()}
             sx={{ width: 40, height: 40, flex: 'none', border: 0, borderRadius: '50%', display: 'grid', placeItems: 'center', cursor: 'pointer', bgcolor: 'var(--accent)', color: 'var(--accent-ink)', transition: 'transform .1s, opacity .15s', '&:hover:not(:disabled)': { filter: 'brightness(1.08)' }, '&:active:not(:disabled)': { transform: 'scale(.94)' }, '&:disabled': { opacity: .45, cursor: 'default' } }}>

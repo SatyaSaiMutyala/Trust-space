@@ -17,6 +17,11 @@ import { buildListQuery, pageInfo } from '../utils/listQuery.js'
 import { ApiError, badRequest, notFound, conflict } from '../utils/ApiError.js'
 import { ok, created } from '../utils/respond.js'
 import { cap, count } from '../utils/text.js'
+import { sendMail } from '../services/mailer.js'
+import { templates } from '../services/mailTemplates.js'
+import { notify } from '../services/notify.js'
+import { removeUserTokens } from '../services/push.js'
+import { env } from '../config/env.js'
 
 const CFG = {
   singular: 'account', plural: 'accounts', search: ['name', 'email', 'phone'],
@@ -47,7 +52,7 @@ async function validate(rec, id) {
   if (!ROLES.includes(rec.role)) errors.role = 'Role must be one of: admin, staff, owner, franchisee'
   if (rec.role === 'owner' && !rec.ownerId) errors.ownerId = 'Choose the owner record this account belongs to'
   if (rec.role === 'franchisee' && !rec.partnerId) errors.partnerId = 'Choose the franchise partner this account belongs to'
-  if (rec.status && !['active', 'disabled'].includes(rec.status)) errors.status = 'Status must be active or disabled'
+  if (rec.status && !['active', 'disabled', 'pending'].includes(rec.status)) errors.status = 'Status must be active, disabled or pending'
   const list = Object.values(errors)
   if (list.length) throw badRequest(list.length === 1 ? list[0] + '.' : `Please fix ${list.length} fields: ${list.join('; ')}.`, errors)
   if (rec.role === 'owner' && !(await models.owners.exists({ _id: rec.ownerId }))) throw badRequest(`Owner “${rec.ownerId}” does not exist.`, { ownerId: 'Not found' })
@@ -116,7 +121,11 @@ export const usersController = {
     await User.updateOne({ _id: u._id }, { $set: set, ...(Object.keys(unset).length ? { $unset: unset } : {}) })
     if (set.status === 'disabled' || (changes.role && changes.role !== u.role)) await Session.deleteMany({ userId: u._id })
     const fresh = await User.findById(u._id).lean()
-    return ok(res, `Account “${fresh.name}” updated.${set.status === 'disabled' && u.status !== 'disabled' ? ' They have been signed out and can no longer sign in.' : ''}`, publicUser(fresh))
+    const approved = u.status === 'pending' && set.status === 'active'
+    if (approved) notify.signupApproved(fresh)
+    if (set.status === 'disabled') await removeUserTokens(u._id)
+    if (approved && fresh.email) await sendMail({ to: fresh.email, ...templates.signupApproved({ name: fresh.name, email: fresh.email, loginUrl: env.clientUrl }) })
+    return ok(res, `Account “${fresh.name}” updated.${approved ? ' They can sign in now and have been emailed.' : ''}${set.status === 'disabled' && u.status !== 'disabled' ? ' They have been signed out and can no longer sign in.' : ''}`, publicUser(fresh))
   },
 
   async remove(req, res) {
@@ -126,7 +135,8 @@ export const usersController = {
     guard(req.user, u.role)
     await Session.deleteMany({ userId: u._id })
     await User.deleteOne({ _id: u._id })
-    return ok(res, `Account “${u.name}” deleted. They can no longer sign in.`, { id: u._id })
+    if (u.status === 'pending' && u.email) await sendMail({ to: u.email, ...templates.signupDeclined({ name: u.name, contact: env.mail.contact }) })
+    return ok(res, `Account “${u.name}” deleted.${u.status === 'pending' ? ' The sign-up was declined and they have been emailed.' : ' They can no longer sign in.'}`, { id: u._id })
   },
 
   async unlock(req, res) {

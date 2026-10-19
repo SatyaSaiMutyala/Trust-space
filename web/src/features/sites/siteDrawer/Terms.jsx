@@ -21,7 +21,8 @@ export default function Terms({ st, fr, stage }) {
         {T('st-r', 'Agreed rent (₹/month)', 'rent')}{T('st-d', 'Security deposit (₹)', 'deposit')}
         {T('st-t', 'Term (months)', 'term')}{T('st-l', 'Lock-in (months)', 'lockIn')}
         {T('st-e', 'Escalation %', 'escPct', 'number', { step: '0.5' })}{T('st-ee', 'Escalate every (months)', 'escEvery')}
-        {T('st-f', 'Rent-free fit-out (days)', 'fitout')}{T('st-n', 'Notice period (months)', 'notice')}
+        {T('st-f', 'Rent-free fit-out (days)', 'fitout')}{T('st-n', 'Notice by lessee — tenant (months)', 'notice')}
+        {T('st-nl', 'Notice by lessor — owner (months)', 'noticeLessor')}
         {T('st-a', 'Advance rent (₹)', 'advance')}{T('st-m', 'Maintenance (₹/month)', 'maint')}
         {T('st-s', 'Expected possession date', 'start', 'date')}{T('st-b', 'Brokerage (₹)', 'brokerage')}
         <TextInput id="st-w" label="Works the owner will complete before handover" multiline full readOnly={ro} defaultValue={t.ownerWorks || ''}

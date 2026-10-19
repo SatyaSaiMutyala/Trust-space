@@ -8,8 +8,8 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
-import { CUR, fmtD, inr, perLabel, ordinal, pctLabel } from '../../domain/utils'
-import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, rentStartOf, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, tdsRate, panValid } from '../../domain/lease'
+import { CUR, fmtD, inr, perLabel, perAdd, addDays, ordinal, pctLabel } from '../../domain/utils'
+import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, noticeByLessor, noticeLessee, noticeLessor, rentStartOf, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, tdsRate, panValid } from '../../domain/lease'
 import { useLeaseDeposit } from './useLeaseDeposit'
 import { TableSkeleton } from '../../components/ui/Skeletons'
 import { useLeaseSchedule } from './useLeaseSchedule'
@@ -97,15 +97,46 @@ function TdM({ v, neg }) {
   return <TableCell className="num">{v ? (neg ? '−' : '') + inr(v) : <span className="muted">—</span>}</TableCell>
 }
 
-function YrRow({ y, gstCol }) {
+function YrRow({ y, gstCol, arr }) {
   return (
     <TableRow className="yr">
       <TableCell><b>Year {y.y}</b><div className="small muted">{perLabel(y.from)} – {perLabel(y.to)}</div></TableCell>
+      <TableCell /><TableCell />
       <TableCell className="num small">{y.lo === Infinity ? '—' : y.lo === y.hi ? inr(y.lo) : inr(y.lo) + '→' + inr(y.hi)}</TableCell>
       <TdM v={y.rent} /><TdM v={y.adj} neg /><TdM v={y.maint} /><TdM v={y[gstCol]} /><TdM v={y.tds} neg />
-      <TableCell className="num"><b>{inr(y.net)}</b></TableCell><TableCell /><TableCell />
+      <TableCell className="num"><b>{inr(y.net)}</b></TableCell>
+      {arr ? <><TableCell className="num liab">{y.liab ? inr(y.liab) : '—'}<div className="small muted">at year end</div></TableCell><TableCell className="num">{inr(y.cash)}</TableCell></> : null}
+      <TableCell />
     </TableRow>
   )
+}
+
+/** "Billed in" cell: the month the rent is invoiced, with same/next month under it. */
+function BillTd({ r, arr }) {
+  return <TableCell className="small nw">{perLabel(r.billIn)}<div className="muted">{arr ? 'next month' : 'same month'}</div></TableCell>
+}
+
+/** Arrears only: liability carried at month-end and the cash actually paid in the month (for the previous month). */
+function ArrTds({ r }) {
+  return <>
+    <TableCell className="num liab">{r.liab ? inr(r.liab) : <span className="muted">—</span>}{r.liab ? <div className="small muted">accrued {fmtD(addDays(perAdd(r.p, 1) + '-01', -1))}</div> : null}</TableCell>
+    <TableCell className="num">{r.cash ? <>{inr(r.cash)}<div className="small muted">for {perLabel(r.cashFor)}</div></> : <span className="muted">—</span>}</TableCell>
+  </>
+}
+
+/** Which month's rent is billed when, and when it is due — "Paid in advance" / "Paid in arrears" (prototype timingNote). */
+export function TimingNote({ sc, L }) {
+  if (!sc.rows.length) return null
+  if (!sc.timingSet) return <Banner sx={{ mb: 1.25 }}><b>Advance or arrears not set.</b> The schedule assumes rent is paid in advance until you choose. {isOwner() ? null : <Btn sm onClick={() => editLease(L.id)}>Set it now</Btn>}</Banner>
+  const r = sc.rows.find(x => x.p === CUR) || sc.rows.find(x => x.rent) || sc.rows[0]
+  const me = addDays(perAdd(r.p, 1) + '-01', -1)
+  const step = (h, b) => <div className="tstep"><span className="eyebrow">{h}</span><span>{b}</span></div>
+  return sc.arrears
+    ? <div className="timing"><div><b>Paid in arrears</b> <span className="small muted">Each month’s rent is a liability at that month’s end and is billed and paid in the following month.</span></div>
+        <div className="tflow">{step('Rent for', perLabel(r.p))}{step('Liability on', <>{fmtD(me)} · <b className="mono">{inr(r.net)}</b></>)}{step('Billed in', perLabel(r.billIn))}{step('Due by', fmtD(r.due))}</div>
+        {sc.tail ? <div className="small muted">The last month ({perLabel(sc.tail.forP)}) is paid in {perLabel(sc.tail.p)}, after the term ends.</div> : null}</div>
+    : <div className="timing"><div><b>Paid in advance</b> <span className="small muted">Each month’s rent is billed and paid in that same month. No rent liability is carried at month-end.</span></div>
+        <div className="tflow">{step('Rent for', perLabel(r.p))}{step('Billed in', perLabel(r.billIn))}{step('Due by', fmtD(r.due))}{step('Liability at month-end', 'None once paid')}</div></div>
 }
 
 /* Phones/tablets: the Month column stays put while the money columns scroll; notes get room so rows stay short. */
@@ -127,7 +158,7 @@ function ScheduleByOwner({ sc }) {
         <TableHead><TableRow>
           <TableCell>Month</TableCell>
           {os.map(x => <TableCell key={x.ownerId} className="num">{owner(x.ownerId)?.name || '—'}<div className="small muted" style={{ textTransform: 'none', letterSpacing: 0 }}>{pctLabel(x.share.rent)} · net</div></TableCell>)}
-          <TableCell className="num">Total net</TableCell><TableCell>Due by</TableCell>
+          <TableCell className="num">Total net</TableCell><TableCell>Billed in</TableCell><TableCell>Due by</TableCell>
         </TableRow></TableHead>
         <TableBody>
           {sc.rows.map(r => (
@@ -135,6 +166,7 @@ function ScheduleByOwner({ sc }) {
               <TableCell>{perLabel(r.p)}{r.notes.length ? <div className="small muted">{r.notes.join(' · ')}</div> : null}</TableCell>
               {r.split.map(x => <TableCell key={x.ownerId} className="num">{inr(x.net)}{x.tds ? <div className="small muted">TDS {inr(x.tds)}</div> : null}</TableCell>)}
               <TableCell className="num"><b>{inr(r.net)}</b></TableCell>
+              <TableCell className="small">{perLabel(r.billIn)}</TableCell>
               <TableCell className="small">{fmtD(r.due)}</TableCell>
             </TableRow>
           ))}
@@ -142,7 +174,7 @@ function ScheduleByOwner({ sc }) {
         <TableFooter><TableRow className="yr tot">
           <TableCell><b>Whole term</b></TableCell>
           {os.map(x => <TableCell key={x.ownerId} className="num"><b>{inr(x.net)}</b></TableCell>)}
-          <TableCell className="num"><b>{inr(sc.tot.net)}</b></TableCell><TableCell />
+          <TableCell className="num"><b>{inr(sc.tot.net)}</b></TableCell><TableCell /><TableCell />
         </TableRow></TableFooter>
       </Table>
     </div>
@@ -154,32 +186,41 @@ export function ScheduleTable({ sc, L, mode }) {
   if (mode === 'owner' && isMulti(L)) return <ScheduleByOwner sc={sc} />
   const modes = new Set(leaseOwners(L).map(o => ownerGstMode(L, o.ownerId))); const mixed = modes.has('Forward') && modes.has('RCM')
   const gstCol = !mixed && modes.has('RCM') ? 'rcm' : 'gst'; const gstH = mixed ? 'GST (on invoice)' : gstCol === 'rcm' ? 'GST (RCM)' : 'GST'
+  const arr = !!sc.arrears; const tl = sc.tail
   const body = []
   sc.years.forEach(y => {
     if (mode !== 'year') sc.rows.filter(r => r.y === y.y).forEach(r => body.push(
       <TableRow key={r.p} className={`${r.esc ? 'escrow' : ''} ${r.p === CUR ? 'nowrow' : ''}`}>
         <TableCell>{perLabel(r.p)}</TableCell>
+        <BillTd r={r} arr={arr} />
+        <TableCell className="small nw">{fmtD(r.due)}</TableCell>
         <TableCell className="num">{r.ch ? inr(r.rate) : '—'}</TableCell>
         <TdM v={r.rent} /><TdM v={r.adj} neg /><TdM v={r.maint} /><TdM v={r[gstCol]} /><TdM v={r.tds} neg />
         <TableCell className="num"><b>{inr(r.net)}</b></TableCell>
-        <TableCell className="small">{fmtD(r.due)}</TableCell>
+        {arr ? <ArrTds r={r} /> : null}
         <TableCell className="small">{r.notes.map((n, i) => <span key={i}>{i ? <br /> : null}{n}</span>)}</TableCell>
       </TableRow>
     ))
-    body.push(<YrRow key={'y' + y.y} y={y} gstCol={gstCol} />)
+    body.push(<YrRow key={'y' + y.y} y={y} gstCol={gstCol} arr={arr} />)
   })
+  // Arrears: the last month's rent is paid in the month after the term ends.
+  if (tl) body.push(mode !== 'year'
+    ? <TableRow key="tail" className="tailrow"><TableCell>{perLabel(tl.p)}<div className="small muted">after the term ends</div></TableCell><TableCell className="small nw">{perLabel(tl.p)}</TableCell><TableCell className="small nw">{fmtD(tl.due)}</TableCell><TableCell /><TableCell colSpan={6} className="small muted">No rent for this month — only the last month’s rent, billed now</TableCell><TableCell className="num muted">—<div className="small">liability cleared</div></TableCell><TableCell className="num">{inr(tl.net)}<div className="small muted">for {perLabel(tl.forP)}</div></TableCell><TableCell /></TableRow>
+    : <TableRow key="tail" className="tailrow"><TableCell><b>After term</b><div className="small muted">{perLabel(tl.p)}</div></TableCell><TableCell /><TableCell /><TableCell /><TableCell colSpan={6} className="small muted">Last month’s rent ({perLabel(tl.forP)}) paid after the term ends</TableCell><TableCell className="num">—</TableCell><TableCell className="num">{inr(tl.net)}</TableCell><TableCell /></TableRow>)
   const t = sc.tot
   return (
     <div className="tbl-wrap sched">
       <Table size="small" sx={SCHED_SX}>
         <TableHead><TableRow>
-          <TableCell>Month</TableCell><TableCell className="num">Monthly rate</TableCell><TableCell className="num">Rent</TableCell><TableCell className="num">Adv. adj.</TableCell><TableCell className="num">Maint.</TableCell><TableCell className="num">{gstH}</TableCell><TableCell className="num">TDS</TableCell><TableCell className="num">Net to owner</TableCell><TableCell>Due by</TableCell><TableCell>Note</TableCell>
+          <TableCell>Rent for</TableCell><TableCell>Billed in</TableCell><TableCell>Due by</TableCell><TableCell className="num">Monthly rate</TableCell><TableCell className="num">Rent</TableCell><TableCell className="num">Adv. adj.</TableCell><TableCell className="num">Maint.</TableCell><TableCell className="num">{gstH}</TableCell><TableCell className="num">TDS</TableCell><TableCell className="num">Net to owner</TableCell>{arr ? <><TableCell className="num">Liability at month-end</TableCell><TableCell className="num">Paid this month</TableCell></> : null}<TableCell>Note</TableCell>
         </TableRow></TableHead>
         <TableBody>{body}</TableBody>
         <TableFooter><TableRow className="yr tot">
-          <TableCell><b>Whole term</b></TableCell><TableCell />
+          <TableCell><b>Whole term</b></TableCell><TableCell /><TableCell /><TableCell />
           <TdM v={t.rent} /><TdM v={t.adj} neg /><TdM v={t.maint} /><TdM v={t[gstCol]} /><TdM v={t.tds} neg />
-          <TableCell className="num"><b>{inr(t.net)}</b></TableCell><TableCell /><TableCell />
+          <TableCell className="num"><b>{inr(t.net)}</b></TableCell>
+          {arr ? <><TableCell className="num">—</TableCell><TableCell className="num"><b>{inr(t.cash + (tl ? tl.net : 0))}</b></TableCell></> : null}
+          <TableCell />
         </TableRow></TableFooter>
       </Table>
     </div>
@@ -187,7 +228,7 @@ export function ScheduleTable({ sc, L, mode }) {
 }
 
 /** One-line description of the schedule: term, escalation, payment timing. */
-const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : 'paid in advance'}`
+const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : L.payTiming === 'Advance' ? 'paid in advance' : 'advance/arrears not set'}`
 
 /** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). headerless: the caller shows the title.
     The schedule comes from the API (useLeaseSchedule). */
@@ -207,6 +248,7 @@ export function SchedulePanel({ L, headerless }) {
         <Btn sm onClick={() => schedCsv(L.id)}>Download (CSV)</Btn>
       </div>}
       <SchedTotals sc={sc} L={L} />
+      <TimingNote sc={sc} L={L} />
       {/* The view switch only changes the month-by-month table below, so it sits right above it — not above the totals and owner split. */}
       <div className="filters" style={{ justifyContent: 'space-between', margin: '14px 0 8px' }}>
         <div className="eyebrow">{mode === 'year' ? 'Year by year' : mode === 'owner' ? 'Month by month — per owner' : 'Month by month'}</div>
@@ -240,8 +282,8 @@ export default function LeaseDetail({ L }) {
           ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None', L.escPct ? `${L.escType === 'Simple' ? 'Simple, on base rent' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}${ne ? ' · next ' + fmtD(ne) : ''}` : null],
           ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, dep?.adjusted ? `${inr(dep.adjusted)} adjusted against rent · ${inr(dep.held)} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'],
           ['Lock-in', L.lockIn ? `${L.lockIn} months` : 'None', L.lockIn ? `Ends ${fmtD(le)}` : null],
-          ['Notice period', `${L.notice} months`, `Serve by ${fmtD(noticeBy(L))}`],
-          ['Rent payment', L.payTiming === 'Arrears' ? 'In arrears' : 'In advance', `By the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
+          ['Notice period', `Lessee ${noticeLessee(L)} mo · Lessor ${noticeLessor(L)} mo`, `Tenant serves by ${fmtD(noticeBy(L))}${noticeLessor(L) !== noticeLessee(L) ? ` · owner by ${fmtD(noticeByLessor(L))}` : ''}`],
+          ['Rent payment', !L.payTiming ? <StatusChip key="pt" label="Not set" k="warn" /> : L.payTiming === 'Arrears' ? 'In arrears — billed next month' : 'In advance — billed same month', !L.payTiming ? 'Choose advance or arrears in the lease' : `By the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
           ['Rent-free period', `${L.fitout || 0} days`, `Rent from ${fmtD(rentStartOf(L))}`],
           ['Advance rent', +L.advanceRent ? inr(L.advanceRent) : 'None', +L.advanceRent ? `Adjusted over ${L.advanceMonths || 1} month${(L.advanceMonths || 1) > 1 ? 's' : ''}` : null],
         ]} /></Section>
@@ -253,7 +295,7 @@ export default function LeaseDetail({ L }) {
             L.tds ? `s.393 (formerly 194-I) · when rent exceeds ₹50,000/month${isMulti(L) ? ' · 20% for a co-owner without a valid PAN' : ''}${tdsPerOwner(L) ? ' · tested on each co-owner’s share' : ''}${!isMulti(L) && !panValid(owner(L.ownerId)) ? ' · 10% once a valid PAN is on file' : ''}` : null],
           ['Registration', L.registered ? 'Registered' : 'Unregistered', L.stamp ? `Stamp duty & registration ${inr(L.stamp)}` : null],
         ]} /></Section>
-        {isMulti(L) ? <Section title="Owners & share of payments"><OwnersBlock L={L} heading={false} /></Section> : null}
+        {isMulti(L) || (!o && L.status !== 'Draft') ? <Section title={isMulti(L) ? 'Owners & share of payments' : 'Owner'} sub={isMulti(L) ? null : 'Add a co-owner here if the property changes hands in part'}><OwnersBlock L={L} heading={false} /></Section> : null}
         {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}
         <Section title="Key clauses"><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></Section>
         <Section title="Joint inspections"><LeaseInspections L={L} /></Section>

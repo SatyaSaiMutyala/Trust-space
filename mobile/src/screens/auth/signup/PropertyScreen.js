@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, s, vs } from '../../../theme';
-import { StepFrame, Input, AppText, Checkbox, PhotoArch, PickerSheet, Icon } from '../../../components';
+import { StepFrame, Input, AppText, Checkbox, PhotoArch, Dropdown, Icon, PhotoPickerSheet, usePhotoPicker } from '../../../components';
 import { SIGNUP_STEPS } from '../../../store/slices/signupSlice';
 import { signupLists } from '../../../mock/data';
 import { useSignup, isPhone, isEmail } from './useSignup';
@@ -13,7 +13,8 @@ export default function PropertyScreen() {
   const nav = useNavigation();
   const { f, set, errors, check } = useSignup();
   const [hasRep, setHasRep] = useState(!!f.repName);
-  const [pick, setPick] = useState(false);
+  const [pick, pickerProps] = usePhotoPicker();
+  const grab = async () => { const files = await pick({ title: company ? 'Board resolution' : 'Power of attorney' }); if (files[0]) set('poaFile')({ uri: files[0].uri, type: files[0].type, name: files[0].name }); };
   const company = f.kind !== 'Individual';
   const next = () => {
     const rules = { propertyName: !f.propertyCode.trim() && !f.propertyName.trim() && 'Enter the property code from your agreement, or its name and town.' };
@@ -34,17 +35,17 @@ export default function PropertyScreen() {
       {hasRep ? (
         <>
           <Input label="Representative name" value={f.repName} onChangeText={set('repName')} autoCapitalize="words" error={errors.repName} style={styles.field} />
-          <Input label="Relationship" select value={f.repRel} placeholder="Pick one" onPress={() => setPick(true)} style={styles.field} />
+          <Dropdown label="Relationship" value={f.repRel} options={signupLists.relations} onSelect={set('repRel')} style={styles.field} />
           <View style={styles.row}>
             <Input label="Phone" prefix="+91" value={f.repPhone} onChangeText={set('repPhone')} keyboardType="phone-pad" error={errors.repPhone} style={styles.half} />
             <Input label="Email" value={f.repEmail} onChangeText={set('repEmail')} keyboardType="email-address" error={errors.repEmail} style={styles.half} />
           </View>
           <AppText variant="label" style={styles.label}>{company ? 'Board resolution' : 'Power of attorney'} (optional)</AppText>
-          <View style={styles.photos}><PhotoArch state={f.poaFile ? 'photo' : 'optional'} label={f.poaFile ? 'Document' : 'Add document'} sub="Photo or PDF" width={150} ratio={0.9} onPress={() => set('poaFile')({ name: 'poa.pdf' })} /></View>
+          <View style={styles.photos}><PhotoArch state={f.poaFile ? 'photo' : 'optional'} label={f.poaFile ? 'Document' : 'Add document'} sub="Photo or PDF" width={150} ratio={0.9} onPress={grab} uri={f.poaFile?.uri} /></View>
         </>
       ) : null}
+      <PhotoPickerSheet {...pickerProps} />
       <View style={styles.note}><Icon name="info" size={18} color={colors.muted} /><AppText variant="small" color="muted" style={styles.flex}>Rent shares and the lease itself are set by the facilities team from the signed agreement, not here.</AppText></View>
-      <PickerSheet open={pick} onClose={() => setPick(false)} title="Relationship" options={signupLists.relations} value={f.repRel} onSelect={set('repRel')} />
     </StepFrame>
   );
 }

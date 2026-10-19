@@ -2,8 +2,8 @@
    readOwnerRows, ownerSums, leaseFromForm, SUBMIT.lease, SUBMIT.depAdj). */
 import { S, UI, prop, owner, save, toast, emit, openDrawer, actor, side } from '../../store/store'
 import { newInsp, settleWithDeposit } from '../../store/actions'
-import { addDays, addMonths, num, inr, perLabel, newId, nowISO, TODAY } from '../../domain/utils'
-import { rentFor, leaseOwners, isMulti, splitAmt } from '../../domain/lease'
+import { addDays, addMonths, num, inr, perLabel, perAdd, newId, nowISO, TODAY } from '../../domain/utils'
+import { rentFor, leaseOwners, depositOwners, isMulti, splitAmt } from '../../domain/lease'
 import { callApi } from '../../app/store'
 import { inspOf } from '../../domain/inspection'
 import { offerDownload } from '../../services/files'
@@ -78,7 +78,7 @@ export function ownerSums(f) {
 /** Read the lease form into a lease record (prototype leaseFromForm). */
 export function leaseFromForm(f, base) {
   const fd = new FormData(f); const P = prop(fd.get('propertyId'))
-  return Object.assign({}, base, { ref: fd.get('ref'), propertyId: fd.get('propertyId'), ownerId: base.ownerId || P?.ownerId, start: fd.get('start'), end: fd.get('end'), lockIn: num(fd.get('lockIn')), notice: num(fd.get('notice')), fitout: num(fd.get('fitout')), status: fd.get('status'), rent: num(fd.get('rent')), payTiming: fd.get('payTiming'), dueDay: Math.min(28, num(fd.get('dueDay')) || 5), escPct: num(fd.get('escPct')), escEvery: num(fd.get('escEvery')), escType: fd.get('escType'), escFrom: fd.get('escFrom'), deposit: num(fd.get('deposit')), depositPaid: !!fd.get('depositPaid'), advanceRent: num(fd.get('advanceRent')), advanceMonths: num(fd.get('advanceMonths')), brokerage: num(fd.get('brokerage')), maintType: fd.get('maintType'), maint: num(fd.get('maint')), maintEsc: !!fd.get('maintEsc'), elec: fd.get('elec'), gstMode: fd.get('gstMode'), tds: !!fd.get('tds'), tdsOnMaint: !!fd.get('tdsOnMaint'), registered: !!fd.get('registered'), stamp: num(fd.get('stamp')), clauses: fd.get('clauses') }, (() => { const rows = readOwnerRows(f); if (rows.length > 1) return { owners: rows, ownerId: rows[0].ownerId || base.ownerId, tdsPerOwner: !!fd.get('tdsPerOwner') }; return { owners: undefined, ownerId: (rows[0] && rows[0].ownerId) || base.ownerId || P?.ownerId, tdsPerOwner: undefined } })())
+  return Object.assign({}, base, { ref: fd.get('ref'), propertyId: fd.get('propertyId'), ownerId: base.ownerId || P?.ownerId, start: fd.get('start'), end: fd.get('end'), lockIn: num(fd.get('lockIn')), notice: num(fd.get('notice')), noticeLessor: num(fd.get('noticeLessor')), fitout: num(fd.get('fitout')), status: fd.get('status'), rent: num(fd.get('rent')), payTiming: fd.get('payTiming'), dueDay: Math.min(28, num(fd.get('dueDay')) || 5), escPct: num(fd.get('escPct')), escEvery: num(fd.get('escEvery')), escType: fd.get('escType'), escFrom: fd.get('escFrom'), deposit: num(fd.get('deposit')), depositPaid: !!fd.get('depositPaid'), advanceRent: num(fd.get('advanceRent')), advanceMonths: num(fd.get('advanceMonths')), brokerage: num(fd.get('brokerage')), maintType: fd.get('maintType'), maint: num(fd.get('maint')), maintEsc: !!fd.get('maintEsc'), elec: fd.get('elec'), gstMode: fd.get('gstMode'), tds: !!fd.get('tds'), tdsOnMaint: !!fd.get('tdsOnMaint'), registered: !!fd.get('registered'), stamp: num(fd.get('stamp')), clauses: fd.get('clauses') }, (() => { const rows = readOwnerRows(f); if (rows.length > 1) return { owners: rows, ownerId: rows[0].ownerId || base.ownerId, tdsPerOwner: !!fd.get('tdsPerOwner') }; return { owners: undefined, ownerId: (rows[0] && rows[0].ownerId) || base.ownerId || P?.ownerId, tdsPerOwner: undefined } })())
 }
 
 /** SUBMIT.lease */
@@ -94,6 +94,25 @@ export async function submitLease(f, fd, id) {
   }
   if (addDays(L.start, L.fitout) > L.end) { toast('Rent-free period runs past the end of the lease.', 'warning'); return }
   await save('leases', L); openDrawer({ kind: 'leaseView', id: L.id })
+}
+
+/* ---------- Co-owner changes: deactivate / add / reactivate, with a new split from a month ---------- */
+/** The split in force until the month before `from` is kept in ownerHistory; `owners` becomes the new current split. */
+export async function submitOwnerChange(leaseId, { mode, ownerId, owners, from, note }) {
+  const L = S.leases.find(l => l.id === leaseId); if (!L) return
+  const ids = owners.map(o => o.ownerId)
+  if (new Set(ids).size !== ids.length) { toast('The same owner is listed twice.', 'warning'); return }
+  for (const [k, lbl] of [['rent', 'Rent'], ['maint', 'Maintenance']]) { const t = owners.reduce((a, o) => a + (+o[k] || 0), 0); if (owners.length > 1 && Math.abs(t - 100) > 0.01) { toast(`${lbl} shares add up to ${Math.round(t * 100) / 100}% — they must total 100%.`, 'warning'); return } }
+  const prev = leaseOwners(L); const startP = L.start.slice(0, 7); const until = perAdd(from, -1)
+  if (until >= startP) L.ownerHistory = (L.ownerHistory || []).filter(h => h.until < until).concat({ until, owners: prev, changedAt: nowISO(), by: actor() })
+  L.owners = owners.length > 1 ? owners : owners.map(o => ({ ...o, rent: 100, maint: 100, dep: 100, adv: 100 }))
+  L.ownerId = owners[0].ownerId
+  if (owners.length > 1 && L.tdsPerOwner === undefined) L.tdsPerOwner = true
+  const name = owner(ownerId)?.name || ownerId
+  const text = mode === 'deactivate' ? `${name} deactivated from ${perLabel(from)}` : mode === 'add' ? `${name} added from ${perLabel(from)}` : `${name} reactivated from ${perLabel(from)}`
+  L.ownerChanges = (L.ownerChanges || []).concat({ at: nowISO(), by: actor(), type: mode, ownerId, from, note: note || '', text, split: owners.map(o => `${owner(o.ownerId)?.name || o.ownerId} ${Math.round(o.rent * 100) / 100}%`).join(' · ') })
+  await save('leases', L)
+  openDrawer({ kind: 'leaseView', id: L.id })
 }
 
 /* ---------- Security deposit adjusted against rent ---------- */
@@ -120,7 +139,7 @@ export async function submitDepAdj(fd, leaseId, dep) {
   for (const [k] of fd.entries()) { if (!k.startsWith('on_')) continue; const i = k.slice(3); const [period, ownerId, tds] = fd.get('key_' + i).split('|'); const amount = num(fd.get('amt_' + i)); if (amount > 0) picks.push({ period, ownerId, tds: +tds || 0, amount }) }
   if (!picks.length) { toast('Tick at least one month.', 'warning'); return }
   const depOf = oid => dep.owners.find(o => o.ownerId === oid) || { held: 0, available: 0 }
-  for (const o of leaseOwners(L)) { const want = picks.filter(x => x.ownerId === o.ownerId).reduce((a, x) => a + x.amount, 0); const avail = depOf(o.ownerId).available; if (want > avail) { toast(`${isMulti(L) ? (owner(o.ownerId)?.name || '') + '’s' : 'The'} deposit held (${inr(avail)}) is less than ${inr(want)}.`, 'warning'); return } }
+  for (const o of depositOwners(L)) { const want = picks.filter(x => x.ownerId === o.ownerId).reduce((a, x) => a + x.amount, 0); const avail = depOf(o.ownerId).available; if (want > avail) { toast(`${isMulti(L) ? (owner(o.ownerId)?.name || '') + '’s' : 'The'} deposit held (${inr(avail)}) is less than ${inr(want)}.`, 'warning'); return } }
   if (how === 'recorded' && !(fd.get('ref') || '').trim()) { toast('Add the reference for the owner’s agreement.', 'warning'); return }
   const consent = how === 'recorded' ? { how: fd.get('how2'), on: fd.get('on'), ref: fd.get('ref'), by: actor() } : null
   L.depAdj = (L.depAdj || []).concat(picks.map(x => Object.assign({ id: newId(), status: consent ? 'Agreed' : 'Proposed', consent, note: fd.get('note') || '', createdAt: nowISO(), createdBy: actor() }, x)))

@@ -58,6 +58,7 @@ async function checkLease(L, { models }) {
   const ids = owners.map(o => o.ownerId)
   const names = await ownerNames(models, ids.filter(Boolean))
   const who = id => names[id] || id
+  const everOwner = id => (Array.isArray(L.ownerHistory) ? L.ownerHistory : []).some(h => (h?.owners || []).some(o => o.ownerId === id)) // former co-owners keep their past records
 
   if (L.owners !== undefined && L.owners !== null) {
     if (!Array.isArray(L.owners)) errors.owners = 'Co-owners must be a list of { ownerId, rent, maint, dep, adv, gst }'
@@ -82,6 +83,22 @@ async function checkLease(L, { models }) {
     }
   }
 
+  if (L.ownerHistory !== undefined && L.ownerHistory !== null) {
+    if (!Array.isArray(L.ownerHistory)) errors.ownerHistory = 'Owner history must be a list of { until, owners }'
+    else {
+      const hid = [...new Set(L.ownerHistory.flatMap(h => (Array.isArray(h?.owners) ? h.owners.map(o => o.ownerId) : [])))]
+      const hn = await ownerNames(models, hid.filter(Boolean))
+      for (const h of L.ownerHistory) {
+        if (!h || !PERIOD.test(h.until || '')) { errors.ownerHistory = 'Each owner history entry needs the last month it applied, like 2026-09'; break }
+        if (!Array.isArray(h.owners) || !h.owners.length) { errors.ownerHistory = `Owner history up to ${perLabel(h.until)} needs at least one owner`; break }
+        if (h.owners.some(o => !o.ownerId || !hn[o.ownerId])) { errors.ownerHistory = `Owner history up to ${perLabel(h.until)} lists an owner that does not exist`; break }
+        const t = h.owners.reduce((a, o) => a + n(o.rent), 0)
+        if (h.owners.length > 1 && Math.abs(t - 100) > 0.01) { errors.ownerHistory = `Rent shares up to ${perLabel(h.until)} add up to ${Math.round(t * 100) / 100}% — they must total 100%`; break }
+      }
+    }
+  }
+  if (L.ownerChanges !== undefined && L.ownerChanges !== null && !Array.isArray(L.ownerChanges)) errors.ownerChanges = 'Owner changes must be a list'
+
   if (L.depAdj !== undefined && L.depAdj !== null) {
     if (!Array.isArray(L.depAdj)) errors.depAdj = 'Deposit adjustments must be a list'
     else {
@@ -89,7 +106,7 @@ async function checkLease(L, { models }) {
       for (const a of L.depAdj) {
         if (!a || typeof a !== 'object') { problem = 'Each deposit adjustment must be an object'; break }
         if (!PERIOD.test(a.period || '')) { problem = 'Each deposit adjustment needs a rent month like 2026-10'; break }
-        if (!ids.includes(a.ownerId)) { problem = `Deposit adjustment for ${perLabel(a.period)} is for someone who is not an owner on this lease`; break }
+        if (!ids.includes(a.ownerId) && !everOwner(a.ownerId)) { problem = `Deposit adjustment for ${perLabel(a.period)} is for someone who is not an owner on this lease`; break }
         if (!isNum(a.amount) || n(a.amount) < 0) { problem = `Deposit adjustment for ${perLabel(a.period)} needs an amount of ₹0 or more`; break }
         if (a.tds !== undefined && a.tds !== null && a.tds !== '' && (!isNum(a.tds) || n(a.tds) < 0)) { problem = `TDS on the ${perLabel(a.period)} deposit adjustment must be a number`; break }
         if (!DEP_ADJ_STATUS.includes(a.status)) { problem = `Deposit adjustment status must be one of: ${DEP_ADJ_STATUS.join(', ')}`; break }
@@ -123,7 +140,7 @@ async function checkLease(L, { models }) {
         const lab = `${it.type || 'Item'} for ${perLabel(it.period)}`
         if (it.period >= ob.asOf.slice(0, 7)) { problem = `${perLabel(it.period)} is on or after ${ob.asOf} — record it as an invoice instead`; break }
         if (!INV_TYPES.includes(it.type)) { problem = `Opening balance type must be one of: ${INV_TYPES.join(', ')}`; break }
-        if (!ids.includes(it.ownerId)) { problem = `${lab} is for someone who is not an owner on this lease`; break }
+        if (!ids.includes(it.ownerId) && !everOwner(it.ownerId)) { problem = `${lab} is for someone who is not an owner on this lease`; break }
         if (!isNum(it.amount) || n(it.amount) <= 0) { problem = `${lab} needs an amount due above ₹0`; break }
         for (const k of ['paidAmount', 'tds']) if (it[k] !== undefined && it[k] !== null && it[k] !== '' && (!isNum(it[k]) || n(it[k]) < 0)) problem = `${lab}: ${k === 'tds' ? 'TDS' : 'amount paid'} must be a number`
         if (problem) break
@@ -142,8 +159,8 @@ async function checkLease(L, { models }) {
 /* ---------- invoices: the owner must be on the lease ---------- */
 async function checkInvoice(i, { models }) {
   if (!i.leaseId || !i.ownerId) return {}
-  const L = await models.leases.findById(i.leaseId, { ownerId: 1, owners: 1, ref: 1 }).lean()
-  if (!L || leaseOwnersOf(L).some(o => o.ownerId === i.ownerId)) return {}
+  const L = await models.leases.findById(i.leaseId, { ownerId: 1, owners: 1, ownerHistory: 1, ref: 1 }).lean()
+  if (!L || leaseOwnersOf(L).some(o => o.ownerId === i.ownerId) || (L.ownerHistory || []).some(h => (h.owners || []).some(o => o.ownerId === i.ownerId))) return {}
   return { ownerId: `Owner “${i.ownerId}” is not an owner on lease ${L.ref}, so this invoice can’t be raised in their name` }
 }
 

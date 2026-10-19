@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { signedOut, switchRole } from '../../store/slices/authSlice';
+import { signOut } from '../../store/slices/authSlice';
 import { colors, ms, s, vs } from '../../theme';
-import { Screen, AppText, ListRow, Icon, Segmented, Button, ConfirmDialog, Avatar } from '../../components';
+import { Screen, AppText, ListRow, Icon, Button, ConfirmDialog, Avatar } from '../../components';
 
 export default function MoreScreen() {
   const nav = useNavigation();
@@ -38,11 +38,9 @@ export default function MoreScreen() {
       {rows.map((r, i) => (
         <ListRow key={r.title} left={<View style={styles.rowIcon}><Icon name={r.icon} size={22} color={colors.teal} /></View>} title={r.title} sub={r.sub} chevron divider={i < rows.length - 1} onPress={() => (r.to ? nav.navigate(r.to) : null)} />
       ))}
-      <AppText variant="title" color="muted" style={styles.group}>Preview as</AppText>
-      <Segmented compact value={role} onChange={r => dispatch(switchRole(r))} options={[{ label: 'Staff', value: 'staff' }, { label: 'Owner', value: 'owner' }, { label: 'Franchise', value: 'franchise' }]} />
       <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => setAskOut(true)} style={styles.signOut} />
       <Button title="Delete account" variant="ghost" size="md" color={colors.coral} onPress={() => nav.navigate('DeleteAccount')} style={styles.del} />
-      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signedOut()); }} />
+      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signOut()); }} />
     </Screen>
   );
 }

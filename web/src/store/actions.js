@@ -25,6 +25,8 @@ export const openSite = id => openDrawer({ kind: 'site', id })
 export const rentMonth = (lease, period) => openDrawer({ kind: 'rentMonth', lease, period })
 /** Settle rent months from the security deposit; preset = [{ period, ownerId }] to pre-tick. */
 export const depAdjOpen = (lease, preset) => openDrawer({ kind: 'depAdj', lease, preset: preset || null })
+/** Deactivate / add / reactivate a co-owner on a lease (mode: 'deactivate' | 'add' | 'reactivate'). */
+export const ownerChangeOpen = (lease, mode, ownerId) => openDrawer({ kind: 'ownerChange', lease, mode, ownerId: ownerId || null })
 export const obEdit = id => openDrawer({ kind: 'opening', id })
 export const obPay = (lease, item) => openDrawer({ kind: 'obPay', lease, item })
 export const startExit = id => { if (!id) { toast('Choose a lease first', 'warning'); return } openDrawer({ kind: 'exitStart', id }) }

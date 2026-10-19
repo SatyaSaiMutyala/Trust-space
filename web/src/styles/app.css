@@ -337,3 +337,10 @@ table.cmp td.bestc{background:color-mix(in srgb,var(--ok) 13%,transparent);font-
 /* Touch: jump chips; phones: full conversation list when it is the only pane */
 @media (pointer:coarse){.ijump a{display:inline-flex;align-items:center;min-height:40px;padding-inline:12px}}
 @media (max-width:760px){.chatlayout .convs{max-height:none}}
+/* Rent timing (advance / arrears) */
+.timing{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);padding:10px 14px;margin:12px 0;display:grid;gap:8px;font-size:13px}
+.timing .tflow{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
+.timing .tstep{display:grid;gap:2px;padding:6px 10px;background:var(--sunk);border-radius:var(--r)}
+.sched .liab{color:var(--warn)}
+.sched .nw,.sched .liab{white-space:nowrap}
+.sched tr.tailrow td{background:var(--sunk);font-style:italic}

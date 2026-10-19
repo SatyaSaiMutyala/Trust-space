@@ -20,7 +20,7 @@ export function newSite(rid) {
     return
   }
   const n = S.sites.length + 1
-  const st = { id: newId(), reqId: r.id, code: 'SITE-' + String(n).padStart(3, '0'), name: '', locality: r.area, city: r.city, state: r.state, purpose: r.purpose, stage: 'Scouted', scoutedOn: TODAY, scoutedBy: isFranchisee() ? (partner(role().partnerId)?.name || 'Franchise partner') : '', photos: [], checks: {}, terms: { escPct: 5, escEvery: 12, lockIn: 24, notice: 3, term: 60, fitout: 30 }, log: [] }
+  const st = { id: newId(), reqId: r.id, code: 'SITE-' + String(n).padStart(3, '0'), name: '', locality: r.area, city: r.city, state: r.state, purpose: r.purpose, stage: 'Scouted', scoutedOn: TODAY, scoutedBy: isFranchisee() ? (partner(role().partnerId)?.name || 'Franchise partner') : '', photos: [], checks: {}, terms: { escPct: 5, escEvery: 12, lockIn: 24, notice: 3, noticeLessor: 3, term: 60, fitout: 30 }, log: [] }
   slog(st, 'Site added'); save('sites', st, true); openDrawer({ kind: 'site', id: st.id })
 }
 export const partners = () => openDrawer({ kind: 'partners' })

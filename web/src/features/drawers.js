@@ -17,6 +17,7 @@ import PartnerDrawer from './sites/PartnerDrawer'
 import PartnersDrawer from './sites/PartnersDrawer'
 import RentMonthDrawer from './leases/RentMonthDrawer'
 import DepAdjDrawer from './leases/DepAdjDrawer'
+import OwnerChangeDrawer from './leases/OwnerChangeDrawer'
 import OpeningDrawer from './opening/OpeningDrawer'
 import ObPayDrawer from './opening/ObPayDrawer'
 import TdsMonthDrawer from './tds/TdsMonthDrawer'
@@ -32,6 +33,6 @@ export const DRAWERS = {
   ticket: TicketFormDrawer, ticketView: TicketViewDrawer,
   exitStart: ExitStartDrawer, inspect: InspectDrawer, skipInsp: SkipInspectionDrawer,
   req: ReqDrawer, site: SiteDrawer, partner: PartnerDrawer, partners: PartnersDrawer,
-  rentMonth: RentMonthDrawer, depAdj: DepAdjDrawer, opening: OpeningDrawer, obPay: ObPayDrawer,
+  rentMonth: RentMonthDrawer, depAdj: DepAdjDrawer, ownerChange: OwnerChangeDrawer, opening: OpeningDrawer, obPay: ObPayDrawer,
   tdsMonth: TdsMonthDrawer, tdsChallan: TdsChallanDrawer, tdsReturn: TdsReturnDrawer, tds16: Tds16Drawer, tdsCert: TdsCertDrawer,
 }

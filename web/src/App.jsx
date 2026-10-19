@@ -10,6 +10,7 @@ import LoginPage from './features/auth/LoginPage'
 import { useStore, UI } from './store/store'
 import { dispatch } from './app/store'
 import { loadPortfolio, refreshPortfolio, startAutoRefresh } from './app/bootstrap'
+import { startRealtime } from './app/realtime'
 import { signOut } from './services/auth'
 import { AppSkeleton } from './components/ui/Skeletons'
 import BrandMark from './components/app/BrandMark'
@@ -46,7 +47,7 @@ export default function App() {
   const data = useSelector(s => s.entities.status)
   const error = useSelector(s => s.entities.error)
   // Keep records current across machines: refresh when the user changes page or returns to the tab (no polling timer).
-  useEffect(() => { startAutoRefresh() }, [])
+  useEffect(() => { startAutoRefresh(); startRealtime() }, []) // live updates over Socket.IO while signed in
   useEffect(() => { refreshPortfolio() }, [UI.route, UI.sel, UI.tab]) // eslint-disable-line react-hooks/exhaustive-deps
   let body
   if (auth === 'checking') body = <Splash text="Checking your sign-in…" />

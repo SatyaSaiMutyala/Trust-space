@@ -7,16 +7,18 @@ import OwnerInvoicesScreen from '../screens/owner/OwnerInvoicesScreen';
 import OwnerRepairsScreen from '../screens/owner/OwnerRepairsScreen';
 import MessagesScreen from '../screens/shared/MessagesScreen';
 import MoreScreen from '../screens/shared/MoreScreen';
+import useTabBadges from './useTabBadges';
 
 const Tab = createBottomTabNavigator();
 
 export default function OwnerTabs() {
+  const b = useTabBadges();
   return (
     <Tab.Navigator tabBar={p => <FloatingTabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: '#FFFFFF' } }}>
       <Tab.Screen name="Home" component={OwnerHomeScreen} options={{ title: 'Home', icon: 'home' }} />
       <Tab.Screen name="Invoices" component={OwnerInvoicesScreen} options={{ title: 'Invoices', icon: 'file-text' }} />
-      <Tab.Screen name="Repairs" component={OwnerRepairsScreen} options={{ title: 'Repairs', icon: 'wrench', badge: 1 }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages', icon: 'message', badge: 2 }} />
+      <Tab.Screen name="Repairs" component={OwnerRepairsScreen} options={{ title: 'Repairs', icon: 'wrench', badge: b.repairs }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages', icon: 'message', badge: b.messages }} />
       <Tab.Screen name="More" component={MoreScreen} options={{ title: 'More', icon: 'menu' }} />
     </Tab.Navigator>
   );

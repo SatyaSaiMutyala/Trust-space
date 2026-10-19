@@ -73,6 +73,12 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>TruSpace uses the camera to photograph repairs, premises and inspection items.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TruSpace lets you attach photos from your library to repairs, sites and invoices.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TruSpace records sound with inspection videos.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -83,6 +89,10 @@
 				<string>truspace</string>
 			</array>
 		</dict>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
 	</array>
 	<key>UIAppFonts</key>
 	<array>

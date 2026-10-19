@@ -14,7 +14,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, prop, owner, closeDrawer } from '../../store/store'
 import { CUR, TODAY, inr, num, perLabel } from '../../domain/utils'
-import { isMulti, leaseOwners } from '../../domain/lease'
+import { isMulti, depositOwners } from '../../domain/lease'
 import { Btn, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { FormGrid, TextInput, SelectInput } from '../../components/form/Fields'
@@ -79,7 +79,7 @@ function DepAdjForm({ L, d, dep }) {
             </Table>
           </div>
           <div className="small" id="da-sum">
-            Total from deposit <b>{inr(live.tot)}</b> · {leaseOwners(L).map((o, i) => <span key={o.ownerId}>{i ? ' · ' : ''}{multi ? (owner(o.ownerId)?.name || '') + ': ' : ''}held after <b style={{ color: live.held[o.ownerId] < 0 ? 'var(--bad)' : 'inherit' }}>{inr(live.held[o.ownerId])}</b></span>)}
+            Total from deposit <b>{inr(live.tot)}</b> · {depositOwners(L).map((o, i) => <span key={o.ownerId}>{i ? ' · ' : ''}{multi ? (owner(o.ownerId)?.name || '') + ': ' : ''}held after <b style={{ color: live.held[o.ownerId] < 0 ? 'var(--bad)' : 'inherit' }}>{inr(live.held[o.ownerId])}</b></span>)}
           </div>
           <fieldset className="dafs"><legend className="eyebrow">Owner’s agreement</legend>
             <RadioGroup name="how" defaultValue={L.ownerPortal !== false ? 'portal' : ''}>

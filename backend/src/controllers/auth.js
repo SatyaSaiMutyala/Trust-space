@@ -15,12 +15,16 @@ import { signAccess, signMedia, randomToken, sha256 } from '../auth/tokens.js'
 import { ApiError, badRequest } from '../utils/ApiError.js'
 import { ok } from '../utils/respond.js'
 import { env } from '../config/env.js'
+import { sendMail } from '../services/mailer.js'
+import { templates } from '../services/mailTemplates.js'
 
 export const REFRESH_COOKIE = 'ts_refresh'
 const cookieOpts = maxAgeMs => ({ httpOnly: true, secure: env.auth.cookieSecure, sameSite: 'lax', path: '/api/auth', ...(maxAgeMs ? { maxAge: maxAgeMs } : {}) })
 const firstName = n => String(n || '').split(/\s+/)[0]
 const DAY = 864e5
-const WRONG = 'The email/mobile number or password is incorrect.'
+/** Wrong-credentials message in the words of what was typed: an address → email, digits → mobile number (the phone app
+    signs in with email only, the web with either). */
+const wrongFor = login => `The ${String(login || '').includes('@') ? 'email' : 'mobile number'} or password is incorrect.`
 
 /** Find an account by email or mobile number. */
 function findByLogin(login) {
@@ -48,12 +52,17 @@ export const authController = {
     if (Object.keys(errors).length) throw badRequest(Object.values(errors).join(' and ') + '.', errors)
 
     const user = await findByLogin(login)
+    const WRONG = wrongFor(login)
     if (!user || !user.passwordHash) throw new ApiError(401, WRONG, { code: 'invalid_credentials' })
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const mins = Math.ceil((user.lockedUntil - Date.now()) / 60000)
       throw new ApiError(423, `Too many failed attempts. Try again in ${mins} minute${mins > 1 ? 's' : ''}, or reset your password.`, { code: 'account_locked' })
     }
-    if (user.status !== 'active') throw new ApiError(403, 'Your account is disabled. Contact TrustLab Facilities to restore access.', { code: 'account_disabled' })
+    if (user.status === 'pending') {
+      if (!(await verifyPassword(String(password), user.passwordHash))) throw new ApiError(401, WRONG, { code: 'invalid_credentials' })
+      throw new ApiError(403, 'Your account is waiting for approval. The facilities team checks your PAN and bank details and links your property, usually within one working day. We will email you when it is ready.', { code: 'pending_approval' })
+    }
+    if (user.status !== 'active') throw new ApiError(403, user.deletedAt ? 'This account was closed. Sign up again if you need access.' : 'Your account is disabled. Contact TrustLab Facilities to restore access.', { code: 'account_disabled' })
 
     if (!(await verifyPassword(String(password), user.passwordHash))) {
       user.failedLogins = (user.failedLogins || 0) + 1
@@ -114,8 +123,8 @@ export const authController = {
       const token = randomToken()
       await PasswordReset.create({ userId: user._id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + env.auth.resetMinutes * 60000) })
       const link = `${env.clientUrl}/?reset=${token}`
-      // Email/SMS delivery is not connected yet — in development the link is logged and returned for testing.
-      if (env.nodeEnv !== 'production') { console.log(`Password reset link for ${user.email || user.phone}: ${link}`); data.devResetToken = token; data.devResetLink = link }
+      const r = user.email ? await sendMail({ to: user.email, ...templates.passwordReset({ name: user.name, link, minutes: env.auth.resetMinutes }) }) : { sent: false }
+      if (env.nodeEnv !== 'production' && !r.sent) { data.devResetToken = token; data.devResetLink = link } // no mail server: returned for testing
     }
     return ok(res, `If an account exists for “${String(login).trim()}”, we have sent a link to reset the password. The link works for ${env.auth.resetMinutes} minutes.`, Object.keys(data).length ? data : undefined)
   },

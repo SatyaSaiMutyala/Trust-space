@@ -32,6 +32,16 @@ export const requireRole = (...roles) => (req, res, next) => {
   next()
 }
 
+/** For uploads: a normal access token, or the short-lived sign-up token (owners upload their PAN card and cheque before an account exists). */
+export async function requireAuthOrSignup(req, res, next) {
+  const h = req.headers.authorization || ''
+  const token = h.startsWith('Bearer ') ? h.slice(7).trim() : ''
+  if (token) {
+    try { const c = verifyAccess(token); if (c.purpose === 'signup' && c.email) { req.user = { _id: 'signup:' + c.email, name: c.email, role: 'signup', status: 'active' }; return next() } } catch { /* not a sign-up token: fall through to the normal check */ }
+  }
+  return requireAuth(req, res, next)
+}
+
 /** For file downloads: a normal access token, or ?t=<media token> (see auth/tokens.js). */
 export async function requireMediaOrAuth(req, res, next) {
   if (req.headers.authorization) return requireAuth(req, res, next)

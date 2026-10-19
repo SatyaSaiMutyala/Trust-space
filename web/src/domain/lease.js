@@ -13,7 +13,7 @@ import { TODAY, daysTo, fmtD, by, fy, inr, nowISO } from './utils'
 export const calcCtx = () => C.makeCtx({ today: TODAY, invoices: S.invoices, me: isOwner() ? role().ownerId : null, ownerView: isOwner(), ownerOf: id => ALL.owners.find(o => o.id === id) || owner(id), ownerName: id => owner(id)?.name, propOf: prop })
 
 /* ---------- pure functions, re-exported unchanged ---------- */
-export const { rentStartOf, escAnchor, escSteps, escAmt, rentFor, leaseOwners, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, noticeBy } = C
+export const { rentStartOf, escAnchor, escSteps, escAmt, rentFor, leaseOwners, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, noticeBy, noticeByLessor, noticeLessee, noticeLessor, noticeOf, depositOwners, allLeaseOwners } = C
 
 /* ---------- bound to today / the store ---------- */
 export const nextEsc = L => C.nextEsc(L, TODAY)
@@ -31,7 +31,7 @@ export const statementCsv = (inv, ownerFn) => C.statementCsv(inv, { ...calcCtx()
 export function leaseOf(pid) { return S.leases.filter(l => l.propertyId === pid).sort(by('start', -1))[0] }
 export const leaseOwnerNames = L => leaseOwners(L).map(o => owner(o.ownerId)?.name || '—')
 export const ownersLabel = L => { const n = leaseOwnerNames(L); return n.length > 1 ? `${n[0]} + ${n.length - 1} co-owner${n.length > 2 ? 's' : ''}` : n[0] }
-export const leasesOfOwner = id => S.leases.filter(L => leaseOwners(L).some(o => o.ownerId === id))
+export const leasesOfOwner = id => S.leases.filter(L => allLeaseOwners(L).some(o => o.ownerId === id))
 export const obMe = () => isOwner() ? role().ownerId : null
 /** Lease for the property, including leases outside scope (used by franchise flows). */
 export const anyLease = id => ALL.leases.find(l => l.id === id)
@@ -63,7 +63,8 @@ export function criticalEvents(days, pid) {
   const ev = []
   for (const L of S.leases) {
     if (pid && L.propertyId !== pid) continue; if (!inScope(L)) continue; const st = leaseState(L); if (['Terminated', 'Draft'].includes(st)) continue; const P = prop(L.propertyId)
-    ev.push({ d: L.end, t: 'Lease expiry', p: P }); ev.push({ d: noticeBy(L), t: `Last date to serve renewal/exit notice (${L.notice} mo)`, p: P })
+    ev.push({ d: L.end, t: 'Lease expiry', p: P }); ev.push({ d: noticeBy(L), t: `Last date for the tenant to serve renewal/exit notice (${noticeLessee(L)} mo)`, p: P })
+    if (noticeLessor(L) !== noticeLessee(L)) ev.push({ d: noticeByLessor(L), t: `Last date for the owner to serve notice (${noticeLessor(L)} mo)`, p: P })
     const le = lockEnd(L); if (le) ev.push({ d: le, t: 'Lock-in ends', p: P })
     const ne = nextEsc(L); if (ne) ev.push({ d: ne, t: `Rent escalates ${L.escPct}% → ${inr(rentFor(L, ne.slice(0, 7)))}`, p: P })
     if (L.exit?.effective && L.exit.stage < 5) ev.push({ d: L.exit.effective, t: 'Exit effective — handover due', p: P })

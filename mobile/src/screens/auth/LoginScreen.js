@@ -1,17 +1,19 @@
-/* Sign in (design p.1): teal arch with the logo, Welcome back, email/mobile, password, remember me. */
+/* Sign in (design p.1): teal arch with the logo, Welcome back, email, password, remember me. Talks to
+   POST /auth/login; errors come back in the server's words. Forgot password sends the reset email. */
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { signedIn, setRemember } from '../../store/slices/authSlice';
-import { clearNotice } from '../../store/slices/uiSlice';
+import { signIn, setRemember } from '../../store/slices/authSlice';
+import { clearNotice, setNotice } from '../../store/slices/uiSlice';
+import { useForgotPasswordMutation, errorMessage } from '../../store/api';
 import { colors, ms, s, vs, fonts } from '../../theme';
-import { Screen, AppText, Input, Button, Checkbox, Icon } from '../../components';
+import { Screen, AppText, Input, Button, Checkbox, Icon, ConfirmDialog } from '../../components';
 
 const ARCH_W = 270;
 
-function Logo({ size = 72 }) {
+function Logo({ size = 62 }) {
   const sz = ms(size);
   return <Image source={require('../../assets/images/logo.png')} style={[styles.logo, { width: sz, height: sz, borderRadius: sz * 0.22 }]} accessibilityIgnoresInvertColors />;
 }
@@ -21,16 +23,23 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const remember = useAppSelector(st => st.auth.remember);
   const notice = useAppSelector(st => st.ui.notice);
-  const [id, setId] = useState('98480 21734');
-  const [pw, setPw] = useState('••••••••••••');
+  const [login, setLogin] = useState('');
+  const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [askReset, setAskReset] = useState(false);
+  const [forgot, forgotState] = useForgotPasswordMutation();
   const w = s(ARCH_W);
-  const signIn = () => {
-    setBusy(true);
-    // Until the API is wired: "owner…" / "franchise…" in the first field previews those roles.
-    const v = id.trim().toLowerCase();
-    const role = v.startsWith('owner') ? 'owner' : v.startsWith('franchise') ? 'franchise' : 'staff';
-    setTimeout(() => { setBusy(false); dispatch(signedIn({ role })); }, 350);
+  const submit = async () => {
+    if (!login.trim() || !pw) { setError('Enter your email and your password.'); return; }
+    setBusy(true); setError('');
+    const r = await dispatch(signIn({ login: login.trim(), password: pw, remember }));
+    setBusy(false);
+    if (r.meta.requestStatus === 'rejected') setError(r.payload || 'Could not sign in.');
+  };
+  const sendReset = async () => {
+    setAskReset(false);
+    try { const r = await forgot({ login: login.trim() }).unwrap(); dispatch(setNotice({ lead: 'Reset link sent.', text: r.message })); } catch (e) { setError(errorMessage(e)); }
   };
   return (
     <Screen keyboard="handled">
@@ -52,15 +61,14 @@ export default function LoginScreen() {
         </View>
       ) : null}
       <AppText variant="h1" center style={styles.welcome}>Welcome back</AppText>
-      <Input label="Email or mobile number" value={id} onChangeText={setId} keyboardType="email-address" style={styles.field} />
-      <Input label="Password" rightLabel="Forgot password?" onRightLabel={() => {}} value={pw} onChangeText={setPw} secure style={styles.field} />
+      <Input label="Email" value={login} onChangeText={v => { setLogin(v); setError(''); }} keyboardType="email-address" placeholder="you@example.com" style={styles.field} />
+      <Input label="Password" rightLabel="Forgot password?" onRightLabel={() => (login.trim() ? setAskReset(true) : setError('Enter your email first, then tap Forgot password.'))} value={pw} onChangeText={v => { setPw(v); setError(''); }} secure error={error} style={styles.field} />
       <Checkbox checked={remember} onChange={v => dispatch(setRemember(v))} label="Remember me on this phone" style={styles.remember} />
-      <Button title="Sign in" variant="primary" onPress={signIn} loading={busy} style={styles.signIn} />
-      <Pressable onPress={() => nav.navigate('SignUpPhone')} hitSlop={8} style={styles.signUp} accessibilityRole="button">
+      <Button title="Sign in" variant="primary" onPress={submit} loading={busy} style={styles.signIn} />
+      <Pressable onPress={() => nav.navigate('SignUpEmail')} hitSlop={8} style={styles.signUp} accessibilityRole="button">
         <AppText variant="body" color="muted" center>Are you a property owner? <AppText variant="bodySemi" color="teal">Create your account</AppText></AppText>
       </Pressable>
-      <View style={styles.spacer} />
-      <AppText variant="small" color="muted" center style={styles.lock}>Five wrong passwords lock sign-in for 15 minutes.</AppText>
+      <ConfirmDialog open={askReset} icon="lock" title="Reset your password?" text={`We will send a reset link to ${login.trim()}.`} confirmLabel="Send link" onCancel={() => setAskReset(false)} onConfirm={sendReset} loading={forgotState.isLoading} />
     </Screen>
   );
 }
@@ -77,6 +85,4 @@ const styles = StyleSheet.create({
   remember: { marginTop: vs(2) },
   signIn: { marginTop: vs(22) },
   signUp: { marginTop: vs(18), alignItems: 'center' },
-  spacer: { flex: 1, minHeight: vs(24) },
-  lock: { marginTop: vs(16), fontSize: ms(13.5) },
 });

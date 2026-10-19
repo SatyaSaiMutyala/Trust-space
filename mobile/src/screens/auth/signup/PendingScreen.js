@@ -21,7 +21,7 @@ export default function PendingScreen() {
       <View style={styles.top}>
         <Arch width={100} height={110} bg={colors.tealTint}><View style={styles.iconWrap}><Icon name="check" size={44} color={colors.teal} strokeWidth={1.6} /></View></Arch>
         <AppText variant="h1" center style={styles.title}>Thank you, {f.name.split(' ')[0] || 'owner'}</AppText>
-        <AppText variant="body" color="muted" center style={styles.body}>Your account is created. The facilities team now checks your PAN and bank account and links {f.propertyCode || f.propertyName || 'your property'} to it. You will get an SMS on +91 {f.phone} when it is ready, usually within one working day.</AppText>
+        <AppText variant="body" color="muted" center style={styles.body}>{f.message || `Your account is created. The facilities team now checks your PAN and bank account and links ${f.propertyCode || f.propertyName || 'your property'} to it. You will get an email at ${f.email} when it is ready, usually within one working day.`}</AppText>
       </View>
       <View style={styles.card}>
         <Stepper ring="amber" steps={[{ label: 'Submitted', state: 'done' }, { label: 'PAN check', state: 'current' }, { label: 'Bank check', state: 'todo' }, { label: 'Linked', state: 'todo' }]} />

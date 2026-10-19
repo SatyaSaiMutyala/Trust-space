@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { makeCtx, schedule, calc, splitAmt, escAmt, escSteps, tdsRateOf, leaseState, rentCell, depHeld, clearSchedCache, rentFor } from '../lease.js'
+import { makeCtx, schedule, calc, splitAmt, escAmt, escSteps, tdsRateOf, leaseState, rentCell, depHeld, clearSchedCache, rentFor, allLeaseOwners, depositOwners, leaseOwners, isMulti } from '../lease.js'
 
 const D = JSON.parse(readFileSync(new URL('../../../backend/src/seed/sample-data.json', import.meta.url)))
 const TODAY = '2026-10-16'
@@ -89,4 +89,20 @@ test('rent roll cell: paid / missing / upcoming, and an owner sees only their ow
 test('deposit held after agreed adjustments (l5)', () => {
   const L = lease('l5'); const agreed = (L.depAdj || []).filter(a => a.status === 'Agreed').reduce((a, x) => a + +x.amount, 0)
   assert.equal(depHeld(L), +L.deposit - agreed)
+})
+
+test('co-owner changes: the split in force each month comes from ownerHistory; deposit stays with the signing owners (l3)', () => {
+  const L = { ...lease('l3'), ownerHistory: [{ until: '2026-06', owners: lease('l3').owners }], owners: [{ ownerId: 'o3', rent: 100, maint: 100, dep: 100, adv: 100, gst: 'RCM' }], ownerId: 'o3' }
+  clearSchedCache()
+  const sc = schedule(L, ctx())
+  const before = sc.rows.find(r => r.p === '2026-06'), after = sc.rows.find(r => r.p === '2026-07')
+  assert.deepEqual(before.split.map(x => x.ownerId), ['o3', 'o8'])
+  assert.deepEqual(after.split.map(x => x.ownerId), ['o3'])
+  assert.equal(after.split[0].rent, after.rent)
+  const o8 = sc.owners.find(o => o.ownerId === 'o8')
+  assert.equal(o8.active, false); assert.equal(o8.until, '2026-06'); assert.ok(o8.rent > 0)
+  assert.equal(o8.deposit, Math.round(L.deposit * 0.4)) // deposit as at signing
+  assert.deepEqual(allLeaseOwners(L).map(o => [o.ownerId, o.active]), [['o3', true], ['o8', false]])
+  assert.equal(depositOwners(L).length, 2); assert.equal(leaseOwners(L).length, 1); assert.equal(isMulti(L), true)
+  clearSchedCache()
 })

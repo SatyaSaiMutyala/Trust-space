@@ -139,6 +139,7 @@ export const api = createApi({
     upload: b.mutation({ query: file => { const fd = new FormData(); fd.append('file', file); return { url: '/assets', method: 'POST', body: fd } } }),
 
     /* portal accounts */
+    pendingSignups: b.query({ query: () => '/users/pending', providesTags: [{ type: 'List', id: 'users' }] }),
     createUser: b.mutation({ query: body => ({ url: '/users', method: 'POST', body }), invalidatesTags: [{ type: 'List', id: 'users' }] }),
     updateUser: b.mutation({ query: ({ id, ...body }) => ({ url: `/users/${id}`, method: 'PATCH', body }), invalidatesTags: [{ type: 'List', id: 'users' }] }),
     deleteUser: b.mutation({ query: id => ({ url: `/users/${id}`, method: 'DELETE' }), invalidatesTags: [{ type: 'List', id: 'users' }] }),

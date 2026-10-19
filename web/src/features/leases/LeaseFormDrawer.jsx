@@ -3,20 +3,28 @@ import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, isFranchisee, closeDrawer, remove, prop, owner, toast } from '../../store/store'
-import { TODAY, addDays, addMonths, dayCount, fmtD, num } from '../../domain/utils'
+import { TODAY, CUR, addDays, addMonths, dayCount, fmtD, num, perAdd, perLabel } from '../../domain/utils'
 import { rentStartOf, schedule, clearSchedCache, splitAmt } from '../../domain/lease'
 import { Btn } from '../../components/ui/Layout'
 import { ConfirmButton } from '../../components/ui/Status'
 import { FormGrid, Cell, SectionTitle, FieldBox, TextInput, SelectInput, CheckField } from '../../components/form/Fields'
-import { SchedTotals, ScheduleTable } from './LeaseDetail'
+import { SchedTotals, ScheduleTable, TimingNote } from './LeaseDetail'
 import RentByYear from './RentByYear'
 import { leaseFromForm, submitLease, ownerSums, readOwnerAmounts, formTotals, amountsFromShares, totalFieldOf, SHARE_KEYS } from './actions'
 import OwnerRows from './OwnerRows'
 
 let SEQ = 0 // keys for co-owner rows
 
+/** What the chosen timing means for this month's rent (prototype timingHint). */
+function timingHint(pt, day) {
+  const d = String(day || 5).padStart(2, '0'), nx = perAdd(CUR, 1)
+  if (pt === 'Arrears') return `${perLabel(CUR)} rent becomes a liability on ${fmtD(addDays(nx + '-01', -1))}, is billed in ${perLabel(nx)} and due by ${fmtD(nx + '-' + d)}.`
+  if (pt === 'Advance') return `${perLabel(CUR)} rent is billed in ${perLabel(CUR)} and due by ${fmtD(CUR + '-' + d)}.`
+  return 'Choose one — it decides the billing month and the month-end liability in the rent schedule.'
+}
+
 function initialLease(d) {
-  return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, notice: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: 'Advance', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
+  return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, notice: 3, noticeLessor: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: '', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
 }
 
 /** Owner rows for a lease that has none yet: the property's owners with their % shares (one row at 100% otherwise). */
@@ -149,12 +157,13 @@ export default function LeaseFormDrawer({ d }) {
           <TextInput id="ls-en" name="end" label="Lease end date" type="date" defaultValue={L.end} required />
           <TextInput id="ls-ff" name="fitout" label="Rent-free period (days)" type="number" min="0" defaultValue={L.fitout || 0} hint={<>Rent starts <b id="ls-rs">{fmtD(rentStartOf(x || L))}</b></>} />
           <TextInput id="ls-li" name="lockIn" label="Lock-in (months)" type="number" min="0" defaultValue={L.lockIn} />
-          <TextInput id="ls-no" name="notice" label="Notice period (months)" type="number" min="0" defaultValue={L.notice} />
+          <TextInput id="ls-no" name="notice" label="Notice by lessee — tenant (months)" type="number" min="0" defaultValue={L.notice} hint="To end or not renew the lease" />
+          <TextInput id="ls-nol" name="noticeLessor" label="Notice by lessor — owner (months)" type="number" min="0" defaultValue={L.noticeLessor ?? L.notice} hint="Often longer than the tenant’s" />
 
           <SectionTitle>3 · Rent &amp; escalation</SectionTitle>
           <TextInput id="ls-rent" name="rent" label="Monthly rent (₹, excl. GST)" type="number" min="0" defaultValue={L.rent} required />
-          <SelectInput id="ls-pt" name="payTiming" label="Rent is paid" options={[['Advance', 'In advance — for the current month'], ['Arrears', 'In arrears — after the month ends']]} defaultValue={L.payTiming || 'Advance'} />
-          <TextInput id="ls-due" name="dueDay" label="Due by (day of month)" type="number" min="1" max="28" defaultValue={L.dueDay} hint="In arrears: day of the following month" />
+          <SelectInput id="ls-pt" name="payTiming" label="Is rent paid in advance or in arrears?" required options={[['', 'Select — required'], ['Advance', 'In advance — billed & paid in the same month'], ['Arrears', 'In arrears — liability at month-end, billed next month']]} defaultValue={L.payTiming || ''} hint={timingHint(x ? x.payTiming : L.payTiming, x ? x.dueDay : L.dueDay)} />
+          <TextInput id="ls-due" name="dueDay" label="Due by (day of month)" type="number" min="1" max="28" defaultValue={L.dueDay} hint="Advance: of the same month · Arrears: of the following month" />
           <TextInput id="ls-esc" name="escPct" label="Escalation %" type="number" min="0" step="0.5" defaultValue={L.escPct} />
           <TextInput id="ls-ee" name="escEvery" label="Escalate every (months)" type="number" min="0" defaultValue={L.escEvery} hint="12 = yearly · 36 = once every 3 years" />
           <SelectInput id="ls-et" name="escType" label="Escalation is" options={[['Compound', 'Compounded on last rent'], ['Simple', 'Simple — on original base rent']]} defaultValue={L.escType || 'Compound'} />
@@ -191,6 +200,7 @@ export default function LeaseFormDrawer({ d }) {
                 <Box sx={{ display: 'grid', gap: 1.5 }}>
                   <RentByYear sc={sc} />
                   <SchedTotals sc={sc} L={x} />
+                  <TimingNote sc={sc} L={x} />
                   <div className="eyebrow" style={{ marginTop: 4 }}>Full breakdown — GST, TDS &amp; net to owner</div>
                   <ScheduleTable sc={sc} L={x} mode="year" />
                 </Box>

@@ -1,12 +1,13 @@
-/* Delete account: what it means, confirm with the password, then the account is closed and the user signed out.
-   Lease, invoice and tax records stay with the facilities team as the law requires; the login and personal contact
-   details are removed. */
+/* Delete account: what it means, confirm with the password (POST /auth/delete-account), then the account is closed and
+   the user signed out. Lease, invoice and tax records stay with the facilities team as the law requires; the login
+   and personal contact details are removed. */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signedOut } from '../../store/slices/authSlice';
 import { setNotice } from '../../store/slices/uiSlice';
+import { useDeleteAccountMutation, errorMessage } from '../../store/api';
 import { colors, ms, s, vs } from '../../theme';
 import { Screen, AppText, Header, Input, Checkbox, Button, Footer, Icon, Arch } from '../../components';
 
@@ -21,24 +22,24 @@ export default function DeleteAccountScreen() {
   const nav = useNavigation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(st => st.auth.user);
+  const [del, state] = useDeleteAccountMutation();
   const [password, setPassword] = useState('');
   const [sure, setSure] = useState(false);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const del = () => {
+  const run = async () => {
     if (!password) return setError('Enter your password to continue.');
-    if (password.length < 4) return setError('That password is not right.'); // POST /api/auth/delete-account checks it once wired
-    setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      dispatch(setNotice({ tone: 'teal', lead: 'Your account is deleted.', text: 'Rent and tax records stay with the facilities team. Contact them if you need a copy.' }));
+    setError('');
+    try {
+      const r = await del({ password }).unwrap();
+      dispatch(setNotice({ tone: 'teal', lead: 'Your account is deleted.', text: r.message }));
       dispatch(signedOut());
-    }, 700);
+    } catch (e) { setError(errorMessage(e)); }
+    return undefined;
   };
   return (
     <Screen footer={(
       <Footer stacked>
-        <Button title="Delete my account" variant="coralSolid" onPress={del} loading={busy} disabled={!sure} />
+        <Button title="Delete my account" variant="coralSolid" onPress={run} loading={state.isLoading} disabled={!sure} />
         <Button title="Keep my account" variant="secondary" onPress={() => nav.goBack()} style={styles.keep} />
       </Footer>
     )}>
@@ -63,7 +64,6 @@ export default function DeleteAccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { marginTop: vs(4) },
   intro: { marginTop: vs(8), fontSize: ms(15) },
   card: { flexDirection: 'row', gap: s(14), backgroundColor: colors.sunk, borderRadius: ms(20), padding: s(16), marginTop: vs(20), marginBottom: vs(22) },
   iconWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },

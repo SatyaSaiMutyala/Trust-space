@@ -35,6 +35,9 @@ export function createAccount(fd, onError) {
 }
 
 export const setAccountStatus = (u, status) => run('updateUser', { id: u.id, status })
+/** Approve a pending owner sign-up (they are emailed) or decline it (the account is removed; the owner record stays). */
+export const approveSignup = u => run('updateUser', { id: u.id, status: 'active' })
+export const declineSignup = u => run('deleteUser', u.id)
 export const unlockAccount = u => run('unlockUser', u.id)
 export const resetAccountPassword = u => run('resetUserPassword', u.id)
 export const deleteAccount = u => run('deleteUser', u.id)

@@ -14,6 +14,7 @@ export default defineConfig({
     fs: { allow: ['..'] }, // lets the dev server serve ../shared
     proxy: {
       '/api': 'http://localhost:5001',
+      '/socket.io': { target: 'http://localhost:5001', ws: true },
     },
   },
 })

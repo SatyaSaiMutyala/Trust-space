@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { signedOut, switchRole } from '../../store/slices/authSlice';
+import { signOut } from '../../store/slices/authSlice';
 import { colors, ms, s, vs } from '../../theme';
-import { Screen, AppText, Icon, Segmented, Button, ConfirmDialog, Avatar, Chip, ListRow } from '../../components';
+import { Screen, AppText, Icon, Button, ConfirmDialog, Avatar, Chip, ListRow } from '../../components';
 import { sections, staffUser } from '../../mock/data';
 
 function SectionRow({ icon, title, sub, subTone, onPress, last }) {
@@ -29,7 +29,7 @@ export default function AllSectionsScreen() {
         <Avatar initials={u.initials || 'RT'} tone="mist" size={48} />
         <View style={styles.flex}>
           <AppText variant="bodySemi" numberOfLines={1}>{u.name}</AppText>
-          <AppText variant="small" color="muted" numberOfLines={1}>{u.team || 'Facilities'} · {u.email || 'ravi.teja@example.com'}</AppText>
+          <AppText variant="small" color="muted" numberOfLines={1}>{u.team || 'Facilities'}{u.email ? ` · ${u.email}` : ''}</AppText>
         </View>
         <Chip label={role === 'admin' ? 'Admin' : 'Staff'} tone="teal" dot={false} size="sm" />
       </View>
@@ -43,12 +43,10 @@ export default function AllSectionsScreen() {
       ))}
       <AppText variant="eyebrow" color="muted" style={styles.group}>ACCOUNT</AppText>
       <View>
-        <AppText variant="small" color="muted" style={styles.previewHint}>Preview as</AppText>
-        <Segmented compact value={role} onChange={r => dispatch(switchRole(r))} options={[{ label: 'Staff', value: 'staff' }, { label: 'Owner', value: 'owner' }, { label: 'Franchise', value: 'franchise' }]} />
         <Button title="Sign out" variant="secondary" size="md" icon="log-out" onPress={() => setAskOut(true)} style={styles.signOut} />
         <Button title="Delete account" variant="ghost" size="sm" color={colors.coral} onPress={() => nav.navigate('DeleteAccount')} style={styles.del} />
       </View>
-      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signedOut()); }} />
+      <ConfirmDialog open={askOut} icon="log-out" title="Sign out?" text="You will need your password to sign in again on this phone." confirmLabel="Sign out" onCancel={() => setAskOut(false)} onConfirm={() => { setAskOut(false); dispatch(signOut()); }} />
     </Screen>
   );
 }
@@ -57,7 +55,6 @@ const styles = StyleSheet.create({
   account: { flexDirection: 'row', alignItems: 'center', gap: s(12), paddingTop: vs(18), paddingBottom: vs(14), borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   group: { marginTop: vs(22), marginBottom: vs(10) },
   row: { paddingVertical: vs(11) },
-  previewHint: { marginBottom: vs(8) },
   signOut: { marginTop: vs(14) },
   del: { marginTop: vs(4), alignSelf: 'center' },
   flex: { flex: 1 },

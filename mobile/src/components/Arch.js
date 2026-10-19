@@ -2,7 +2,7 @@
    <Arch> is the shape (full semicircle top, soft bottom corners) with a photo gradient or a flat fill, dashed states.
    <PhotoArch state="photo|uploading|needed|optional|add|failed|waiting" label sub progress /> is the capture tile. */
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { colors, ms, s, vs } from '../theme';
 import AppText from './AppText';
@@ -22,7 +22,7 @@ export function PhotoGradient({ dark }) {
   );
 }
 
-export default function Arch({ width, height, ratio = 1.1, photo, dark, bg, dashed, dashColor = colors.line, bottomRadius = 24, children, style, onPress, flat }) {
+export default function Arch({ width, height, ratio = 1.1, photo, dark, bg, dashed, dashColor = colors.line, bottomRadius = 24, children, style, onPress, flat, uri }) {
   const [w, setW] = useState(width ? ms(width) : 0);
   const h = height ? ms(height) : w ? w * ratio : 0;
   const Wrap = onPress ? Pressable : View;
@@ -31,18 +31,18 @@ export default function Arch({ width, height, ratio = 1.1, photo, dark, bg, dash
     <Wrap onPress={onPress} onLayout={width ? undefined : e => setW(e.nativeEvent.layout.width)}
       style={[styles.arch, width ? { width: w } : styles.fill, { height: h || undefined, backgroundColor: bg || (photo ? colors.photo : colors.sunk), borderTopLeftRadius: top, borderTopRightRadius: top, borderBottomLeftRadius: ms(bottomRadius), borderBottomRightRadius: ms(bottomRadius) },
         dashed && { borderWidth: 2, borderStyle: 'dashed', borderColor: dashColor }, style]}>
-      {photo && w ? <PhotoGradient dark={dark} /> : null}
+      {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : photo && w ? <PhotoGradient dark={dark} /> : null}
       {children}
     </Wrap>
   );
 }
 
-export function PhotoArch({ state = 'photo', label, sub, progress = 0.62, onPress, style, ratio = 1.1, width, labelPosition = 'left' }) {
+export function PhotoArch({ state = 'photo', label, sub, progress = 0.62, onPress, style, ratio = 1.1, width, labelPosition = 'left', uri }) {
   const isPhoto = state === 'photo' || state === 'uploading' || state === 'waiting';
   const needed = state === 'needed', optional = state === 'optional' || state === 'add', failed = state === 'failed';
   const fg = needed || state === 'photo' ? colors.teal : failed ? colors.coral : colors.muted;
   return (
-    <Arch width={width} ratio={ratio} onPress={onPress} photo={isPhoto} dark={state === 'uploading'}
+    <Arch width={width} ratio={ratio} onPress={onPress} photo={isPhoto} dark={state === 'uploading'} uri={isPhoto ? uri : undefined}
       bg={needed ? '#EEF6F4' : failed ? colors.coralTint : optional ? colors.surface : undefined}
       dashed={needed || optional} dashColor={needed ? colors.teal : '#B9C8C4'} style={style}>
       {state === 'photo' ? <View style={styles.check}><Icon name="check" size={18} color={colors.teal} strokeWidth={2.4} /></View> : null}

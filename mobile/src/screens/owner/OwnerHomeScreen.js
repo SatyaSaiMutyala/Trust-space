@@ -1,55 +1,87 @@
-/* Owner home (design p.15): Namaskaram, teal arch with the gauge and Sent / Checked / Approving / Paid,
-   Your to-do amber tiles, This year, Form 16A download. */
+/* Owner home (design p.15): the next payout and where it is (Sent → Checked → Approving → Paid) from the owner's open
+   invoices, "Your to-do" (things waiting for the owner), this year's totals from the ledger, Form 16A link. */
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useAppSelector } from '../../store/hooks';
 import { colors, ms, s, vs } from '../../theme';
-import { Screen, AppText, HeroCard, Gauge, Tile, SectionHeader, ListRow, Icon } from '../../components';
-import { ownerHome } from '../../mock/data';
+import { Screen, AppText, HeroCard, Gauge, Tile, SectionHeader, ListRow, Icon, Skeleton, ErrorState } from '../../components';
+import { useListQuery, useLedgerQuery, errorMessage, inr, perLabel, fmtDate, todayISO, useDepositRequestsQuery } from '../../store/api';
+import { useLookup } from '../../store/hooks';
+
+const fyOf = d => { const y = +d.slice(0, 4), m = +d.slice(5, 7); const a = m >= 4 ? y : y - 1; return `${String(a).slice(2)}-${String(a + 1).slice(2)}`; };
+const STEP = { Submitted: 0, Verified: 1, Approved: 2, Paid: 3 };
+const firstName = n => String(n || '').split(/\s+/)[0];
 
 export default function OwnerHomeScreen() {
   const nav = useNavigation();
-  const h = ownerHome.hero;
+  const user = useAppSelector(st => st.auth.user);
+  const today = todayISO();
+  const open = useListQuery({ resource: 'invoices', params: { open: true, sort: 'date', order: 'desc', limit: 20 } });
+  const ledger = useLedgerQuery({ tab: 'Rent', fy: fyOf(today) });
+  const inspections = useListQuery({ resource: 'inspections', params: { status: 'Awaiting owner sign-off', limit: 5 } });
+  const depReqs = useDepositRequestsQuery();
+  const props = useLookup('properties');
+  const pending = (open.data?.data || []).filter(i => i.status !== 'Rejected');
+  const next = pending.sort((a, b) => STEP[b.status] - STEP[a.status] || (a.date < b.date ? 1 : -1))[0];
+  const stepIx = next ? STEP[next.status] : 0;
+  const logAt = (inv, re) => { const l = (inv?.log || []).filter(x => re.test(x.text)).pop(); return l ? fmtDate(l.at.slice(0, 10)).slice(0, 6) : null; };
+  const steps = next ? [
+    { label: 'Sent', value: fmtDate(next.date).slice(0, 6) }, { label: 'Checked', value: logAt(next, /verified/i) || (stepIx >= 1 ? 'done' : 'soon') },
+    { label: 'Approving', value: stepIx >= 2 ? (logAt(next, /approved/i) || 'done') : stepIx === 1 ? 'now' : 'soon', current: stepIx === 1 }, { label: 'Paid', value: stepIx >= 3 ? fmtDate(next.paidDate || '').slice(0, 6) : 'soon', current: stepIx === 2 },
+  ] : [];
+  const todo = [
+    ...(inspections.data?.data || []).map(i => ({ icon: 'pencil', title: `Sign the ${i.kind === 'Move-in' ? 'take-over' : 'handover'} check`, sub: props.name(i.propertyId), to: 'SignOff', params: { id: i.id } })),
+    ...(depReqs.data?.data || []).filter(r => r.status === 'Proposed').map(r => ({ icon: 'credit-card', title: `Use your deposit for ${r.periodLabel} rent?`, sub: `${r.propertyName} · ${inr(r.amount)}`, to: 'DepositRequest', params: { id: r.id } })),
+    ...pending.filter(i => i.status === 'Rejected').map(i => ({ icon: 'file-text', title: 'Invoice sent back', sub: `${perLabel(i.period)} · ${i.reason || 'see note'}`, to: 'OwnerInvoices' })),
+  ];
+  const T = ledger.data?.data?.totals;
   return (
     <Screen tabs>
       <View style={styles.top}>
         <View>
-          <AppText variant="body" color="muted" style={styles.greet}>{ownerHome.greeting}</AppText>
-          <AppText variant="display">{ownerHome.name}</AppText>
+          <AppText variant="body" color="muted" style={styles.greet}>Namaskaram,</AppText>
+          <AppText variant="display">{firstName(user?.name)} garu</AppText>
         </View>
       </View>
-      <HeroCard arch arcs="none" style={styles.hero} padding={false}>
-        <View style={styles.heroInner}>
-          <Gauge width={220} stroke={11} value={h.value} color={colors.white} track="rgba(255,255,255,0.28)" knob={colors.amber}>
-            <AppText variant="monoXl" color="white" style={styles.amount}>{h.amount}</AppText>
-            <AppText variant="body" color={colors.onTealMuted} style={styles.heroSub}>{h.sub}</AppText>
-          </Gauge>
-          <View style={styles.stepsRow}>
-            {h.steps.map(st => (
-              <View key={st.label} style={styles.step}>
-                <AppText variant="small" color={st.current ? colors.amber : colors.onTealMuted} center style={styles.stepLabel}>{st.label}</AppText>
-                <AppText variant="smallSemi" color={st.current ? colors.amber : colors.white} center style={styles.stepVal}>{st.value}</AppText>
+      {open.isLoading ? <Skeleton h={300} r={24} tone="mist" style={styles.hero} /> : open.error ? <ErrorState title="Couldn't load your payments" body={errorMessage(open.error)} action="Try again" onAction={open.refetch} /> : (
+        <HeroCard arch arcs="none" style={styles.hero} padding={false}>
+          <View style={styles.heroInner}>
+            <Gauge width={220} stroke={11} value={next ? (stepIx + 1) / 4 : 1} color={colors.white} track="rgba(255,255,255,0.28)" knob={next && stepIx < 3 ? colors.amber : undefined}>
+              <AppText variant="monoXl" color="white" style={styles.amount}>{next ? inr(next.net) : inr(0)}</AppText>
+              <AppText variant="body" color={colors.onTealMuted} style={styles.heroSub}>{next ? (next.status === 'Paid' ? `paid on ${fmtDate(next.paidDate || '')}` : `coming to you${next.dueDate ? ` by ${fmtDate(next.dueDate).slice(0, 6)}` : ''}`) : 'nothing pending'}</AppText>
+            </Gauge>
+            {next ? (
+              <View style={styles.stepsRow}>
+                {steps.map(st => (
+                  <View key={st.label} style={styles.step}>
+                    <AppText variant="small" color={st.current ? colors.amber : colors.onTealMuted} center style={styles.stepLabel}>{st.label}</AppText>
+                    <AppText variant="smallSemi" color={st.current ? colors.amber : colors.white} center style={styles.stepVal}>{st.value}</AppText>
+                  </View>
+                ))}
               </View>
-            ))}
+            ) : null}
+            <View style={styles.heroLine} />
+            <AppText variant="body" color={colors.onTealMuted} center style={styles.note}>{next ? `${perLabel(next.period)} ${next.type.toLowerCase()}, ${props.name(next.propertyId)}, after TDS` : 'All your invoices are paid.'}</AppText>
           </View>
-          <View style={styles.heroLine} />
-          <AppText variant="body" color={colors.onTealMuted} center style={styles.note}>{h.note}</AppText>
-        </View>
-      </HeroCard>
-      <SectionHeader title="Your to-do" />
-      <View style={styles.tiles}>
-        {ownerHome.todo.map(t => <Tile key={t.title} tone="amber" icon={t.icon} title={t.title} sub={t.sub} subTone="amber" subWeight="regular" onPress={() => nav.navigate(t.to)} />)}
-      </View>
+        </HeroCard>
+      )}
+      {todo.length ? (
+        <>
+          <SectionHeader title="Your to-do" />
+          <View style={styles.tiles}>{todo.slice(0, 2).map(t => <Tile key={t.title} tone="amber" icon={t.icon} title={t.title} sub={t.sub} subTone="amber" subWeight="regular" onPress={() => nav.navigate(t.to, t.params)} />)}</View>
+        </>
+      ) : null}
       <SectionHeader title="This year" />
       <Pressable style={styles.year} onPress={() => nav.navigate('OwnerLedger')} accessibilityRole="button" accessibilityLabel="Open ledger">
-        {ownerHome.year.map((y, i) => (
-          <View key={y.label} style={[styles.yearCol, i === 0 && styles.yearDivider]}>
-            <AppText variant="body" color="muted">{y.label}</AppText>
-            <AppText variant="monoLg" style={styles.yearVal}>{y.value}</AppText>
+        {[['Received', T ? inr(T.cr - T.tds) : '—'], ['TDS credited', T ? inr(T.tds) : '—']].map(([l, v], i) => (
+          <View key={l} style={[styles.yearCol, i === 0 && styles.yearDivider]}>
+            <AppText variant="body" color="muted">{l}</AppText>
+            <AppText variant="monoLg" style={styles.yearVal}>{v}</AppText>
           </View>
         ))}
       </Pressable>
-      <ListRow left={<View style={styles.dl}><Icon name="download" size={22} color={colors.teal} /></View>} title={ownerHome.form16.title} sub={ownerHome.form16.sub} chevron onPress={() => nav.navigate('Agreements')} divider={false} />
+      <ListRow left={<View style={styles.dl}><Icon name="download" size={22} color={colors.teal} /></View>} title="Form 16A and agreements" sub="TDS certificates, lease documents" chevron onPress={() => nav.navigate('Agreements')} divider={false} />
     </Screen>
   );
 }

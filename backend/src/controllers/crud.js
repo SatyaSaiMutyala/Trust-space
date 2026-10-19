@@ -10,6 +10,7 @@
  *
  * Every response carries a human-readable `message` meant to be shown to the user as-is.
  */
+import { notify } from '../services/notify.js'
 import { models, toApi } from '../models/index.js'
 import { byPath, FIELD_LABELS } from '../resources/config.js'
 import { CHECKS } from '../resources/checks.js'
@@ -133,6 +134,7 @@ export function crudController(cfg) {
       validate(cfg, body); await checkRefs(cfg, body); await deepCheck(cfg, body); await checkUnique(cfg, body, id)
       const rec = stamp(await derive(cfg, body, null))
       await Model.create({ _id: id, ...rec })
+      notify.afterSave(cfg.path, null, { id, ...rec }, req.user)
       return created(res, `${nameOf(rec)} created.`, { id, ...rec })
     },
 
@@ -149,9 +151,11 @@ export function crudController(cfg) {
       const rec = stamp(await derive(cfg, body, existing), existing)
       if (existing) {
         await Model.replaceOne({ _id: id }, rec)
+        notify.afterSave(cfg.path, toApi(existing), { id, ...rec }, req.user)
         return ok(res, `${nameOf(rec)} updated.`, { id, ...rec })
       }
       await Model.create({ _id: id, ...rec })
+      notify.afterSave(cfg.path, null, { id, ...rec }, req.user)
       return created(res, `${nameOf(rec)} created.`, { id, ...rec })
     },
 
@@ -170,6 +174,7 @@ export function crudController(cfg) {
       validate(cfg, body, { partial: true }); validate(cfg, merged); await checkRefs(cfg, body); await deepCheck(cfg, merged); await checkUnique(cfg, merged, id)
       const rec = stamp(await derive(cfg, merged, existing), existing)
       await Model.replaceOne({ _id: id }, rec)
+      notify.afterSave(cfg.path, toApi(existing), { id, ...rec }, req.user)
       return ok(res, `${nameOf(rec)} updated.`, { id, ...rec })
     },
 

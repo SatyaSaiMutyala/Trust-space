@@ -20,12 +20,12 @@ const TDPL_TDS = { $or: [{ ws: 'tdpl' }, { ws: { $exists: false } }] }
 async function ctx(user) {
   let propFilter
   if (user.role === 'owner') {
-    const coOwned = await models.leases.find({ 'owners.ownerId': user.ownerId }).distinct('propertyId')
+    const coOwned = await models.leases.find({ $or: [{ 'owners.ownerId': user.ownerId }, { 'ownerHistory.owners.ownerId': user.ownerId }] }).distinct('propertyId') // incl. former co-owners
     propFilter = { $or: [{ ownerId: user.ownerId }, { 'owners.ownerId': user.ownerId }, ...(coOwned.length ? [{ _id: { $in: coOwned } }] : [])] }
   } else propFilter = { managedBy: 'franchise', partnerId: user.partnerId }
   const props = await models.properties.find(propFilter, { _id: 1, ownerId: 1, owners: 1, partnerId: 1 }).lean()
   const propIds = props.map(p => p._id)
-  const coOwners = await models.leases.find({ propertyId: { $in: propIds } }).distinct('owners.ownerId')
+  const coOwners = (await models.leases.find({ propertyId: { $in: propIds } }).distinct('owners.ownerId')).concat(await models.leases.find({ propertyId: { $in: propIds } }).distinct('ownerHistory.owners.ownerId'))
   const propOwners = props.flatMap(p => (Array.isArray(p.owners) ? p.owners.map(o => o.ownerId) : []))
   return { propFilter, propIds, ownerIds: [...new Set(props.map(p => p.ownerId).concat(propOwners, coOwners).filter(Boolean))], partnerIds: [...new Set(props.map(p => p.partnerId).filter(Boolean))] }
 }

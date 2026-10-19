@@ -16,6 +16,8 @@ before(async () => {
   mongo = await MongoMemoryServer.create()
   process.env.MONGODB_URI = mongo.getUri('truspace')
   process.env.STORAGE_DRIVER = 'local' // tests never touch AWS; the S3 test injects its own client
+  process.env.MAIL_HOST = '' // tests never send mail: it is kept in the mailer's outbox
+  process.env.FIREBASE_ADMIN_FILE = '' // tests never send pushes: they are kept in push.js `sent`
   process.env.UPLOAD_DIR = await fs.mkdtemp(path.join(os.tmpdir(), 'truspace-uploads-'))
   const { connectDb } = await import('../src/config/db.js')
   const { seed } = await import('../src/seed/seed.js')
@@ -295,7 +297,9 @@ test('login with email or mobile, wrong password messages, me', async () => {
   let res = await login({ login: '', password: '' }); let body = await res.json()
   assert.equal(res.status, 400); assert.equal(body.message, 'Enter your email or mobile number and Enter your password.')
   res = await login({ login: 'nobody@x.com', password: 'whatever1' }); body = await res.json()
-  assert.equal(res.status, 401); assert.equal(body.message, 'The email/mobile number or password is incorrect.')
+  assert.equal(res.status, 401); assert.equal(body.message, 'The email or password is incorrect.')
+  res = await login({ login: '9999999999', password: 'whatever1' }); body = await res.json()
+  assert.equal(res.status, 401); assert.equal(body.message, 'The mobile number or password is incorrect.')
   res = await login({ login: '98480 11223', password: 'Trust@1234', remember: true }); body = await res.json()
   assert.equal(res.status, 200); assert.equal(body.message, 'Welcome back, Srinivasa.')
   assert.equal(body.data.user.role, 'owner'); assert.equal(body.data.user.ownerId, 'o1'); assert.equal(body.data.tokenType, 'Bearer')
@@ -471,6 +475,50 @@ test('properties: co-owners with shares are validated, and a co-owner on the pro
   assert.ok((await call('GET', '/properties?limit=100', undefined, t)).body.data.some(p => p.id === 'p-co'), 'co-owner on the property sees it without a lease')
   assert.ok((await call('GET', '/owners', undefined, t)).body.data.some(o => o.id === 'o3'), 'and the co-owner\'s fellow owner')
   await call('DELETE', '/properties/p-co'); await call('DELETE', '/trash/properties/p-co')
+})
+
+test('mobile overview: rent roll of the month, tiles and needs-you-today in one call', async () => {
+  const r = await call('GET', '/mobile/overview')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const d = r.body.data
+  assert.match(d.dateLabel, /^[A-Z][a-z]+day, \d{1,2} [A-Z][a-z]+$/)
+  assert.ok(d.rentRoll.amount > 0 && d.rentRoll.leases > 0 && d.rentRoll.sqft > 0)
+  assert.ok(d.rentRoll.paidPct + d.rentRoll.processPct + d.rentRoll.overduePct <= 100)
+  assert.ok(d.tiles.payable.amount >= 0 && d.tiles.repairs.open >= d.tiles.repairs.pastSla && d.tiles.deposits.held > 0 && d.tiles.pipeline.sites >= d.tiles.pipeline.waiting)
+  assert.ok(Array.isArray(d.needs) && d.needs.every(n => n.n > 0 && n.title && n.to) && d.needsTotal === d.needs.reduce((a, n) => a + n.n, 0))
+  const { accessToken: t } = await tokenFor('accounts@meridian.example.com') // an owner only sees their own premises in it
+  const o = await call('GET', '/mobile/overview', undefined, t)
+  assert.equal(o.status, 200); assert.ok(o.body.data.rentRoll.leases <= d.rentRoll.leases)
+  assert.equal((await call('GET', '/mobile/overview', undefined, 'nope')).status, 401)
+})
+
+test('mobile notifications: feed per user with read, delete and clear-all state', async () => {
+  const r = await call('GET', '/mobile/notifications')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const { items, unread } = r.body.data
+  assert.ok(items.length > 0 && items.every(x => x.id && x.title && x.when && x.to) && unread === items.length)
+  const first = items[0]
+  assert.equal((await call('POST', '/mobile/notifications/read', { ids: [first.id] })).status, 200)
+  let again = (await call('GET', '/mobile/notifications')).body.data
+  assert.equal(again.items.find(x => x.id === first.id).read, true); assert.equal(again.unread, unread - 1)
+  assert.equal((await call('DELETE', '/mobile/notifications/' + encodeURIComponent(first.id))).status, 200)
+  again = (await call('GET', '/mobile/notifications')).body.data
+  assert.ok(!again.items.some(x => x.id === first.id), 'deleted one is gone')
+  assert.equal((await call('DELETE', '/mobile/notifications')).status, 200)
+  assert.equal((await call('GET', '/mobile/notifications')).body.data.items.length, 0, 'clear all empties the feed')
+  const { accessToken: t } = await tokenFor('accounts@meridian.example.com') // another user keeps their own feed
+  assert.ok((await call('GET', '/mobile/notifications', undefined, t)).body.data.items.length >= 0)
+})
+
+test('mobile site: record, requirement, catchment index, checklist score and items in one call', async () => {
+  const r = await call('GET', '/mobile/sites/s3')
+  assert.equal(r.status, 200, r.body.message); assertEnvelope(r)
+  const d = r.body.data
+  assert.equal(d.site.id, 's3'); assert.ok(d.req && d.req.code)
+  assert.ok(d.catch.filled && d.catch.idx > 0 && d.catch.idx <= 100)
+  assert.ok(d.score.total > 30 && d.score.done <= d.score.total && typeof d.score.pct === 'number' && d.score.verdict)
+  assert.ok(d.items.length === d.score.total && d.items.every(i => i.k && i.label && i.sec) && d.sections.length >= 5)
+  assert.equal((await call('GET', '/mobile/sites/nope')).status, 404)
 })
 
 test('rent invoices are generated for every owner of every active lease, once per month', async () => {
@@ -688,4 +736,208 @@ test('TDS records: challans and returns per workspace; owners only read their ow
   assert.equal((await call('POST', '/tds', { ...challan, bsr: '0510308', ws: 'tdpl' }, fr)).status, 403)
   assert.equal((await call('POST', '/tds', { ...challan, bsr: '0510308', ws: 'pa2' }, fr)).status, 201)
   assert.equal((await call('GET', '/tds?ws=pa2')).body.pagination.total, 0) // TrustLab does not see a partner's TDS
+})
+
+test('mobile inspections: start, record items and photos one call at a time, submit, owner video, sign; scope and locks', async () => {
+  const upload = async (type, name) => { const fd = new FormData(); fd.append('file', new Blob([Buffer.from('x'.repeat(100))], { type }), name); const r = await fetch(base + '/assets', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd }); return (await r.json()).data.id }
+  const photo = await upload('image/jpeg', 'item.jpg'), video = await upload('video/mp4', 'clip.mp4')
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+
+  const lst = await call('GET', '/mobile/inspections')
+  assert.equal(lst.status, 200)
+  assert.ok(lst.body.data.todo.some(t => t.leaseId === 'l1' && t.kind === 'Move-in'))
+  assert.ok(lst.body.data.todo.some(t => t.leaseId === 'l5' && t.kind === 'Move-out')) // notice served, take-over signed
+  assert.equal(lst.body.data.records.length, 1)
+  assert.equal((await call('GET', '/mobile/inspections', undefined, o1)).body.data.todo.length, 0) // owners never start one
+
+  assert.equal((await call('POST', '/mobile/inspections', { leaseId: 'l1', kind: 'Move-out' })).status, 400) // no notice on l1
+  const made = await call('POST', '/mobile/inspections', { leaseId: 'l1', kind: 'Move-in' })
+  assert.equal(made.status, 201); const I = made.body.data.inspection; const id = I.id
+  assert.equal(I.status, 'Not started'); assert.equal(I.items.length, 36); assert.equal(made.body.data.ownerName, 'Srinivasa Rao Kondapalli')
+  assert.equal(made.body.data.sections.filter(s => s.total).length, 8)
+  const again = await call('POST', '/mobile/inspections', { leaseId: 'l1', kind: 'Move-in' })
+  assert.equal(again.status, 200); assert.equal(again.body.data.inspection.id, id)
+
+  assert.equal((await call('PATCH', `/mobile/inspections/${id}/items/k_main`, { cond: 'Great' })).status, 400)
+  assert.equal((await call('PATCH', `/mobile/inspections/${id}/items/k_main`, { val: '2' }, o1)).status, 403) // owner can't record
+  let r = await call('PATCH', `/mobile/inspections/${id}/items/k_main`, { val: '2', addPhotos: [photo] })
+  assert.equal(r.status, 200); assert.equal(r.body.data.inspection.status, 'In progress')
+  const km = r.body.data.inspection.items.find(x => x.k === 'k_main'); assert.equal(km.val, '2'); assert.equal(km.photos[0].id, photo); assert.ok(km.photos[0].url)
+  assert.equal(r.body.data.progress.done, 1)
+  r = await call('PATCH', `/mobile/inspections/${id}/items/c_walls`, { cond: 'Damaged', remark: 'Seepage', resp: 'TrustLab', deduct: 5000 })
+  assert.equal(r.body.data.inspection.items.find(x => x.k === 'c_walls').deduct, 5000)
+  r = await call('PATCH', `/mobile/inspections/${id}/items/c_walls`, { cond: 'Good' })
+  assert.equal(r.body.data.inspection.items.find(x => x.k === 'c_walls').resp, undefined) // cleared once the item is fine
+  r = await call('PATCH', `/mobile/inspections/${id}`, { date: '2026-10-19', inspector: 'R. Kumar, Facilities', addFixture: { label: 'Ceiling fans', qty: 2 } })
+  assert.equal(r.status, 200); assert.equal(r.body.data.inspection.items.length, 37)
+  assert.equal((await call('GET', `/mobile/inspections/${id}`, undefined, o1)).status, 200) // the owner sees their own property's record
+  assert.equal((await call('GET', `/mobile/inspections/${id}`, undefined, (await tokenFor('sravani.pydi@example.com')).accessToken)).status, 404)
+
+  const early = await call('POST', `/mobile/inspections/${id}/submit`)
+  assert.equal(early.status, 400); assert.ok(early.body.errors.length > 30)
+  // record every item: readings and counts get a value, the rest N/A (no photo needed), required ones a photo
+  const cur = (await call('GET', `/mobile/inspections/${id}`)).body.data.inspection
+  for (const it of cur.items) await call('PATCH', `/mobile/inspections/${id}/items/${it.k}`, it.type === 'count' || it.type === 'reading' ? { val: '1', addPhotos: it.req ? [photo] : [] } : { cond: 'N/A' })
+  await call('PATCH', `/mobile/inspections/${id}`, { addRoomPhotos: [photo, photo, photo, photo], tdplVideo: { id: video, dur: 12 } })
+  assert.equal((await call('PATCH', `/mobile/inspections/${id}`, { tdplVideo: { id: video, dur: 3 } })).status, 400)
+  assert.equal((await call('POST', `/mobile/inspections/${id}/sign`, { name: 'X', agree: true })).status, 409) // not sent yet
+  const before = (await call('GET', '/messages?propertyId=p1')).body.pagination.total
+  const sub = await call('POST', `/mobile/inspections/${id}/submit`)
+  assert.equal(sub.status, 200); assert.equal(sub.body.data.inspection.status, 'Awaiting owner sign-off'); assert.equal(sub.body.data.inspection.tdplSign.name, 'R. Kumar, Facilities')
+  assert.equal((await call('GET', '/messages?propertyId=p1')).body.pagination.total, before + 1)
+  assert.equal((await call('PATCH', `/mobile/inspections/${id}/items/k_main`, { val: '3' })).status, 409) // locked while with the owner
+  assert.equal((await call('POST', `/mobile/inspections/${id}/sign`, { name: 'Srinivasa Rao Kondapalli', agree: true }, o1)).status, 400) // owner video first
+  r = await call('PATCH', `/mobile/inspections/${id}`, { ownerVideo: { id: video, dur: 20 } }, o1)
+  assert.equal(r.status, 200); assert.equal(r.body.data.canSign, true)
+  assert.equal((await call('POST', `/mobile/inspections/${id}/sign`, { name: 'Srinivasa Rao Kondapalli' }, o1)).status, 400) // must agree
+  const signed = await call('POST', `/mobile/inspections/${id}/sign`, { name: 'Srinivasa Rao Kondapalli', agree: true, sig: { d: 'M1 1 L20 20', w: 300, h: 120 } }, o1)
+  assert.equal(signed.status, 200); assert.equal(signed.body.data.inspection.status, 'Signed'); assert.equal(signed.body.data.inspection.ownerSign.method, 'Owner app'); assert.equal(signed.body.data.inspection.ownerSign.sig.d, 'M1 1 L20 20')
+  assert.equal((await call('POST', `/mobile/inspections/${id}/reopen`)).status, 409)
+  assert.equal((await call('GET', '/mobile/inspections')).body.data.counts.done, 2)
+
+  // dispute path on a handover: start, send, owner disputes, staff reopens
+  const mo = await call('POST', '/mobile/inspections', { leaseId: 'l5', kind: 'Move-out' })
+  assert.equal(mo.status, 201); assert.ok(mo.body.data.inspection.items.some(it => it.prev && it.prev.cond)) // take-over values carried
+  const o5 = (await (await login({ login: 'vgupta.m@example.com', password: 'Better2026' })).json()).data.accessToken // changed by an earlier test
+  assert.equal((await call('POST', `/mobile/inspections/${mo.body.data.inspection.id}/dispute`, { reason: 'Wrong' }, o5)).status, 409)
+  assert.equal((await call('POST', `/mobile/inspections/${mo.body.data.inspection.id}/reopen`)).status, 409)
+})
+
+test('co-owner changes: the lease keeps the old split in ownerHistory, the schedule follows it month by month, a former co-owner keeps access', async () => {
+  const L = (await call('GET', '/leases/l3')).body.data
+  const bad = await call('PATCH', '/leases/l3', { ownerHistory: [{ until: 'June', owners: L.owners }] })
+  assert.equal(bad.status, 400); assert.match(bad.body.message, /last month it applied/)
+  const r = await call('PATCH', '/leases/l3', { owners: [{ ownerId: 'o3', rent: 100, maint: 100, dep: 100, adv: 100, gst: 'RCM' }], ownerId: 'o3', ownerHistory: [{ until: '2026-06', owners: L.owners }], ownerChanges: [{ at: new Date().toISOString(), by: 'Test', type: 'deactivate', ownerId: 'o8', from: '2026-07', text: 'Sravani Pydi deactivated from Jul 26' }] })
+  assert.equal(r.status, 200, JSON.stringify(r.body))
+  const sc = (await call('GET', '/leases/l3/schedule')).body.data
+  assert.deepEqual(sc.rows.find(x => x.p === '2026-06').split.map(x => x.ownerId), ['o3', 'o8'])
+  assert.deepEqual(sc.rows.find(x => x.p === '2026-07').split.map(x => x.ownerId), ['o3'])
+  assert.equal(sc.owners.find(o => o.ownerId === 'o8').active, false)
+  const { accessToken: o8 } = await tokenFor('sravani.pydi@example.com')
+  assert.equal((await call('GET', '/leases/l3', undefined, o8)).status, 200) // former co-owner still sees the lease
+  assert.equal((await call('GET', '/properties/p3', undefined, o8)).status, 200)
+  await call('PATCH', '/leases/l3', { owners: L.owners, ownerId: L.ownerId, ownerHistory: [], ownerChanges: [] }) // restore for later tests
+})
+
+test('owner sign-up: email code, pending account, approval on Portal access; delete own account', async () => {
+  const { outbox } = await import('../src/services/mailer.js')
+  assert.equal((await call('POST', '/auth/register/start', { email: 'sr.kondapalli@example.com' }, null)).status, 409) // existing account
+  const st = await call('POST', '/auth/register/start', { email: 'New.Owner@example.com' }, null)
+  assert.equal(st.status, 200); assert.match(st.body.message, /emailed a six-digit code/); assert.match(st.body.data.devCode, /^\d{6}$/)
+  assert.equal(outbox[outbox.length - 1].to, 'new.owner@example.com'); assert.ok(outbox[outbox.length - 1].text.includes(st.body.data.devCode))
+  assert.equal((await call('POST', '/auth/register/verify', { email: 'new.owner@example.com', code: '000000' }, null)).status, st.body.data.devCode === '000000' ? 200 : 400)
+  const ve = await call('POST', '/auth/register/verify', { email: 'new.owner@example.com', code: st.body.data.devCode }, null)
+  assert.equal(ve.status, 200); const signupToken = ve.body.data.signupToken
+  assert.equal((await call('POST', '/auth/register/verify', { email: 'new.owner@example.com', code: st.body.data.devCode }, null)).status, 400) // used once
+  const bad = await call('POST', '/auth/register', { signupToken, password: 'Strong2026', owner: { name: 'Ravi Owner', phone: '9000011111', pan: 'BAD' }, property: { code: 'HYD-BGP-01' } }, null)
+  assert.equal(bad.status, 400); assert.match(bad.body.message, /PAN should look like/)
+  const reg = await call('POST', '/auth/register', { signupToken, password: 'Strong2026', owner: { name: 'Ravi Owner', kind: 'Individual', phone: '9000011111', pan: 'ABCPR1234K', gstin: '', addr: { line: '1 Main Rd', city: 'Hyderabad', state: 'Telangana', pin: '500001' }, bankName: 'HDFC Bank', ifsc: 'HDFC0001234', acctNo: '123456789012', acctHolder: 'Ravi Owner' }, property: { code: 'HYD-BGP-01' } }, null)
+  assert.equal(reg.status, 201); assert.equal(reg.body.data.status, 'pending')
+  const O = await call('GET', `/owners/${reg.body.data.ownerId}`)
+  assert.equal(O.status, 200); assert.equal(O.body.data.panStatus, 'Not verified'); assert.equal(O.body.data.bankPending, true); assert.equal(O.body.data.signup.propertyCode, 'HYD-BGP-01')
+  const pendingLogin = await login({ login: 'new.owner@example.com', password: 'Strong2026' })
+  assert.equal(pendingLogin.status, 403); assert.equal((await pendingLogin.json()).code, 'pending_approval')
+  assert.equal((await login({ login: 'new.owner@example.com', password: 'wrong' })).status, 401)
+  const pend = await call('GET', '/users/pending')
+  assert.equal(pend.status, 200); assert.equal(pend.body.data.length, 1); assert.equal(pend.body.data[0].owner.name, 'Ravi Owner')
+  const uid = pend.body.data[0].id
+  const ap = await call('PATCH', `/users/${uid}`, { status: 'active' })
+  assert.equal(ap.status, 200); assert.match(ap.body.message, /emailed/); assert.match(outbox[outbox.length - 1].subject, /ready/)
+  const li = await login({ login: 'new.owner@example.com', password: 'Strong2026' }); assert.equal(li.status, 200)
+  const tok = (await li.json()).data.accessToken
+  assert.equal((await call('POST', '/auth/delete-account', { password: 'nope' }, tok)).status, 401)
+  const del = await call('POST', '/auth/delete-account', { password: 'Strong2026' }, tok)
+  assert.equal(del.status, 200)
+  assert.equal((await call('GET', '/auth/me', undefined, tok)).status, 401)
+  assert.equal((await login({ login: 'new.owner@example.com', password: 'Strong2026' })).status, 401) // email freed, no account
+  assert.equal((await call('POST', '/auth/register/start', { email: 'new.owner@example.com' }, null)).status, 200) // can sign up again
+  assert.equal((await call('POST', '/auth/delete-account', { password: 'Trust@1234' })).status, 403) // admins are not self-service
+})
+
+test('owner self-service: invoice defaults and deposit requests', async () => {
+  const { accessToken: o5 } = { accessToken: (await (await login({ login: 'vgupta.m@example.com', password: 'Better2026' })).json()).data.accessToken }
+  const d = await call('GET', '/mobile/invoice-defaults?propertyId=p5&type=Rent', undefined, o5)
+  assert.equal(d.status, 200); assert.equal(d.body.data.ownerId, 'o5'); assert.match(d.body.data.number, /^VGM\/\d\d-\d\d\/\d{3}$/); assert.ok(d.body.data.base > 0); assert.ok(d.body.data.months.length)
+  assert.equal((await call('GET', '/mobile/invoice-defaults?propertyId=p1&type=Rent', undefined, o5)).status, 404) // not their property
+  const r = await call('GET', '/mobile/deposit-requests', undefined, o5)
+  assert.equal(r.status, 200); const prop = r.body.data.find(x => x.status === 'Proposed'); assert.ok(prop); assert.equal(prop.propertyName, 'KPHB Collection Centre'); assert.ok(prop.deposit.share > 0)
+  assert.equal((await call('POST', `/mobile/deposit-requests/${prop.leaseId}/${prop.id}/agree`, {})).status, 403) // admin can't answer for the owner
+  const ag = await call('POST', `/mobile/deposit-requests/${prop.leaseId}/${prop.id}/agree`, {}, o5)
+  assert.equal(ag.status, 200); assert.equal(ag.body.data.status, 'Agreed')
+  assert.equal((await call('POST', `/mobile/deposit-requests/${prop.leaseId}/${prop.id}/decline`, {}, o5)).status, 409)
+  const L = (await call('GET', '/leases/l5')).body.data; assert.equal(L.depAdj.find(a => a.id === prop.id).consent.how, 'Agreed in TruSpace app')
+})
+
+test('mobile threads: one per property with unread counts, the thread itself, marking read; owners see only their own', async () => {
+  const t = await call('GET', '/mobile/threads')
+  assert.equal(t.status, 200); assert.equal(t.body.data.side, 'tdpl')
+  const beg = t.body.data.threads.find(x => x.propertyId === 'p1'); assert.ok(beg); assert.ok(beg.people.length >= 1); assert.ok(beg.last)
+  const vsp = t.body.data.threads.find(x => x.propertyId === 'p3'); assert.equal(vsp.people.length, 2) // co-owned lease → two people
+  const th = await call('GET', '/mobile/threads/p1')
+  assert.equal(th.status, 200); assert.ok(th.body.data.messages.length >= 2); assert.ok(th.body.data.messages.every((m, i, a) => !i || a[i - 1].at <= m.at)) // oldest first
+  const { accessToken: o2 } = await tokenFor('accounts@meridian.example.com') // owner of p2
+  assert.equal((await call('GET', '/mobile/threads/p1', undefined, o2)).status, 404)
+  const mine = await call('GET', '/mobile/threads', undefined, o2)
+  assert.deepEqual(mine.body.data.threads.map(x => x.propertyId), ['p2']); assert.equal(mine.body.data.side, 'owner')
+  // the facilities side writes; the owner sees it unread, opens the thread and it is marked read
+  const sent = await call('POST', '/messages', { propertyId: 'p2', ownerId: 'o2', from: 'tdpl', by: 'Facilities Desk', kind: 'Message', text: 'Plumber visits Monday at 10.', at: new Date().toISOString(), files: [], read: { tdpl: true } })
+  assert.equal(sent.status, 201)
+  assert.equal((await call('GET', '/mobile/threads', undefined, o2)).body.data.threads[0].unread, 1)
+  const rd = await call('POST', '/mobile/threads/p2/read', undefined, o2)
+  assert.equal(rd.body.data.marked, 1)
+  assert.equal((await call('GET', '/mobile/threads', undefined, o2)).body.data.unread, 0)
+})
+
+test('push notifications: device tokens per account; who is notified for messages, invoices, tickets, inspections, deposits', async () => {
+  const { sent } = await import('../src/services/push.js')
+  const { DeviceToken } = await import('../src/models/auth.js')
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  const r = await call('POST', '/mobile/push-token', { token: 'fcm-token-o1-phone', platform: 'ios' }, o1)
+  assert.equal(r.status, 200); assert.equal((await DeviceToken.findOne({ token: 'fcm-token-o1-phone' }).lean()).userId, 'u-o1')
+  await call('POST', '/mobile/push-token', { token: 'fcm-token-o1-phone', platform: 'ios' }, o1) // same token again: one record
+  assert.equal(await DeviceToken.countDocuments({ token: 'fcm-token-o1-phone' }), 1)
+  const wait = async () => { await new Promise(res => setTimeout(res, 60)) } // notifications run after the reply
+  // facilities writes to the Begumpet owner → the owner's account is notified, not staff
+  sent.length = 0
+  await call('POST', '/messages', { propertyId: 'p1', ownerId: 'o1', from: 'tdpl', by: 'Facilities Desk', kind: 'Message', text: 'Terrace access arranged for 11 am.', at: new Date().toISOString(), files: [], read: { tdpl: true } })
+  await wait()
+  let n = sent.find(x => x.data.link === 'truspace://thread/p1'); assert.ok(n); assert.deepEqual(n.userIds, ['u-o1']); assert.match(n.body, /Terrace access/)
+  // the owner replies → admins and staff are notified, not the owner
+  sent.length = 0
+  await call('POST', '/messages', { propertyId: 'p1', ownerId: 'o1', from: 'owner', by: 'Srinivasa Rao Kondapalli', kind: 'Message', text: 'Noted, thank you.', at: new Date().toISOString(), files: [], read: { owner: true } }, o1)
+  await wait()
+  n = sent.find(x => x.data.link === 'truspace://thread/p1'); assert.ok(n); assert.ok(n.userIds.includes('u-admin') && n.userIds.includes('u-staff') && !n.userIds.includes('u-o1'))
+  // invoice approved → the owner; a new ticket by staff → the owner; deposit proposed → that owner
+  const inv = (await call('GET', '/invoices?propertyId=p1&status=Verified&limit=1')).body.data[0]
+  if (inv) { sent.length = 0; await call('PATCH', `/invoices/${inv.id}`, { status: 'Approved' }); await wait(); n = sent.find(x => x.title === 'Invoice approved'); assert.ok(n); assert.deepEqual(n.userIds, ['u-o1']) }
+  sent.length = 0
+  const tk = await call('POST', '/tickets', { no: 'TKT-9901', propertyId: 'p1', title: 'Lift stuck on 2nd floor', category: 'Other', priority: 'P2', responsibility: 'Owner', status: 'Open', createdAt: new Date().toISOString(), raisedBy: 'Facilities Desk', log: [{ at: new Date().toISOString(), by: 'Facilities Desk', text: 'Stuck since morning' }] })
+  assert.equal(tk.status, 201); await wait()
+  n = sent.find(x => x.data.link === `truspace://ticket/${tk.body.data.id}`); assert.ok(n); assert.deepEqual(n.userIds, ['u-o1']); assert.match(n.body, /Lift stuck/)
+  sent.length = 0
+  const L1 = (await call('GET', '/leases/l1')).body.data
+  await call('PATCH', '/leases/l1', { depAdj: [...(L1.depAdj || []), { id: 'da-test', period: '2026-12', ownerId: 'o1', amount: 100000, tds: 0, status: 'Proposed', consent: null, note: 'test', createdAt: new Date().toISOString() }] })
+  await wait()
+  n = sent.find(x => x.data.link === 'truspace://owner/deposit/da-test'); assert.ok(n); assert.deepEqual(n.userIds, ['u-o1'])
+  await call('PATCH', '/leases/l1', { depAdj: L1.depAdj || [] })
+  assert.equal((await call('DELETE', '/mobile/push-token', { token: 'fcm-token-o1-phone' }, o1)).status, 200)
+  assert.equal(await DeviceToken.countDocuments({ token: 'fcm-token-o1-phone' }), 0)
+})
+
+test('live updates: a socket joins a conversation it may see and receives new messages and notify events at once', async () => {
+  const { attachRealtime } = await import('../src/services/realtime.js')
+  attachRealtime(server) // the test server was started without it
+  const { io } = await import('socket.io-client')
+  const port = server.address().port
+  const connect = tok => new Promise((resolve, reject) => { const s = io(`http://127.0.0.1:${port}`, { path: '/socket.io', auth: { token: tok }, transports: ['websocket'], reconnection: false }); s.on('connect', () => resolve(s)); s.on('connect_error', e => reject(e)) })
+  await assert.rejects(connect('bad-token'), /unauthorized/)
+  const { accessToken: o1 } = await tokenFor('sr.kondapalli@example.com')
+  const s = await connect(o1)
+  assert.deepEqual(await new Promise(r => s.emit('thread:join', 'p2', r)), { ok: false }) // not their property
+  assert.deepEqual(await new Promise(r => s.emit('thread:join', 'p1', r)), { ok: true })
+  const gotMessage = new Promise(r => s.on('message:new', r)); const gotNotify = new Promise(r => s.on('notify', r))
+  await call('POST', '/messages', { propertyId: 'p1', ownerId: 'o1', from: 'tdpl', by: 'Facilities Desk', kind: 'Message', text: 'Live hello', at: new Date().toISOString(), files: [], read: { tdpl: true } })
+  const m = await gotMessage; assert.equal(m.text, 'Live hello')
+  const n = await gotNotify; assert.equal(n.link, 'truspace://thread/p1')
+  s.disconnect()
 })

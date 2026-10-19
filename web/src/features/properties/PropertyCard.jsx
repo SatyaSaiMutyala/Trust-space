@@ -20,7 +20,7 @@ function noticeStatus(P) {
   if (d < 0) return { v: 'Deadline passed', k: 'bad', note: `Was ${fmtD(by)} · lease runs to ${fmtD(L.end)}` }
   if (d <= 7) return { v: d === 0 ? 'Serve today' : `${d} day${d > 1 ? 's' : ''} left`, k: 'bad', cls: 'blink', warn: true, note: `Serve notice by ${fmtD(by)}` }
   const left = d >= 60 ? `${Math.round(d / 30.44)} months left` : `${d} days left` // far-off deadlines read better in months
-  return { v: left, k: d <= 30 ? 'warn' : 'ok', note: `Serve by ${fmtD(by)} · ${L.notice} months notice` }
+  return { v: left, k: d <= 30 ? 'warn' : 'ok', note: `Serve by ${fmtD(by)} · ${L.notice} months’ notice by the tenant` }
 }
 
 /** The independent statuses of a property: occupancy, rent, repairs and the notice-period countdown. */

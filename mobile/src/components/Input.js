@@ -25,7 +25,7 @@ export default function Input({ label, rightLabel, onRightLabel, value, onChange
           <Pressable onPress={() => setShow(v => !v)} hitSlop={10} accessibilityLabel={show ? 'Hide password' : 'Show password'}>
             <Icon name={show ? 'eye-off' : 'eye'} size={22} color={colors.muted} />
           </Pressable>
-        ) : select ? <Icon name="chevron-down" size={22} color={colors.muted} /> : right}
+        ) : select ? (right || <Icon name="chevron-down" size={22} color={colors.muted} />) : right}
       </View>
     </View>
   );

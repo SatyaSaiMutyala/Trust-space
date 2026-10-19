@@ -3,7 +3,8 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAppSelector } from '../store/hooks';
 import LoginScreen from '../screens/auth/LoginScreen';
-import PhoneScreen from '../screens/auth/signup/PhoneScreen';
+import SplashScreen from '../screens/auth/SplashScreen';
+import EmailScreen from '../screens/auth/signup/EmailScreen';
 import OtpScreen from '../screens/auth/signup/OtpScreen';
 import AboutScreen from '../screens/auth/signup/AboutScreen';
 import AddressScreen from '../screens/auth/signup/AddressScreen';
@@ -27,12 +28,12 @@ import AreaPhotosScreen from '../screens/staff/AreaPhotosScreen';
 import VideoRecordingScreen from '../screens/staff/VideoRecordingScreen';
 import SignOffScreen from '../screens/staff/SignOffScreen';
 import InspectionAreaScreen from '../screens/staff/InspectionAreaScreen';
+import InspectionHubScreen from '../screens/staff/InspectionHubScreen';
 import { PropertiesScreen, SiteScoutingScreen, LeasesScreen, ExitsScreen, OwnersScreen, InvoicesScreen, DepositsScreen } from '../screens/staff/ListScreens';
 import OwnerLedgersScreen from '../screens/staff/OwnerLedgersScreen';
 import SearchScreen from '../screens/shared/SearchScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import NewInvoiceScreen from '../screens/owner/NewInvoiceScreen';
-import OwnerCheckSignScreen from '../screens/owner/OwnerCheckSignScreen';
 import DepositRequestScreen from '../screens/owner/DepositRequestScreen';
 import RecordChallanScreen from '../screens/staff/RecordChallanScreen';
 import RaiseTicketScreen from '../screens/shared/RaiseTicketScreen';
@@ -48,10 +49,12 @@ export default function RootNavigator() {
   const { status, role } = useAppSelector(st => st.auth);
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      {status !== 'signedIn' ? (
+      {status === 'checking' ? (
+        <Stack.Screen name="Splash" component={SplashScreen} options={{ animation: 'fade' }} />
+      ) : status !== 'signedIn' ? (
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="SignUpPhone" component={PhoneScreen} />
+          <Stack.Screen name="SignUpEmail" component={EmailScreen} />
           <Stack.Screen name="SignUpOtp" component={OtpScreen} />
           <Stack.Screen name="SignUpAbout" component={AboutScreen} />
           <Stack.Screen name="SignUpAddress" component={AddressScreen} />
@@ -75,6 +78,7 @@ export default function RootNavigator() {
           <Stack.Screen name="Tds" component={TdsScreen} />
           <Stack.Screen name="InspectionItem" component={InspectionItemScreen} options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="InspectionArea" component={InspectionAreaScreen} />
+          <Stack.Screen name="InspectionHub" component={InspectionHubScreen} />
           <Stack.Screen name="AreaPhotos" component={AreaPhotosScreen} />
           <Stack.Screen name="VideoRecording" component={VideoRecordingScreen} options={{ animation: 'fade' }} />
           <Stack.Screen name="SignOff" component={SignOffScreen} />
@@ -89,7 +93,6 @@ export default function RootNavigator() {
           <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'fade' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="NewInvoice" component={NewInvoiceScreen} />
-          <Stack.Screen name="OwnerCheckSign" component={OwnerCheckSignScreen} />
           <Stack.Screen name="DepositRequest" component={DepositRequestScreen} />
           <Stack.Screen name="RecordChallan" component={RecordChallanScreen} />
           <Stack.Screen name="RaiseTicket" component={RaiseTicketScreen} />

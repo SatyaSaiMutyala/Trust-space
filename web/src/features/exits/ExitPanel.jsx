@@ -7,7 +7,7 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { S, isOwner, owner, useStore, openDrawer } from '../../store/store'
 import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
-import { lockEnd, isMulti, leaseOwners, ownerShare } from '../../domain/lease'
+import { lockEnd, isMulti, depositOwners, ownerShare, noticeLessee, noticeLessor } from '../../domain/lease'
 import { useLeaseDeposit } from '../leases/useLeaseDeposit'
 import { useOpening } from '../opening/useOpening'
 import { inspOf, inspOpen } from '../../domain/inspection'
@@ -30,7 +30,7 @@ export default function ExitPanel({ L }) {
     const le = lockEnd(L)
     return (
       <Panel>
-        <p className="muted">No exit started for this lease. Earliest exit without penalty: {fmtD(le && le > TODAY ? le : TODAY)} (lock-in) with {L.notice} months’ notice.</p>
+        <p className="muted">No exit started for this lease. Earliest exit without penalty: {fmtD(le && le > TODAY ? le : TODAY)} (lock-in) with {noticeLessee(L)} months’ notice from the tenant{noticeLessor(L) !== noticeLessee(L) ? ` (${noticeLessor(L)} months if the owner serves notice)` : ''}.</p>
         {o ? null : <Btn primary onClick={() => startExit(L.id)}>Serve notice</Btn>}
       </Panel>
     )
@@ -39,7 +39,7 @@ export default function ExitPanel({ L }) {
   const pendInv = S.invoices.filter(i => i.leaseId === L.id && !['Paid', 'Rejected'].includes(i.status))
   const held = dep?.held || 0, adjTot = dep?.adjusted || 0; const refund = held - dedTotal
   const multi = isMulti(L)
-  const refundRows = multi ? leaseOwners(L).map(w => { const s = dep?.settlement.rows.find(r => r.ownerId === w.ownerId) || { dep: 0, ded: 0, due: 0 }; return { ownerId: w.ownerId, dep: s.dep, ded: s.ded, due: s.due, got: (x.refunds || []).find(r => r.ownerId === w.ownerId) } }) : []
+  const refundRows = multi ? depositOwners(L).map(w => { const s = dep?.settlement.rows.find(r => r.ownerId === w.ownerId) || { dep: 0, ded: 0, due: 0 }; return { ownerId: w.ownerId, dep: s.dep, ded: s.ded, due: s.due, got: (x.refunds || []).find(r => r.ownerId === w.ownerId) } }) : []
 
   const submit = step => async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
@@ -129,7 +129,7 @@ export default function ExitPanel({ L }) {
             <TableHead><TableRow><TableCell>Owner</TableCell><TableCell className="num" align="right">Deposit held</TableCell><TableCell className="num" align="right">Share of deductions</TableCell><TableCell className="num" align="right">Refund due</TableCell><TableCell>Received</TableCell></TableRow></TableHead>
             <TableBody>{refundRows.map(r => (
               <TableRow key={r.ownerId}>
-                <TableCell>{owner(r.ownerId)?.name || ''} <span className="small muted">{pctLabel(ownerShare(L, r.ownerId, 'dep') * 100)}</span></TableCell>
+                <TableCell>{owner(r.ownerId)?.name || ''} <span className="small muted">{pctLabel(ownerShare(L, r.ownerId, 'dep', L.start.slice(0, 7)) * 100)}</span></TableCell>
                 <TableCell className="num" align="right">{inr(r.dep)}</TableCell>
                 <TableCell className="num" align="right">{r.ded ? '−' + inr(r.ded) : '—'}</TableCell>
                 <TableCell className="num" align="right"><b>{inr(r.due)}</b></TableCell>

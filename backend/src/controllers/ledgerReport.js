@@ -10,7 +10,7 @@
 import { badRequest } from '../utils/ApiError.js'
 import { ok } from '../utils/respond.js'
 import { reportContext } from './reportContext.js'
-import { schedule, rentCell, rentStatusOf, ledgerEntries, openingEntries, depAdjEntries, invState, leaseState, leaseOwners, isMulti, splitAmt, depAdjs, depHeld, rentFor, ownerShare, fy as fyOf, perAdd, perLabel, fmtD, inr, toCsv } from '../../../shared/calc/index.js'
+import { schedule, rentCell, rentStatusOf, ledgerEntries, openingEntries, depAdjEntries, invState, leaseState, leaseOwners, depositOwners, isMulti, splitAmt, depAdjs, depHeld, rentFor, ownerShare, fy as fyOf, perAdd, perLabel, fmtD, inr, toCsv } from '../../../shared/calc/index.js'
 
 const TABS = ['Rent', 'Electricity', 'Maintenance', 'Other']
 const ledTypes = t => (t === 'Other' ? ['Water', 'Other'] : [t])
@@ -57,7 +57,7 @@ function reconRows(R, leases, type, from, to, ownerId) {
 function depositRows(R, leases, ownerId) {
   const rows = []
   leases.forEach(L => {
-    const sc = schedule(L, R.ctx); const x = L.exit || {}; const multi = isMulti(L); const ded = (x.deductions || []).reduce((a, dd) => a + (+dd.amount || 0), 0); const dedSplit = splitAmt(ded, leaseOwners(L), 'dep')
+    const sc = schedule(L, R.ctx); const x = L.exit || {}; const multi = isMulti(L); const ded = (x.deductions || []).reduce((a, dd) => a + (+dd.amount || 0), 0); const dedSplit = splitAmt(ded, depositOwners(L), 'dep')
     ;(sc.owners || []).forEach((o, i) => {
       if (ownerId && o.ownerId !== ownerId) return; const who = multi && !R.me ? ` — ${R.ctx.ownerName(o.ownerId) || ''} (${Math.round((+o.share.dep || 0) * 100) / 100}%)` : ''
       if (o.deposit) rows.push({ d: L.start, propertyId: L.propertyId, t: 'Security deposit received from TrustLab' + who, a: o.deposit, s: L.depositPaid ? 'Received' : 'Pending', n: 'Refundable at the end of the lease' })

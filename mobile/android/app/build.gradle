@@ -1,6 +1,22 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services" // reads google-services.json for Firebase
+
+/* Force update: src/config/appVersion.js is generated from versionName / versionCode so the app always knows the
+   version it was built as. Regenerated before every build; a release with a stale file is refused. */
+tasks.register("syncAppVersion", Exec) {
+    workingDir rootProject.file("..")
+    commandLine "node", "scripts/sync-app-version.js"
+}
+tasks.register("checkAppVersionSync", Exec) {
+    workingDir rootProject.file("..")
+    commandLine "node", "scripts/sync-app-version.js", "--check"
+}
+afterEvaluate {
+    tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "syncAppVersion" }
+    tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach { dependsOn "checkAppVersionSync" }
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
