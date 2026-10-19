@@ -135,6 +135,11 @@ export const api = createApi({
       providesTags: ['leases', 'owners'].map(id => ({ type: 'List', id })),
     }),
 
+    /* Excel import of owners, properties and leases (admin and staff) */
+    importTemplate: b.mutation({ query: sheet => ({ url: '/import/template' + qs({ sheet }), responseHandler: r => r.blob() }) }), // a mutation so it is never served from cache (the dropdowns list the current owners and properties)
+    importPreview: b.mutation({ query: file => { const fd = new FormData(); fd.append('file', file); return { url: '/import/preview', method: 'POST', body: fd } } }),
+    importCommit: b.mutation({ query: file => { const fd = new FormData(); fd.append('file', file); return { url: '/import', method: 'POST', body: fd } }, invalidatesTags: ['owners', 'properties', 'leases'].map(id => ({ type: 'List', id })) }),
+
     /* uploads */
     upload: b.mutation({ query: file => { const fd = new FormData(); fd.append('file', file); return { url: '/assets', method: 'POST', body: fd } } }),
 

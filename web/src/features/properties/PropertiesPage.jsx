@@ -6,7 +6,7 @@
  * they cannot run on the server and are not offered here (each card still shows both statuses).
  */
 import { useStore, S, isOwner } from '../../store/store'
-import { newProperty } from '../../store/actions'
+import { newProperty, importOpen } from '../../store/actions'
 import { TYPES } from '../../domain/constants'
 import { Btn, PageHead, Empty } from '../../components/ui/Layout'
 import { SampleBanner } from '../../components/app/Banners'
@@ -28,7 +28,7 @@ export default function PropertiesPage() {
       <PageHead
         title={o ? 'My properties' : 'Properties'}
         sub={o ? 'Premises you have leased to TrustLab Diagnostics.' : 'Every premises TrustLab rents or is negotiating, with its owner, lease and live status.'}
-        actions={o ? null : <Btn primary onClick={newProperty}>Add property</Btn>}
+        actions={o ? null : <><Btn onClick={() => importOpen('properties')}>Import from Excel</Btn><Btn primary onClick={newProperty}>Add property</Btn></>}
       />
       <SampleBanner />
       <ListToolbar list={L} searchPlaceholder="Search name, code, city or address">

@@ -21,7 +21,7 @@ function init() {
   if (app) return app
   const file = env.push.adminFile ? path.resolve(env.push.adminFile) : ''
   if (!file || !fs.existsSync(file) || env.nodeEnv === 'test') { if (!warned && env.nodeEnv !== 'test') { console.log(`Push notifications off: ${file ? `${file} not found` : 'FIREBASE_ADMIN_FILE not set'} (notifications are logged only)`); warned = true } return null }
-  try { app = admin.initializeApp({ credential: admin.credential.cert(JSON.parse(fs.readFileSync(file, 'utf8'))) }) }
+  try { const sa = JSON.parse(fs.readFileSync(file, 'utf8')); app = admin.initializeApp({ credential: admin.credential.cert(sa) }); console.log(`Push notifications on (Firebase project ${sa.project_id})`) }
   catch (e) { if (!warned) { console.error('Push notifications off: could not load the Firebase service account —', e.message); warned = true } return null }
   return app
 }

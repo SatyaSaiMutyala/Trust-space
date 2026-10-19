@@ -6,8 +6,8 @@ import TableHead from '@mui/material/TableHead'
 import TableBody from '@mui/material/TableBody'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
-import { useStore, prop, owner, scopeProps } from '../../store/store'
-import { newLease, openLease } from '../../store/actions'
+import { useStore, prop, owner, scopeProps, isOwner, isFranchisee } from '../../store/store'
+import { newLease, openLease, importOpen } from '../../store/actions'
 import { CUR, fmtD, inr } from '../../domain/utils'
 import { leaseState, rentFor } from '../../domain/lease'
 import { Btn, PageHead, TableCard, ClickRow, Empty } from '../../components/ui/Layout'
@@ -26,7 +26,7 @@ export default function LeasesPage() {
   const L = useServerList('leases', 'leases', { defaults: { limit: 10 } })
   return (
     <>
-      <PageHead title="Leases & contracts" sub="Every agreement from term sheet to termination: rent, escalation, lock-in, deposit, tax treatment and signed copies." actions={<Btn primary onClick={() => newLease()}>New lease</Btn>} />
+      <PageHead title="Leases & contracts" sub="Every agreement from term sheet to termination: rent, escalation, lock-in, deposit, tax treatment and signed copies." actions={<>{isOwner() || isFranchisee() ? null : <Btn onClick={() => importOpen('leases')}>Import from Excel</Btn>}<Btn primary onClick={() => newLease()}>New lease</Btn></>} />
       <ListToolbar list={L} searchPlaceholder="Search lease reference or clauses" dateLabel="Start">
         <ListFilter list={L} name="status" label="Agreement" allLabel="Any status" options={[['Draft', 'Draft / term sheet'], ['Active', 'Signed & active']]} />
         <ListFilter list={L} name="gstMode" label="GST" allLabel="Any GST" options={[['Forward', 'GST 18%'], ['RCM', 'GST RCM'], ['None', 'No GST']]} />

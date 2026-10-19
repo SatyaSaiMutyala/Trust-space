@@ -941,3 +941,127 @@ test('live updates: a socket joins a conversation it may see and receives new me
   const n = await gotNotify; assert.equal(n.link, 'truspace://thread/p1')
   s.disconnect()
 })
+
+/* ---------- Excel import: template, preview, commit ---------- */
+import ExcelJS from 'exceljs'
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+async function sheetFile(fill) {
+  const wb = new ExcelJS.Workbook()
+  const add = (title, headers, rows) => { const ws = wb.addWorksheet(title); ws.addRow(headers); rows.forEach(r => ws.addRow(r)) }
+  fill(add)
+  return new Blob([Buffer.from(await wb.xlsx.writeBuffer())], { type: XLSX })
+}
+const postSheet = async (url, blob, name = 'import.xlsx', auth = token) => { const fd = new FormData(); fd.append('file', blob, name); const res = await fetch(base + url, { method: 'POST', headers: { Authorization: 'Bearer ' + auth }, body: fd }); return { status: res.status, body: await res.json() } }
+
+test('import template: one sheet per type, dropdowns from the system, staff only', async () => {
+  let res = await fetch(base + '/import/template', { headers: { Authorization: 'Bearer ' + token } })
+  assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), XLSX)
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(Buffer.from(await res.arrayBuffer()))
+  assert.deepEqual(wb.worksheets.map(w => w.name), ['Read me', 'Lists', 'Owners', 'Properties', 'Leases'])
+  assert.equal(wb.getWorksheet('Lists').state, 'hidden')
+  const leases = wb.getWorksheet('Leases')
+  assert.equal(leases.getRow(1).getCell(1).value, 'Lease reference')
+  const lists = wb.getWorksheet('Lists'); const heads = []; lists.getRow(1).eachCell(c => heads.push(c.value))
+  const col = heads.indexOf('owners') + 1; const owners = []; for (let r = 2; r <= 30; r++) { const v = lists.getCell(r, col).value; if (v) owners.push(v) }
+  assert.ok(owners.includes('Srinivasa Rao Kondapalli · ABCPK1234F'), 'existing owners are offered in the dropdown')
+  const dv = Object.entries(leases.dataValidations.model).find(([range]) => range.startsWith('H2')) // Rent paid
+  assert.ok(dv && dv[1].type === 'list' && dv[1].formulae[0].startsWith('Lists!'), 'dropdowns point at the Lists sheet')
+  const ownerDv = Object.entries(wb.getWorksheet('Properties').dataValidations.model).find(([range]) => range.startsWith('L2'))[1] // Owner column
+  assert.match(ownerDv.formulae[0], /^OFFSET\(Lists!\$\w+\$2,0,0,MAX\(1,\d+\+COUNTA\(Owners!\$A\$2:\$A\$1001\)\),1\)$/, 'the owner dropdown grows with the Owners sheet')
+  const liveCol = heads.indexOf('ownersLive') + 1; const first = lists.getCell(owners.length + 2, liveCol).value
+  assert.ok(first && first.formula && first.formula.startsWith('IF(Owners!A2=""'), 'rows typed into Owners feed the dropdown')
+  // one page's own template: just that sheet, owner dropdown = what exists (no live rows to read)
+  res = await fetch(base + '/import/template?sheet=properties', { headers: { Authorization: 'Bearer ' + token } })
+  assert.equal(res.status, 200); assert.match(res.headers.get('content-disposition'), /truspace-properties-template\.xlsx/)
+  const wb2 = new ExcelJS.Workbook(); await wb2.xlsx.load(Buffer.from(await res.arrayBuffer()))
+  assert.deepEqual(wb2.worksheets.map(w => w.name), ['Read me', 'Lists', 'Properties'])
+  const od = Object.entries(wb2.getWorksheet('Properties').dataValidations.model).find(([range]) => range.startsWith('L2'))[1]
+  assert.match(od.formulae[0], /^Lists!\$\w+\$2:\$\w+\$\d+$/)
+  assert.match(String(wb2.getWorksheet('Read me').getCell(1, 1).value), /^TruSpace import — properties$/)
+  assert.equal((await fetch(base + '/import/template?sheet=x', { headers: { Authorization: 'Bearer ' + token } })).status, 400)
+  // owners can't use it
+  const o = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: 'sr.kondapalli@example.com', password: 'Trust@1234' }) })
+  const ot = (await o.json()).data?.accessToken
+  res = await fetch(base + '/import/template', { headers: { Authorization: 'Bearer ' + ot } })
+  assert.equal(res.status, 403)
+})
+
+test('import preview: new, existing and bad rows, references across sheets', async () => {
+  const file = await sheetFile(add => {
+    add('Owners', ['Owner name', 'Owner type', 'PAN', 'GSTIN', 'Mobile', 'Email', 'Address', 'City'], [
+      ['Srinivasa Rao Kondapalli', 'Individual', 'ABCPK1234F', '', '+91 98480 11223', 'sr.kondapalli@example.com', 'Plot 31', 'Hyderabad'], // exists → skip
+      ['New Owner One', 'HUF', 'NEWPO1111A', '36NEWPO1111A1Z5', '+91 90000 00001', 'one@example.com', '12 MG Road', 'Vizag'],
+      ['Bad Owner', 'Individual', 'BADPAN', '', '', 'not-an-email', '', ''],
+      ['New Owner One', 'Individual', 'NEWPO1111A', '', '+91 90000 00002', 'dup@example.com', 'x', ''], // duplicate PAN in file
+    ])
+    add('Properties', ['Site code', 'Property name', 'Use', 'Status', 'Address', 'City', 'Owner'], [
+      ['HYD-BGP-01', 'Begumpet HQ', 'Laboratory', 'Active', 'x', 'Hyderabad', ''], // exists → skip
+      ['VZG-MG-01', 'MG Road Lab', 'Laboratory', 'Active', '12 MG Road', 'Vizag', 'NEWPO1111A'], // owner from this file
+      ['VZG-MG-02', 'Beach Road CC', 'Collection centre', 'Pipeline', '1 Beach Road', 'Vizag', 'Nobody Known'], // bad owner
+      ['VZG-MG-03', 'No status', 'Hospital', 'Open', '2 Beach Road', 'Vizag', 'Srinivasa Rao Kondapalli · ABCPK1234F'], // bad status
+    ])
+    add('Leases', ['Lease reference', 'Property', 'Owner', 'Lease start', 'Lease end', 'Monthly rent (₹)', 'Rent paid', 'Deposit paid'], [
+      ['TDPL-FAC-LSE-001', 'HYD-BGP-01', 'ABCPK1234F', '2023-04-01', '2032-03-31', 320000, 'Advance', 'Yes'], // exists → skip
+      ['VZG-LSE-001', 'VZG-MG-01', 'NEWPO1111A', new Date(Date.UTC(2026, 3, 1)), '31/03/2031', '45,000', 'Arrears', 'Yes'],
+      ['VZG-LSE-002', 'VZG-MG-01', 'NEWPO1111A', '2026-04-01', '2025-04-01', 45000, 'Advance', ''], // end before start
+      ['VZG-LSE-003', 'VZG-MG-02', 'NEWPO1111A', '2026-04-01', '2031-03-31', 45000, 'Advance', ''], // property row has errors
+      ['VZG-LSE-004', 'VZG-MG-01', 'NEWPO1111A', '2026-04-01', '2031-03-31', 45000, '', ''], // rent paid missing
+    ])
+  })
+  const r = await postSheet('/import/preview', file)
+  assert.equal(r.status, 200); assertEnvelope(r)
+  const p = r.body.data
+  assert.deepEqual(p.owners.rows.map(x => x.action), ['skip', 'create', 'error', 'error'])
+  assert.match(p.owners.rows[2].note, /PAN must look like/); assert.match(p.owners.rows[2].note, /Email does not look right/); assert.match(p.owners.rows[2].note, /Mobile is required/)
+  assert.equal(p.owners.rows[3].note, 'Same PAN as row 3')
+  assert.deepEqual(p.properties.rows.map(x => x.action), ['skip', 'create', 'error', 'error'])
+  assert.match(p.properties.rows[2].note, /Owner “Nobody Known” is not in the system or in the Owners sheet/)
+  assert.match(p.properties.rows[3].note, /Status must be one of/)
+  assert.deepEqual(p.leases.rows.map(x => x.action), ['skip', 'create', 'error', 'error', 'error'])
+  assert.match(p.leases.rows[2].note, /Lease end must be after/)
+  assert.match(p.leases.rows[3].note, /Property on row 4 of the Properties sheet has errors/)
+  assert.match(p.leases.rows[4].note, /Rent paid is required/)
+  assert.deepEqual(p.total, { create: 3, skip: 3, error: 7, rows: 13 })
+  assert.equal(r.body.message, 'Ready to add 1 owner new, 1 already there, 2 rows with errors · 1 property new, 1 already there, 2 rows with errors · 1 lease new, 1 already there, 3 rows with errors.')
+  // nothing was saved
+  assert.equal((await call('GET', '/owners?search=New Owner One')).body.data.length, 0)
+})
+
+test('import commit: creates in order with cross-sheet links, skips existing, leaves errors out, is repeatable', async () => {
+  const file = await sheetFile(add => {
+    add('Owners', ['Owner name', 'PAN', 'GSTIN', 'Mobile', 'Email', 'Address', 'Bank', 'IFSC'], [
+      ['New Owner One', 'NEWPO1111A', '36NEWPO1111A1Z5', '+91 90000 00001', 'one@example.com', '12 MG Road', 'SBI', 'sbin0001234'],
+      ['Bad Owner', 'BADPAN', '', '1', 'bad@example.com', 'x', '', ''],
+    ])
+    add('Properties', ['Site code', 'Property name', 'Address', 'City', 'Area (sq ft)', 'Owner'], [
+      ['vzg-mg-01', 'MG Road Lab', '12 MG Road', 'Vizag', '1,200', 'New Owner One'],
+    ])
+    add('Leases', ['Lease reference', 'Property', 'Owner', 'Lease start', 'Lease end', 'Monthly rent (₹)', 'Rent paid', 'Escalation %', 'Escalate every (months)', 'TDS'], [
+      ['VZG-LSE-001', 'VZG-MG-01', 'NEWPO1111A', '2026-04-01', '2031-03-31', 45000, 'Arrears', 5, 12, 'No'],
+      ['VZG-LSE-002', 'VZG-MG-01', 'New Owner One · NEWPO1111A', '2026-04-01', '2031-03-31', 45000, 'Advance', '', '', ''],
+    ])
+  })
+  let r = await postSheet('/import', file)
+  assert.equal(r.status, 201); assertEnvelope(r)
+  assert.equal(r.body.message, 'Added 1 owner, 1 property, 2 leases. 1 row with errors left out.')
+  assert.deepEqual(r.body.data.added, { owners: 1, properties: 1, leases: 2 })
+  const O = (await call('GET', '/owners?search=NEWPO1111A')).body.data[0]
+  assert.equal(O.name, 'New Owner One'); assert.equal(O.ifsc, 'SBIN0001234'); assert.equal(O.acctHolder, 'New Owner One'); assert.equal(O.kind, 'Individual'); assert.equal(O.address, '12 MG Road')
+  const P = (await call('GET', '/properties?search=VZG-MG-01')).body.data[0]
+  assert.equal(P.code, 'VZG-MG-01'); assert.equal(P.ownerId, O.id); assert.equal(P.status, 'Active'); assert.equal(P.area, 1200)
+  const ls = (await call('GET', '/leases?propertyId=' + P.id)).body.data.sort((a, b) => a.ref.localeCompare(b.ref))
+  assert.equal(ls.length, 2)
+  assert.equal(ls[0].ownerId, O.id); assert.equal(ls[0].gstMode, 'Forward'); assert.equal(ls[0].tds, false); assert.equal(ls[0].escPct, 5); assert.equal(ls[0].payTiming, 'Arrears'); assert.equal(ls[0].status, 'Active'); assert.equal(ls[0].dueDay, 5)
+  assert.equal(ls[1].tds, true); assert.equal(ls[1].escPct, 0); assert.equal(ls[1].payTiming, 'Advance')
+  // the schedule works on an imported lease
+  const sch = await call('GET', `/leases/${ls[0].id}/schedule`); assert.equal(sch.status, 200)
+  // the same file again: everything is already there
+  r = await postSheet('/import', file)
+  assert.equal(r.status, 400); assert.match(r.body.message, /Nothing can be added/)
+  assert.equal((await call('GET', '/owners?search=NEWPO1111A')).body.data.length, 1)
+  // a plain-text upload is refused; a broken .xlsx gets a readable message
+  r = await postSheet('/import/preview', new Blob(['hello'], { type: 'text/plain' }), 'notes.txt')
+  assert.equal(r.status, 415)
+  r = await postSheet('/import/preview', new Blob(['hello'], { type: XLSX }))
+  assert.equal(r.status, 400); assert.match(r.body.message, /could not be read as an Excel workbook/)
+})

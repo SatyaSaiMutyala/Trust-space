@@ -7,8 +7,8 @@ import TableHead from '@mui/material/TableHead'
 import TableBody from '@mui/material/TableBody'
 import TableRow from '@mui/material/TableRow'
 import TableCell from '../invoices/TableCell'
-import { S, prop, useStore } from '../../store/store'
-import { newOwner, editOwner, viewOwnerProfile } from '../../store/actions'
+import { S, prop, useStore, isOwner, isFranchisee } from '../../store/store'
+import { newOwner, editOwner, viewOwnerProfile, importOpen } from '../../store/actions'
 import { inr, CUR, pctLabel } from '../../domain/utils'
 import { leaseOf, leaseState, rentFor, maskAcct, leasesOfOwner, isMulti, ownerShare } from '../../domain/lease'
 import { PageHead, Btn, TableCard, Empty } from '../../components/ui/Layout'
@@ -48,7 +48,7 @@ export default function OwnersPage() {
   const U = useServerList('owners-accounts', 'users', { defaults: { limit: 100 }, fixed: { role: 'owner' } })
   return (
     <>
-      <PageHead title="Owners" sub="Landlords of TrustLab premises, their tax status and portal access." actions={<Btn primary onClick={newOwner}>Add owner</Btn>} />
+      <PageHead title="Owners" sub="Landlords of TrustLab premises, their tax status and portal access." actions={<>{isOwner() || isFranchisee() ? null : <Btn onClick={() => importOpen('owners')}>Import from Excel</Btn>}<Btn primary onClick={newOwner}>Add owner</Btn></>} />
       <SampleBanner />
       <ListToolbar list={L} searchPlaceholder="Search name, phone, email, PAN, GSTIN, city or bank">
         <ListFilter list={L} name="kind" label="Type" allLabel="All types" options={KINDS} width={150} />

@@ -32,14 +32,20 @@ function bodyOf(cfg, req) {
   return rest
 }
 
-/** Field checks: required (full records only), allowed values, numbers. Throws one readable 400. */
-function validate(cfg, rec, { partial } = {}) {
+/** Field checks: required (full records only), allowed values, numbers → { field: message } (empty = valid). Also used by the Excel import. */
+export function fieldErrors(cfg, rec, { partial } = {}) {
   const errors = {}
   if (!partial) for (const [f, label] of cfg.required || []) if (isBlank(rec[f])) errors[f] = `${label} is required`
   for (const [f, allowed] of Object.entries(cfg.enums || {})) {
     if (!isBlank(rec[f]) && !allowed.includes(rec[f])) errors[f] = `${cap(fieldLabel(cfg, f))} must be one of: ${allowed.filter(Boolean).join(', ')}`
   }
   for (const f of cfg.numbers || []) if (!isBlank(rec[f]) && !errors[f] && Number.isNaN(Number(rec[f]))) errors[f] = `${cap(fieldLabel(cfg, f))} must be a number`
+  return errors
+}
+
+/** Throws one readable 400 for the field errors of a record. */
+function validate(cfg, rec, { partial } = {}) {
+  const errors = fieldErrors(cfg, rec, { partial })
   const list = Object.values(errors)
   if (list.length === 1) throw badRequest(list[0] + '.', errors)
   if (list.length > 1) throw badRequest(`Please fix ${list.length} fields: ${list.join('; ')}.`, errors)

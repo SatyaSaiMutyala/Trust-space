@@ -1,4 +1,5 @@
 import app from './app.js'
+import { pushEnabled } from './services/push.js'
 import { env } from './config/env.js'
 import { connectDb } from './config/db.js'
 import { startInvoiceScheduler } from './services/invoiceGenerator.js'
@@ -13,6 +14,6 @@ try {
   process.exit(1)
 }
 
-const server = app.listen(env.port, () => console.log(`TruSpace API running on http://localhost:${env.port}/api`))
+const server = app.listen(env.port, () => { console.log(`TruSpace API running on http://localhost:${env.port}/api`); pushEnabled() }) // prints the push status at start
 attachRealtime(server) // live updates (Socket.IO on /socket.io)
 startInvoiceScheduler() // rent invoices on the 1st of every month

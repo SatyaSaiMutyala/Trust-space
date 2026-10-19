@@ -13,6 +13,7 @@ import trashRouter from './routes/trash.js'
 import assetRouter from './routes/assets.js'
 import invoicesRouter from './routes/invoices.js'
 import mobileRouter from './routes/mobile.js'
+import importRouter from './routes/import.js'
 import { notFoundRoute, errorHandler } from './middleware/errors.js'
 
 if (!env.auth.jwtSecret) throw new Error('JWT_SECRET must be set in production.')
@@ -36,6 +37,7 @@ app.use('/api/tds', tdsRouter) // /tds/report etc. — before the generic /tds/:
 app.use('/api/leases', leasesRouter) // /leases/:id/schedule
 app.use('/api/invoices', invoicesRouter) // /invoices/generate — before the generic /invoices/:id routes
 app.use('/api/mobile', mobileRouter) // combined screen data for the phone app
+app.use('/api/import', importRouter) // Excel import of owners, properties and leases
 app.use('/api', reportsRouter) // /ledgers, /rent-roll, /rent-status
 app.use('/api/trash', trashRouter)
 app.use('/api', resourceRouter)

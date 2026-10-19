@@ -19,6 +19,7 @@ export const editOwner = id => openDrawer({ kind: 'owner', id })
 export const newOwner = () => openDrawer({ kind: 'owner' })
 export const newProperty = () => openDrawer({ kind: 'property' })
 export const editProperty = id => openDrawer({ kind: 'property', id })
+export const importOpen = sheet => openDrawer({ kind: 'import', sheet }) // Excel import: 'owners' | 'properties' | 'leases' (the page's own sheet)
 export const openInsp = id => openDrawer({ kind: 'inspect', id })
 export const openSite = id => openDrawer({ kind: 'site', id })
 /** Rent for one month of a co-owned lease, owner by owner. */

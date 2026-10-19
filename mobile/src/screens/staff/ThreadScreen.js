@@ -1,18 +1,19 @@
 /* Messages thread (design p.9) from GET /mobile/threads/:propertyId: pinned header with the owners' avatars, date
    pills, formal-notice and approval-request cards, bubbles with photos and files, and the composer with
-   Message / Notice / Approval request pills and attachments. Sends with POST /messages; opening marks the other
+   a type button (message / formal notice / approval request, picked from a sheet) and attachments. Sends with POST /messages; opening marks the other
    side's messages read. Newest message at the bottom; pull down for older ones. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { colors, ms, s, vs, gutter, fonts, shadows } from '../../theme';
-import { Screen, AppText, IconButton, AvatarGroup, Card, Icon, Chip, MessageBubble, Footer, Skeleton, ErrorState, PhotoPickerSheet, usePhotoPicker, Arch } from '../../components';
+import { Screen, AppText, IconButton, AvatarGroup, Card, Icon, Chip, MessageBubble, Footer, Skeleton, ErrorState, PhotoPickerSheet, usePhotoPicker, Arch, PickerSheet } from '../../components';
 import { useAppSelector } from '../../store/hooks';
 import { joinThread, leaveThread, sendTyping } from '../../store/realtime';
 import { useThreadQuery, useThreadReadMutation, useSendMessageMutation, useOneQuery, errorMessage, fileUrl } from '../../store/api';
 import { uploadAll } from '../../store/uploads';
 
-const KINDS = ['Message', 'Notice', 'Approval request'];
+const KINDS = [{ value: 'Message', label: 'Message' }, { value: 'Notice', label: 'Formal notice' }, { value: 'Approval request', label: 'Approval request' }];
+const KIND_ICON = { Message: 'message', Notice: 'file-text', 'Approval request': 'check-circle' };
 const dayOf = iso => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 const timeOf = iso => (iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '');
 const isImg = f => (f?.type || '').startsWith('image') || /\.(png|jpe?g|webp|gif|heic)$/i.test(f?.name || '');
@@ -44,6 +45,7 @@ export default function ThreadScreen() {
   const [markRead] = useThreadReadMutation();
   const [send, sState] = useSendMessageMutation();
   const [kind, setKind] = useState('Message');
+  const [kindOpen, setKindOpen] = useState(false);
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [err, setErr] = useState('');
@@ -62,6 +64,8 @@ export default function ThreadScreen() {
     if (day) out.push({ type: 'date', key: 'd' + day, text: day });
     return out.reverse();
   }, [d]);
+  const who = side === 'owner' ? 'the facilities team' : d?.people?.length > 1 ? 'the owners' : 'the owner';
+  const placeholder = kind === 'Notice' ? `Formal notice to ${who}…` : kind === 'Approval request' ? `What do you need ${who} to approve?` : `Write to ${who}`;
   const attach = async () => { const got = await pick({ multiple: true, video: true, title: 'Attach' }); if (got.error) { setErr(got.error); return; } if (got.length) setFiles(x => x.concat(got)); };
   const submit = async () => {
     const t = text.trim(); if (!t && !files.length) return;
@@ -122,13 +126,12 @@ export default function ThreadScreen() {
       </View>
     )} footer={(
       <Footer stacked flat hint={err || undefined} hintColor="coralInk">
-        <View style={styles.modes}>
-          {KINDS.map(k => (
-            <Pressable key={k} onPress={() => setKind(k)} style={[styles.mode, kind === k && styles.modeOn]} accessibilityRole="button" accessibilityState={{ selected: kind === k }}>
-              <AppText variant="title" color={kind === k ? 'teal' : 'muted'}>{k}</AppText>
-            </Pressable>
-          ))}
-        </View>
+        {kind !== 'Message' ? (
+          <Pressable onPress={() => setKindOpen(true)} style={styles.kindRow} accessibilityRole="button" accessibilityLabel="Change message type">
+            <Chip label={kind === 'Notice' ? 'Formal notice' : 'Approval request'} tone={kind === 'Notice' ? 'amber' : 'teal'} />
+            <AppText variant="caption" color="muted">Sending as · tap to change</AppText>
+          </Pressable>
+        ) : null}
         {files.length ? (
           <View style={styles.pending}>
             {files.map((f, i) => <Pressable key={i} onPress={() => setFiles(x => x.filter((_, j) => j !== i))} accessibilityLabel="Remove attachment"><Arch photo width={48} height={52} bottomRadius={10} uri={f.uri}><View style={styles.removeChip}><Icon name="x" size={12} color={colors.white} strokeWidth={2.6} /></View></Arch></Pressable>)}
@@ -136,11 +139,12 @@ export default function ThreadScreen() {
           </View>
         ) : null}
         <View style={styles.composerRow}>
-          <IconButton name="paperclip" onPress={attach} accessibilityLabel="Attach" />
+          <IconButton name={KIND_ICON[kind]} variant={kind === 'Message' ? 'sunk' : 'mist'} size={46} iconSize={22} onPress={() => setKindOpen(true)} accessibilityLabel="Message type" />
           <View style={styles.composer}>
-            <TextInput value={text} onChangeText={v => { setText(v); if (v) sendTyping(propertyId); }} placeholder={side === 'owner' ? 'Write to the facilities team' : d?.people?.length > 1 ? 'Write to the owners' : 'Write to the owner'} placeholderTextColor={colors.muted} style={styles.input} multiline accessibilityLabel="Message" />
+            <IconButton name="paperclip" size={36} iconSize={20} color={colors.muted} onPress={attach} accessibilityLabel="Attach" style={styles.clip} />
+            <TextInput value={text} onChangeText={v => { setText(v); if (v) sendTyping(propertyId); }} placeholder={placeholder} placeholderTextColor={colors.muted} style={styles.input} multiline accessibilityLabel="Message" />
           </View>
-          <IconButton name="arrow-right" variant="teal" size={54} iconSize={24} onPress={submit} accessibilityLabel="Send" disabled={sState.isLoading} />
+          <IconButton name="arrow-right" variant="teal" size={46} iconSize={22} onPress={submit} accessibilityLabel="Send" disabled={sState.isLoading} />
         </View>
       </Footer>
     )}>
@@ -149,6 +153,7 @@ export default function ThreadScreen() {
           : <FlatList ref={listRef} data={rows} inverted keyExtractor={r => r.key} renderItem={render} contentContainerStyle={styles.list} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled"
               ListEmptyComponent={<View style={styles.emptyFlip}><AppText variant="body" color="muted" center>No messages yet. Start the conversation below.</AppText></View>} />}
       <PhotoPickerSheet {...pickerProps} />
+      <PickerSheet open={kindOpen} onClose={() => setKindOpen(false)} title="Send as" options={KINDS} value={kind} onSelect={setKind} />
     </Screen>
   );
 }
@@ -177,13 +182,13 @@ const styles = StyleSheet.create({
   image: { width: s(220), height: vs(160), borderRadius: ms(16), backgroundColor: colors.photo },
   file: { flexDirection: 'row', alignItems: 'center', gap: s(8), backgroundColor: colors.white, borderRadius: ms(14), paddingHorizontal: s(12), paddingVertical: vs(10), maxWidth: s(240) },
   fileOut: { backgroundColor: colors.teal },
-  modes: { flexDirection: 'row', gap: s(6), marginBottom: vs(10) },
-  mode: { paddingHorizontal: s(14), height: vs(40), borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  modeOn: { backgroundColor: colors.tealTint },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(8) },
   pending: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(10), flexWrap: 'wrap' },
   removeChip: { position: 'absolute', top: 4, right: 4, width: ms(18), height: ms(18), borderRadius: ms(9), backgroundColor: 'rgba(16,32,30,0.8)', alignItems: 'center', justifyContent: 'center' },
-  composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: s(8) },
-  composer: { flex: 1, minHeight: vs(54), maxHeight: vs(130), borderRadius: ms(27), backgroundColor: colors.sunk, paddingHorizontal: s(18), paddingVertical: vs(14), justifyContent: 'center' },
-  input: { fontFamily: fonts.body, fontSize: ms(15), color: colors.ink, paddingVertical: 0, maxHeight: vs(100) },
+  composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: s(10) },
+  // one rounded field: clip inside on the left, text beside it; the send circle sits outside and matches the field's height
+  composer: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', minHeight: ms(46), maxHeight: vs(130), borderRadius: ms(23), backgroundColor: colors.sunk, paddingLeft: s(6), paddingRight: s(16), paddingVertical: ms(5) },
+  clip: { marginBottom: 0 },
+  input: { flex: 1, fontFamily: fonts.body, fontSize: ms(15), lineHeight: ms(20), color: colors.ink, paddingVertical: ms(8), paddingTop: ms(8), maxHeight: vs(110) },
   flex: { flex: 1 },
 });
