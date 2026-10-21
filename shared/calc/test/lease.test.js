@@ -162,3 +162,17 @@ test('rent changes as per the agreement: the rule runs in between, a change repl
   const E = { ...only, end: '2037-03-31', extensions: [{ id: 'x', fromEnd: '2035-03-31', toEnd: '2037-03-31', rent: 33000, rentFrom: '2035-04-01' }] }
   assert.equal(rentFor(E, '2035-04'), 33000); assert.equal(resolvedRentSteps(E).length, 4)
 })
+
+test('a repeating rent change: 10% every 12 months from 2030 until Mar 2035 pauses the 15% rule, which resumes after', async () => {
+  const { resolvedRentSteps, nextEsc: ne } = await import('../lease.js')
+  const L = { id: 'rep', start: '2026-04-01', end: '2038-03-31', rent: 20000, escType: 'Compound', escPct: 15, escEvery: 12, escFrom: 'Lease start', fitout: 0, payTiming: 'Advance', dueDay: 5, gstMode: 'None', tds: false, maintType: 'None', ownerId: 'o1',
+    rentSteps: [{ id: 'a', from: '2030-04-01', kind: 'pct', value: 10, every: 12, until: '2035-03-31' }] }
+  // rule: Apr 2027 23000, Apr 2028 26450, Apr 2029 30417; then 10% yearly 2030–2034 (rule paused); then the rule again, 12 months after the last change
+  assert.deepEqual(resolvedRentSteps(L).map(s => [s.from, s.before, s.rent]), [['2030-04-01', 30417, 33459], ['2031-04-01', 33459, 36805], ['2032-04-01', 36805, 40486], ['2033-04-01', 40486, 44535], ['2034-04-01', 44535, 48989]])
+  assert.equal(rentFor(L, '2029-06'), 30417); assert.equal(rentFor(L, '2030-04'), 33459); assert.equal(rentFor(L, '2032-10'), 40486, 'no 15% inside the window'); assert.equal(rentFor(L, '2034-12'), 48989)
+  assert.equal(rentFor(L, '2035-04'), Math.round(48989 * 1.15), 'the rule resumes on the yearly cadence after the window'); assert.equal(ne(L, '2035-05-01'), '2036-04-01')
+  // repeat to the end of the lease when Until is blank, stopped early by a later change
+  const M = { ...L, rentSteps: [{ id: 'a', from: '2030-04-01', kind: 'pct', value: 10, every: 12 }, { id: 'b', from: '2033-04-01', kind: 'rent', value: 50000 }] }
+  assert.deepEqual(resolvedRentSteps(M).map(s => [s.from, s.rent]), [['2030-04-01', 33459], ['2031-04-01', 36805], ['2032-04-01', 40486], ['2033-04-01', 50000]])
+  assert.equal(rentFor(M, '2034-04'), 57500, 'after the one-off change the rule runs again')
+})

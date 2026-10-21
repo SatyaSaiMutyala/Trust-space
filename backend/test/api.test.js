@@ -582,6 +582,8 @@ test('rent changes as per the agreement: validated and used by the schedule inst
   assert.equal(r.status, 400); assert.match(r.body.message, /% increase, a ₹ increase or a new rent/)
   r = await put({ rentSteps: [{ id: 'a', from: '2026-04-01', kind: 'pct', value: 10 }, { id: 'b', from: '2026-04-01', kind: 'pct', value: 5 }] })
   assert.equal(r.status, 400); assert.match(r.body.message, /Two rent changes on 2026-04-01/)
+  r = await put({ rentSteps: [{ id: 'a', from: '2026-04-01', kind: 'pct', value: 10, every: 12, until: '2025-01-01' }] })
+  assert.equal(r.status, 400); assert.match(r.body.message, /“Until” on the rent change of 2026-04-01 must be a date after it/)
   r = await put({ rentSteps: [{ id: 'a', from: '2026-04-01', kind: 'pct', value: 10 }, { id: 'b', from: '2027-04-01', kind: 'amt', value: 5000 }, { id: 'c', from: '2028-04-01', kind: 'rent', value: 400000 }] })
   assert.equal(r.status, 200, r.body.message)
   const sch = (await call('GET', '/leases/l1/schedule')).body.data
@@ -1139,7 +1141,7 @@ test('import commit: creates in order with cross-sheet links, skips existing, le
   const csFile = await sheetFile(add => {
     add('Owners', ['Owner name', 'Owner or co-share', 'PAN', 'GSTIN', 'Mobile', 'Email', 'Address'], [['Share Holder', 'Co-share', 'SHRPH1111A', '36SHRPH1111A1Z1', '+91 90000 00009', 'share@example.com', 'x']])
     add('Leases', ['Lease reference', 'Property', 'Owner', 'Lease start', 'Lease end', 'Monthly rent (₹)', 'Rent paid', 'Co-shares', 'Rent changes'], [
-      ['VZG-LSE-010', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'SHRPH1111A:25', '2029-05-01:10%, 2030-05-01:+2000, 2031-01-01:60000'],
+      ['VZG-LSE-010', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'SHRPH1111A:25', '2029-05-01:10%, 2030-05-01:+2000/12 to 2032-12-31, 2033-01-01:60000'],
       ['VZG-LSE-011', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'SHRPH1111A:100'],
       ['VZG-LSE-012', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'NOBODY9999Z:10'],
     ])
@@ -1151,5 +1153,5 @@ test('import commit: creates in order with cross-sheet links, skips existing, le
   const csO = (await call('GET', '/owners?search=SHRPH1111A')).body.data[0]; assert.equal(csO.party, 'Co-share'); assert.equal(csO.gstin, '')
   const csL = (await call('GET', '/leases?search=VZG-LSE-010')).body.data[0]
   assert.deepEqual(csL.owners.map(x => [x.ownerId === csO.id ? 'cs' : 'owner', x.rent, x.dep, x.gst, x.role]), [['owner', 75, 100, '', undefined], ['cs', 25, 0, 'None', 'coShare']])
-  assert.deepEqual(csL.rentSteps.map(s => [s.from, s.kind, s.value]), [['2029-05-01', 'pct', 10], ['2030-05-01', 'amt', 2000], ['2031-01-01', 'rent', 60000]])
+  assert.deepEqual(csL.rentSteps.map(s => [s.from, s.kind, s.value, s.every, s.until]), [['2029-05-01', 'pct', 10, 0, ''], ['2030-05-01', 'amt', 2000, 12, '2032-12-31'], ['2033-01-01', 'rent', 60000, 0, '']])
 })

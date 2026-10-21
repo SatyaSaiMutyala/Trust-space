@@ -89,7 +89,7 @@ export const SHEETS = {
       { key: 'escEvery', label: 'Escalate every (months)', kind: 'number', def: 0, width: 20, note: '12 = yearly, 36 = every 3 years.' },
       { key: 'escType', label: 'Escalation type', list: 'escType', def: 'Compound', width: 14, note: 'Compound = % on the last rent. Simple = % on the base rent. Amount = fixed ₹ each time.' },
       { key: 'escFrom', label: 'Escalation from', list: 'escFrom', def: 'Lease start', width: 18 },
-      { key: 'rentSteps', label: 'Rent changes', width: 34, note: 'Increases that differ from the escalation rule (the rule still runs in between and continues after the last one). Each change as date:increase, separated by commas — 2029-04-01:10% (percent), 2030-04-01:+2000 (₹ added), 2031-04-01:27000 (new rent).' },
+      { key: 'rentSteps', label: 'Rent changes', width: 40, note: 'Increases that differ from the escalation rule (the rule still runs in between and continues after). Each change as date:increase, separated by commas — 2029-04-01:10% (percent), 2030-04-01:+2000 (₹ added), 2031-04-01:27000 (new rent). To repeat, add /months and optionally a stop date: 2030-04-01:10%/12 to 2035-03-31.' },
       { key: 'gstMode', label: 'GST on rent', list: 'gstMode', width: 12, note: 'Blank = Forward when the owner has a GSTIN, otherwise RCM.' },
       { key: 'tds', label: 'TDS', kind: 'bool', list: 'yesNo', def: 'Yes', width: 8 },
       { key: 'maintType', label: 'Maintenance', list: 'maintType', def: 'Fixed monthly', width: 16 },

@@ -17,8 +17,8 @@ export function renewLease(id) {
  *  the addendum reference and file. Recorded in L.extensions; invoices already raised are untouched. */
 /** Rent changes rows of the lease form: [{ id, from, kind, value }] (fields rs-id, rs-from, rs-kind, rs-value, one per row). */
 export function readRentSteps(fd) {
-  const g = k => fd.getAll(k); const ids = g('rs-id'), from = g('rs-from'), kind = g('rs-kind'), value = g('rs-value')
-  return ids.map((id, i) => ({ id: id || newId(), from: from[i] || '', kind: kind[i] || 'pct', value: num(value[i]) })).filter(s => s.from || s.value)
+  const g = k => fd.getAll(k); const ids = g('rs-id'), from = g('rs-from'), kind = g('rs-kind'), value = g('rs-value'), every = g('rs-every'), until = g('rs-until')
+  return ids.map((id, i) => ({ id: id || newId(), from: from[i] || '', kind: kind[i] || 'pct', value: num(value[i]), every: num(every[i]), until: until[i] || '' })).filter(s => s.from || s.value)
 }
 
 export async function submitExtension(id, fd) {

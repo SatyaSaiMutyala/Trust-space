@@ -346,9 +346,9 @@ export async function planImport(buffer) {
     const steps = []
     if (v.rentSteps) {
       for (const part of String(v.rentSteps).split(/[,;\n]+/).map(s => s.trim()).filter(Boolean)) {
-        const m = part.match(/^(\d{4}-\d{2}-\d{2})\s*[:=]\s*(\+?)\s*([\d.]+)\s*(%?)$/)
-        if (!m) { errors.rentSteps = `Rent changes must be written as date:increase, e.g. 2029-04-01:10% or 2030-04-01:+2000 or 2031-04-01:27000 — “${part}” is not`; break }
-        steps.push({ id: `rs${steps.length + 1}`, from: m[1], kind: m[4] ? 'pct' : m[2] ? 'amt' : 'rent', value: Number(m[3]) })
+        const m = part.match(/^(\d{4}-\d{2}-\d{2})\s*[:=]\s*(\+?)\s*([\d.]+)\s*(%?)\s*(?:\/\s*(\d+)\s*(?:to\s*(\d{4}-\d{2}-\d{2}))?)?$/i)
+        if (!m) { errors.rentSteps = `Rent changes must be written as date:increase, e.g. 2029-04-01:10% or 2030-04-01:+2000 or 2031-04-01:27000, with /12 to repeat yearly and “to 2035-03-31” to stop — “${part}” is not`; break }
+        steps.push({ id: `rs${steps.length + 1}`, from: m[1], kind: m[4] ? 'pct' : m[2] ? 'amt' : 'rent', value: Number(m[3]), every: m[5] ? Number(m[5]) : 0, until: m[6] || '' })
       }
     }
     // GST default follows the owner's registration
