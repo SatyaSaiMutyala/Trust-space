@@ -62,7 +62,7 @@ export default function ToApproveScreen() {
   ) : state === 'Verified' ? (
     <SwipeToApprove onApprove={approve} onReject={() => setReject(true)} style={styles.flex} />
   ) : (
-    <View style={styles.doneRow}><AppText variant="body" color="muted" style={styles.flex}>{state === 'Submitted' ? 'Not verified yet. Accounts verify it on the web first.' : `This invoice is ${state.toLowerCase()}.`}</AppText><Button title={i < list.length - 1 ? 'Next' : 'Done'} variant="secondary" onPress={next} /></View>
+    <View style={styles.doneRow}><AppText variant="body" color="muted" style={styles.flex}>{state === 'Submitted' ? 'Not verified yet. Accounts verify it on the web first.' : `This ${inv.voucher ? 'payment' : 'invoice'} is ${state.toLowerCase()}.`}</AppText><Button title={i < list.length - 1 ? 'Next' : 'Done'} variant="secondary" onPress={next} /></View>
   );
   return (
     <Screen bg="canvas" padded={false} footer={footer ? <Footer hint={err || undefined} hintColor="coralInk">{footer}</Footer> : null}>
@@ -83,11 +83,11 @@ export default function ToApproveScreen() {
                       <Avatar initials={initials(O?.name)} size={44} />
                       <View style={styles.flex}>
                         <AppText variant="title">{O?.name || inv.ownerId}</AppText>
-                        <AppText variant="small" color="muted" style={styles.ownerSub}>{props.name(inv.propertyId)}{inv.source === 'Generated' ? ' · generated from the lease' : ''}</AppText>
+                        <AppText variant="small" color="muted" style={styles.ownerSub}>{props.name(inv.propertyId)}{inv.voucher ? ' · co-share rent payment, no GST' : inv.source === 'Generated' ? ' · generated from the lease' : ''}</AppText>
                       </View>
                       {state === 'Rejected' ? <Chip label="Rejected" tone="coral" /> : null}
                     </View>
-                    <AppText variant="body" color="muted" style={styles.period}>{perLabel(inv.period)} {inv.type.toLowerCase()}, net payable · {inv.number}</AppText>
+                    <AppText variant="body" color="muted" style={styles.period}>{perLabel(inv.period)} {inv.voucher ? 'rent payment' : inv.type.toLowerCase()}, net payable · {inv.number}</AppText>
                     <AppText variant="monoXxl" style={styles.net} numberOfLines={1} adjustsFontSizeToFit>{inr(inv.net)}</AppText>
                     <KeyValueRow label={inv.type === 'Rent' ? 'Rent' : inv.type} value={inr(inv.base)} />
                     {inv.gst ? <KeyValueRow label="GST 18%" value={`+ ${inr(inv.gst)}`} /> : inv.rcm ? <KeyValueRow label="GST under RCM (paid by us)" value={inr(inv.rcm)} /> : null}

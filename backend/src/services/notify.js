@@ -12,7 +12,7 @@ import { pushToUsers, ownerUsers, tenantUsers, propertyOwnerIds } from './push.j
 import { emitUsers, emitThread } from './realtime.js'
 import { models } from '../models/index.js'
 import { User } from '../models/auth.js'
-import { perLabel, inr } from '../../../shared/calc/index.js'
+import { perLabel, inr, fmtD } from '../../../shared/calc/index.js'
 
 const propName = async id => (id ? (await models.properties.findById(id, { name: 1 }).lean())?.name || '' : '')
 const ownerName = async id => (id ? (await models.owners.findById(id, { name: 1 }).lean())?.name || '' : '')
@@ -38,14 +38,14 @@ export const notify = {
   }),
 
   invoiceChanged: safe(async (prev, inv, user) => {
-    const P = await propName(inv.propertyId); const what = `${inv.type} ${perLabel(inv.period)} · ${inr(inv.net)}`
+    const P = await propName(inv.propertyId); const what = `${inv.voucher ? 'Rent payment' : inv.type} ${perLabel(inv.period)} · ${inr(inv.net)}`; const W = inv.voucher ? 'Rent payment' : 'Invoice'
     if (!prev) { // new invoice
       if (inv.source === 'Generated' && inv.generated) return null // the monthly batch: no push per invoice
       if (user?.role === 'owner') return toTenant(inv.propertyId, { title: 'Owner sent an invoice', body: `${await ownerName(inv.ownerId)} · ${what} · ${P}`, link: 'truspace://invoices', web: `/?invoice=${inv.id}`, tag: 'invoices' }, user)
-      return toOwners([inv.ownerId], { title: 'Invoice recorded for you', body: `${what} · ${P}`, link: 'truspace://invoices', web: `/?invoice=${inv.id}`, tag: 'invoices' }, user)
+      return toOwners([inv.ownerId], { title: `${W} recorded for you`, body: `${what} · ${P}`, link: 'truspace://invoices', web: `/?invoice=${inv.id}`, tag: 'invoices' }, user)
     }
     if (prev.status === inv.status) return null
-    const T = { Verified: ['Invoice checked', 'Verified by accounts, awaiting approval'], Approved: ['Invoice approved', 'Approved for payment'], Paid: ['Payment made', `Paid ${inr(inv.paidAmount || inv.net)}${inv.utr && inv.utr !== 'Deposit adjustment' ? ` · UTR ${inv.utr}` : inv.paidBy === 'Deposit' ? ' · from the deposit' : ''}`], Rejected: ['Invoice sent back', inv.reason ? `Reason: ${short(inv.reason, 80)}` : 'Please check and raise it again'] }[inv.status]
+    const T = { Verified: [`${W} checked`, 'Verified by accounts, awaiting approval'], Approved: [`${W} approved`, 'Approved for payment'], Paid: ['Payment made', `Paid ${inr(inv.paidAmount || inv.net)}${inv.utr && inv.utr !== 'Deposit adjustment' ? ` · UTR ${inv.utr}` : inv.paidBy === 'Deposit' ? ' · from the deposit' : ''}`], Rejected: [`${W} sent back`, inv.reason ? `Reason: ${short(inv.reason, 80)}` : 'Please check and raise it again'] }[inv.status]
     if (!T) return null
     return toOwners([inv.ownerId], { title: T[0], body: `${what} · ${T[1]}`, link: 'truspace://invoices', web: `/?invoice=${inv.id}`, tag: `invoice:${inv.id}` }, user)
   }),
@@ -80,6 +80,15 @@ export const notify = {
     }
   }),
 
+  /** A new entry in L.extensions: tell every owner of the lease. */
+  leaseExtended: safe(async (prev, L, user) => {
+    const before = (prev && prev.extensions) || []; const now = L.extensions || []
+    if (now.length <= before.length) return null
+    const e = now[now.length - 1]; const P = await propName(L.propertyId)
+    const ids = [...new Set((Array.isArray(L.owners) && L.owners.length ? L.owners.map(o => o.ownerId) : [L.ownerId]).filter(Boolean))]
+    return toOwners(ids, { title: 'Lease extended', body: `${P} · now until ${fmtD(e.toEnd)}${+e.rent > 0 ? ` · rent ${inr(e.rent)} from ${fmtD(e.rentFrom)}` : ' · rent as before'}${e.ref ? ` · ${short(e.ref, 40)}` : ''}`, link: 'truspace://home', web: `/?lease=${L.id}`, tag: `lease:${L.id}` }, user)
+  }),
+
   signupPending: safe(async u => {
     const ids = (await User.find({ role: { $in: ['admin', 'staff'] }, status: 'active' }, { _id: 1 }).lean()).map(x => x._id)
     return pushToUsers(ids, { title: 'New owner sign-up', body: `${u.name} · ${u.signup?.propertyCode || u.signup?.propertyName || 'property to link'} · approve on Portal access`, link: 'truspace://home', web: '/?access', tag: 'signups' })
@@ -94,7 +103,7 @@ export const notify = {
     if (path === 'invoices') return notify.invoiceChanged(prev, rec, user)
     if (path === 'tickets') return notify.ticketSaved(prev, rec, user)
     if (path === 'inspections') return notify.inspectionSaved(prev, rec, user)
-    if (path === 'leases') return notify.leaseSaved(prev, rec, user)
+    if (path === 'leases') { await notify.leaseExtended(prev, rec, user); return notify.leaseSaved(prev, rec, user) }
     return null
   }),
 }

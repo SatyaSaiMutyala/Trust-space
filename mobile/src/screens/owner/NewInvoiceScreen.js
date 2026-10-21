@@ -5,9 +5,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, ms, s, vs } from '../../theme';
-import { Screen, AppText, Header, Segmented, Input, FilterChip, Footer, Button, PhotoArch, Dropdown, Checkbox, PhotoPickerSheet, usePhotoPicker, Skeleton } from '../../components';
+import { Screen, AppText, Header, Segmented, Input, FilterChip, Footer, Button, PhotoArch, Dropdown, Checkbox, PhotoPickerSheet, usePhotoPicker, Skeleton, EmptyState } from '../../components';
 import { useAppSelector, useLookup } from '../../store/hooks';
-import { useInvoiceDefaultsQuery, useCreateRecordMutation, errorMessage, inr, perLabel, todayISO } from '../../store/api';
+import { useInvoiceDefaultsQuery, useOneQuery, useCreateRecordMutation, errorMessage, inr, perLabel, todayISO } from '../../store/api';
 import { uploadAll } from '../../store/uploads';
 
 const TYPES = ['Rent', 'Electricity', 'Maintenance', 'Water', 'Other'];
@@ -18,6 +18,8 @@ export default function NewInvoiceScreen() {
   const route = useRoute();
   const { user } = useAppSelector(st => st.auth);
   const props = useLookup('properties');
+  const me = useOneQuery({ resource: 'owners', id: user?.ownerId }, { skip: !user?.ownerId });
+  const coShare = me.data?.data?.party === 'Co-share';
   const [mode, setMode] = useState('make');
   const [type, setType] = useState('Rent');
   const [property, setProperty] = useState(route.params?.propertyId || '');
@@ -58,6 +60,7 @@ export default function NewInvoiceScreen() {
       nav.goBack();
     } catch (e) { setErr(e.message && !e.status ? e.message : errorMessage(e)); }
   };
+  if (coShare) return <Screen><Header heading="New invoice" /><EmptyState title="Nothing to raise" body="As a co-share you do not raise invoices. Your share of the rent is generated as a payment each month and paid to your bank." /></Screen>;
   return (
     <Screen footer={<Footer hint={err || (D?.duplicate ? `${type} for ${perLabel(period)} already sent (${D.duplicate.status}).` : D?.note || undefined)} hintColor={err || D?.duplicate ? 'coralInk' : 'muted'}><Button title="Send invoice" variant="primary" full onPress={submit} loading={cState.isLoading} disabled={!D || !!D.duplicate} /></Footer>}>
       <Header heading="New invoice" />

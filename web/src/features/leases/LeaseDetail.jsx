@@ -8,8 +8,8 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { useStore, UI, isOwner, role, owner } from '../../store/store'
 import { editLease, depAdjOpen } from '../../store/actions'
-import { CUR, fmtD, inr, perLabel, perAdd, addDays, ordinal, pctLabel } from '../../domain/utils'
-import { leaseState, lockEnd, nextEsc, rentFor, noticeBy, noticeByLessor, noticeLessee, noticeLessor, rentStartOf, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, tdsRate, panValid } from '../../domain/lease'
+import { CUR, TODAY, fmtD, inr, perLabel, perAdd, addDays, ordinal, pctLabel } from '../../domain/utils'
+import { leaseState, lockEnd, lockEndLessor, lockInLessee, lockInLessor, nextEsc, rentFor, rentBaseAt, escOn, escLabel, noticeBy, noticeByLessor, noticeLessee, noticeLessor, rentStartOf, isMulti, leaseOwners, ownerGstMode, tdsPerOwner, depAdjs, tdsRate, panValid } from '../../domain/lease'
 import { useLeaseDeposit } from './useLeaseDeposit'
 import { TableSkeleton } from '../../components/ui/Skeletons'
 import { useLeaseSchedule } from './useLeaseSchedule'
@@ -17,6 +17,8 @@ import { Btn, Panel, FactGrid, Kpis, Kpi, Banner, Section } from '../../componen
 import { StatusChip, Seg } from '../../components/ui/Status'
 import LeaseInspections from '../inspections/LeaseInspections'
 import { activateLease, renewLease, schedMode, schedCsv } from './actions'
+import { extendOpen } from '../../store/actions'
+import { FileLinks } from '../../components/ui/Media'
 import OwnersBlock from './OwnersBlock'
 import DepAdjTable from './DepAdjTable'
 
@@ -228,7 +230,7 @@ export function ScheduleTable({ sc, L, mode }) {
 }
 
 /** One-line description of the schedule: term, escalation, payment timing. */
-const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${L.escPct ? `${L.escPct}% every ${L.escEvery} months, ${L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : L.payTiming === 'Advance' ? 'paid in advance' : 'advance/arrears not set'}`
+const schedSub = (L, sc) => `${fmtD(L.start)} to ${fmtD(sc.end)}${sc.end !== L.end ? ' (exit date)' : ''} · ${escOn(L) ? `${escLabel(L)}, ${L.escType === 'Amount' ? 'fixed amount' : L.escType === 'Simple' ? 'simple' : 'compounded'}` : 'no escalation'} · ${L.payTiming === 'Arrears' ? 'paid in arrears' : L.payTiming === 'Advance' ? 'paid in advance' : 'advance/arrears not set'}`
 
 /** Rent schedule — full term, with Monthly/Yearly toggle and CSV download (schedulePanel). headerless: the caller shows the title.
     The schedule comes from the API (useLeaseSchedule). */
@@ -272,16 +274,16 @@ export default function LeaseDetail({ L }) {
       actions={<div className="actions"><StatusChip label={st} />{o ? null : <>
         <Btn sm onClick={() => editLease(L.id)}>Edit</Btn>
         {st === 'Draft' ? <Btn sm primary onClick={() => activateLease(L.id)}>Mark signed &amp; active</Btn> : null}
-        {['Active', 'Renewal due', 'Expired'].includes(st) ? <Btn sm onClick={() => renewLease(L.id)}>Renew</Btn> : null}
+        {['Active', 'Renewal due', 'Expired'].includes(st) ? <><Btn sm onClick={() => extendOpen(L.id)}>Extend</Btn><Btn sm onClick={() => renewLease(L.id)}>Renew</Btn></> : null}
         {['Active', 'Renewal due', 'Expired', 'Notice period'].includes(st) && +L.deposit ? <Btn sm onClick={() => depAdjOpen(L.id)}>Adjust deposit against rent</Btn> : null}
       </>}</div>}
     >
       <Box sx={{ display: 'grid', gap: '14px', gridTemplateColumns: 'minmax(0,1fr)' }}>
         <Section title="Lease terms"><FactGrid items={[
-          ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span><span className="muted small">/mo</span></>, `Base rent ${inr(L.rent)}`],
-          ['Escalation', L.escPct ? `${L.escPct}% every ${L.escEvery} months` : 'None', L.escPct ? `${L.escType === 'Simple' ? 'Simple, on base rent' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}${ne ? ' · next ' + fmtD(ne) : ''}` : null],
-          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, dep?.adjusted ? `${inr(dep.adjusted)} adjusted against rent · ${inr(dep.held)} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'],
-          ['Lock-in', L.lockIn ? `${L.lockIn} months` : 'None', L.lockIn ? `Ends ${fmtD(le)}` : null],
+          ['Current rent', <><span className="mono">{inr(rentFor(L, CUR))}</span><span className="muted small">/mo</span></>, rentBaseAt(L, TODAY).step ? `Revised rent ${inr(rentBaseAt(L, TODAY).base)} from ${fmtD(rentBaseAt(L, TODAY).anchor)} (extension)` : `Base rent ${inr(L.rent)}`],
+          ['Escalation', escOn(L) ? escLabel(L) : 'None', escOn(L) ? `${L.escType === 'Amount' ? 'Fixed amount added' : L.escType === 'Simple' ? 'Simple, on base rent' : 'Compounded'} from ${L.escFrom === 'Rent commencement' ? 'rent commencement' : 'lease start'}${ne ? ' · next ' + fmtD(ne) : ''}` : null],
+          ['Security deposit', <><span className="mono">{inr(L.deposit)}</span>{L.depositPaid ? <StatusChip label="Paid" k="ok" /> : <StatusChip label="Pending" k="warn" />}</>, `${dep?.adjusted ? `${inr(dep.adjusted)} adjusted against rent · ${inr(dep.held)} held` : L.depositPaid ? 'Refundable at exit' : 'Not yet paid to the owner'}${L.depositPaid && (L.depositChannel || L.depositBank || L.depositUtr) ? ` · paid${L.depositChannel ? ' by ' + L.depositChannel : ''}${L.depositBank ? ' from ' + L.depositBank : ''}${L.depositUtr ? ' · ' + L.depositUtr : ''}` : ''}`],
+          ['Lock-in', lockInLessee(L) || lockInLessor(L) ? `Lessee ${lockInLessee(L)} mo · Lessor ${lockInLessor(L)} mo` : 'None', le || lockEndLessor(L) ? `Tenant bound until ${le ? fmtD(le) : '—'}${lockInLessor(L) !== lockInLessee(L) ? ` · owner until ${lockEndLessor(L) ? fmtD(lockEndLessor(L)) : '—'}` : ''}` : null],
           ['Notice period', `Lessee ${noticeLessee(L)} mo · Lessor ${noticeLessor(L)} mo`, `Tenant serves by ${fmtD(noticeBy(L))}${noticeLessor(L) !== noticeLessee(L) ? ` · owner by ${fmtD(noticeByLessor(L))}` : ''}`],
           ['Rent payment', !L.payTiming ? <StatusChip key="pt" label="Not set" k="warn" /> : L.payTiming === 'Arrears' ? 'In arrears — billed next month' : 'In advance — billed same month', !L.payTiming ? 'Choose advance or arrears in the lease' : `By the ${ordinal(L.dueDay)} ${L.payTiming === 'Arrears' ? 'of the following month' : 'of the month'}`],
           ['Rent-free period', `${L.fitout || 0} days`, `Rent from ${fmtD(rentStartOf(L))}`],
@@ -297,6 +299,7 @@ export default function LeaseDetail({ L }) {
         ]} /></Section>
         {isMulti(L) || (!o && L.status !== 'Draft') ? <Section title={isMulti(L) ? 'Owners & share of payments' : 'Owner'} sub={isMulti(L) ? null : 'Add a co-owner here if the property changes hands in part'}><OwnersBlock L={L} heading={false} /></Section> : null}
         {depAdjs(L, null, true).length ? <Section title="Security deposit adjusted against rent"><DepAdjTable L={L} heading={false} /></Section> : null}
+        {(L.extensions || []).length ? <Section title="Extensions" sub="The same agreement, running longer. Earlier invoices and the ledger were not changed."><div className="list">{L.extensions.slice().reverse().map(x => <div key={x.id} className="li"><span className="when">{fmtD(x.at)}</span><div className="grow"><div>Extended from {fmtD(x.fromEnd)} to <b>{fmtD(x.toEnd)}</b>{+x.rent > 0 ? <> · rent <span className="mono">{inr(x.rent)}</span> from {fmtD(x.rentFrom)}</> : ' · rent as before'}</div><div className="small muted">{x.ref || 'No reference'} · {x.by}{x.file ? <> · <FileLinks files={[x.file]} /></> : null}</div></div></div>)}</div></Section> : null}
         <Section title="Key clauses"><div style={{ maxWidth: '75ch' }}>{L.clauses || '—'}</div></Section>
         <Section title="Joint inspections"><LeaseInspections L={L} /></Section>
         {!sc ? <Section title="Rent schedule — full term"><TableSkeleton rows={6} cols={8} panel={false} /></Section>

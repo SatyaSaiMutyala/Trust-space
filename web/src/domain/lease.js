@@ -13,10 +13,16 @@ import { TODAY, daysTo, fmtD, by, fy, inr, nowISO } from './utils'
 export const calcCtx = () => C.makeCtx({ today: TODAY, invoices: S.invoices, me: isOwner() ? role().ownerId : null, ownerView: isOwner(), ownerOf: id => ALL.owners.find(o => o.id === id) || owner(id), ownerName: id => owner(id)?.name, propOf: prop })
 
 /* ---------- pure functions, re-exported unchanged ---------- */
-export const { rentStartOf, escAnchor, escSteps, escAmt, rentFor, leaseOwners, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, noticeBy, noticeByLessor, noticeLessee, noticeLessor, noticeOf, depositOwners, allLeaseOwners } = C
+export const { rentStartOf, escAnchor, escSteps, escAmt, escOn, escLabel, rentFor, rentAt, rentBaseAt, rentSteps, leaseOwners, isCoShare, leaseParties, leaseCoShares, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, lockEndLessor, lockEndOf, lockInLessee, lockInLessor, lockInOf, noticeBy, noticeByLessor, noticeLessee, noticeLessor, noticeOf, depositOwners, allLeaseOwners } = C
 
 /* ---------- bound to today / the store ---------- */
 export const nextEsc = L => C.nextEsc(L, TODAY)
+/* Co-shares: an owner record with party 'Co-share' is paid a share of the rent (TDS on their PAN) but is not on the
+   agreement — no invoice (a payment voucher instead), no GST. */
+export const isCoShareOwner = O => !!O && O.party === 'Co-share'
+export const meIsCoShare = () => isOwner() && isCoShareOwner(owner(role().ownerId))
+/** How to call an invoice record: a co-share's is a "Rent payment" (voucher), everyone else's an "Invoice". */
+export const invoiceWord = i => (i && i.voucher ? 'Rent payment' : 'Invoice')
 export const tdsRate = (ownerId, date) => C.tdsRate(ownerId, date, calcCtx())
 export const schedule = L => C.schedule(L, calcCtx())
 export const schedRow = (L, p) => C.schedRow(L, p, calcCtx())
@@ -65,8 +71,9 @@ export function criticalEvents(days, pid) {
     if (pid && L.propertyId !== pid) continue; if (!inScope(L)) continue; const st = leaseState(L); if (['Terminated', 'Draft'].includes(st)) continue; const P = prop(L.propertyId)
     ev.push({ d: L.end, t: 'Lease expiry', p: P }); ev.push({ d: noticeBy(L), t: `Last date for the tenant to serve renewal/exit notice (${noticeLessee(L)} mo)`, p: P })
     if (noticeLessor(L) !== noticeLessee(L)) ev.push({ d: noticeByLessor(L), t: `Last date for the owner to serve notice (${noticeLessor(L)} mo)`, p: P })
-    const le = lockEnd(L); if (le) ev.push({ d: le, t: 'Lock-in ends', p: P })
-    const ne = nextEsc(L); if (ne) ev.push({ d: ne, t: `Rent escalates ${L.escPct}% → ${inr(rentFor(L, ne.slice(0, 7)))}`, p: P })
+    const le = lockEnd(L); if (le) ev.push({ d: le, t: `Lock-in ends for the tenant (${lockInLessee(L)} mo)`, p: P })
+    const lo = lockEndLessor(L); if (lo && lockInLessor(L) !== lockInLessee(L)) ev.push({ d: lo, t: `Lock-in ends for the owner (${lockInLessor(L)} mo)`, p: P })
+    const ne = nextEsc(L); if (ne) ev.push({ d: ne, t: `Rent changes → ${inr(rentFor(L, ne.slice(0, 7)))}${escLabel(L) ? ` (${escLabel(L)})` : ''}`, p: P })
     if (L.exit?.effective && L.exit.stage < 5) ev.push({ d: L.exit.effective, t: 'Exit effective — handover due', p: P })
   }
   return ev.filter(e => e.d && daysTo(e.d) <= days && daysTo(e.d) >= -30).sort(by('d'))

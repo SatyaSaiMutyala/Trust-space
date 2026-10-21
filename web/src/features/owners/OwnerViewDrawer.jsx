@@ -11,7 +11,7 @@ export default function OwnerViewDrawer({ d }) {
   const O = owner(d.id)
   if (!O) return <DrawerLayout title="Owner" />
   return (
-    <DrawerLayout title={O.name} sub={`${O.kind} · ${S.properties.filter(p => p.ownerId === O.id).map(p => p.code).join(', ')}`}
+    <DrawerLayout title={O.name} sub={`${O.kind}${O.party === 'Co-share' ? ' · Co-share (not on the agreement)' : ''} · ${S.properties.filter(p => p.ownerId === O.id).map(p => p.code).join(', ')}`}
       footer={<>
         {O.bankPending || (!O.bankVerified && O.acctNo) ? <Btn onClick={() => verifyBank(O.id)}>Mark bank verified</Btn> : null}
         <Btn primary onClick={() => editOwner(O.id)}>Edit</Btn>

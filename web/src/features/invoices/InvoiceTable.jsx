@@ -29,7 +29,7 @@ export default function InvoiceTable({ invoices, list, compact }) {
       <TableBody>
         {rows.map(i => (
           <ClickRow key={i.id} onClick={() => openInv(i.id)}>
-            <TableCell sx={{ whiteSpace: 'nowrap' }}><span className="mono">{i.number}</span><div className="small muted">{fmtD(i.date)} · {i.source === 'Uploaded' ? 'Uploaded' : 'Generated'}</div></TableCell>
+            <TableCell sx={{ whiteSpace: 'nowrap' }}><span className="mono">{i.number}</span><div className="small muted">{fmtD(i.date)} · {i.voucher ? 'Rent payment · co-share' : i.source === 'Uploaded' ? 'Uploaded' : 'Generated'}</div></TableCell>
             {compact ? null : <TableCell sx={{ minWidth: 140 }}>{prop(i.propertyId)?.name || ''}<div className="code">{prop(i.propertyId)?.code || ''}</div></TableCell>}
             <TableCell>{i.type}</TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{perLabel(i.period)}</TableCell>

@@ -1,6 +1,6 @@
 /*
  * Monthly rent invoices. On the 1st of every month (and on demand from the web), one rent invoice is created for every
- * owner of every active lease, from the lease's own rent schedule — escalation, rent-free months, pro-rata months and
+ * owner of every active lease (a payment voucher for a co-share, who raises no invoice), from the lease's own rent schedule — escalation, rent-free months, pro-rata months and
  * advance-rent adjustments are already in that schedule (shared/calc). GST, TDS and net payable are then derived the
  * same way as for a hand-made invoice (resources/derive.js), so a generated invoice is identical to one typed in.
  *
@@ -69,11 +69,12 @@ export async function generateRentInvoices({ period, by = 'TruSpace', status } =
       const date = period + '-01'
       const due = row.due && row.due >= date ? row.due : addDays(date, 7)
       const notes = (row.notes || []).filter(n => !/^Rent-free/.test(n))
+      const voucher = s.role === 'coShare' // not on the agreement: a rent payment voucher instead of an invoice (no GST, TDS on their PAN)
       const rec = {
-        number: await nextNumber(O, date, taken), propertyId: L.propertyId, leaseId: L._id, ownerId: s.ownerId, type: 'Rent', period, date, dueDate: due,
-        base, gst: s.gst, source: 'Generated', generated: true, files: [], status,
-        desc: `Rent for ${perLabel(period)}${notes.length ? ' · ' + notes.join(' · ') : ''}`,
-        log: [{ at: new Date().toISOString(), by, text: `Generated from the lease schedule for ${perLabel(period)}${status === 'Verified' ? ' · checked against the agreement' : ''}` }],
+        number: await nextNumber(voucher ? { ...O, invPrefix: O.invPrefix || 'PAY' } : O, date, taken), propertyId: L.propertyId, leaseId: L._id, ownerId: s.ownerId, type: 'Rent', period, date, dueDate: due,
+        base, gst: voucher ? 0 : s.gst, source: 'Generated', generated: true, voucher, files: [], status,
+        desc: `${voucher ? 'Rent share' : 'Rent'} for ${perLabel(period)}${notes.length ? ' · ' + notes.join(' · ') : ''}`,
+        log: [{ at: new Date().toISOString(), by, text: `${voucher ? 'Payment voucher generated' : 'Generated'} from the lease schedule for ${perLabel(period)}${status === 'Verified' ? ' · checked against the agreement' : ''}` }],
       }
       const full = await deriveInvoice(rec, null, { models })
       const now = new Date().toISOString()

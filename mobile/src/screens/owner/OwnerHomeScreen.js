@@ -33,7 +33,7 @@ export default function OwnerHomeScreen() {
   const todo = [
     ...(inspections.data?.data || []).map(i => ({ icon: 'pencil', title: `Sign the ${i.kind === 'Move-in' ? 'take-over' : 'handover'} check`, sub: props.name(i.propertyId), to: 'SignOff', params: { id: i.id } })),
     ...(depReqs.data?.data || []).filter(r => r.status === 'Proposed').map(r => ({ icon: 'credit-card', title: `Use your deposit for ${r.periodLabel} rent?`, sub: `${r.propertyName} · ${inr(r.amount)}`, to: 'DepositRequest', params: { id: r.id } })),
-    ...pending.filter(i => i.status === 'Rejected').map(i => ({ icon: 'file-text', title: 'Invoice sent back', sub: `${perLabel(i.period)} · ${i.reason || 'see note'}`, to: 'OwnerInvoices' })),
+    ...pending.filter(i => i.status === 'Rejected').map(i => ({ icon: 'file-text', title: `${i.voucher ? 'Rent payment' : 'Invoice'} sent back`, sub: `${perLabel(i.period)} · ${i.reason || 'see note'}`, to: 'OwnerInvoices' })),
   ];
   const T = ledger.data?.data?.totals;
   return (

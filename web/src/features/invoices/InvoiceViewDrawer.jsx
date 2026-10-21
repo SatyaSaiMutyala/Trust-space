@@ -20,7 +20,7 @@ export function InvDoc({ i, P, O, L }) {
     <div className="invdoc">
       <div className="split">
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: '#666' }}>{i.gst ? 'Tax invoice' : 'Invoice'}{i.source === 'Uploaded' ? ' · uploaded copy on file' : ''}</div>
+          <div style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: '#666' }}>{i.voucher ? 'Rent payment voucher · co-share, not on the agreement' : i.gst ? 'Tax invoice' : 'Invoice'}{i.source === 'Uploaded' && !i.voucher ? ' · uploaded copy on file' : ''}</div>
           <h2>{O?.name || ''}</h2><div>{O?.address || ''}</div><div>PAN {O?.pan || '—'}{O?.gstin ? ' · GSTIN ' + O.gstin : ''}</div>
         </div>
         <div style={{ textAlign: 'right' }}><div><b>No.</b> <span className="mono">{i.number}</span></div><div><b>Date</b> {fmtD(i.date)}</div><div><b>Due</b> {fmtD(i.dueDate)}</div><div><b>Period</b> {perLabel(i.period)}</div></div>
@@ -32,7 +32,7 @@ export function InvDoc({ i, P, O, L }) {
       <div style={{ overflowX: 'auto' }}><Box component="table" sx={{ '& th': { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600, whiteSpace: 'nowrap' }, '& td': { fontSize: 13.5 } }}><thead><tr><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead><tbody>
         <tr><td>{i.desc || `${i.type} for ${perLabel(i.period)}`}{i.type === 'Rent' ? ' · SAC 997212' : ''}</td><td className="num">{inr(i.base)}</td></tr>
         {i.gst ? <tr><td>{P?.state === 'Telangana' && (O?.gstin || '').startsWith('36') ? 'CGST 9% + SGST 9%' : 'IGST 18%'}</td><td className="num">{inr(i.gst)}</td></tr> : null}
-        <tr className="tot"><td>Invoice total</td><td className="num">{inr(i.total)}</td></tr>
+        <tr className="tot"><td>{i.voucher ? 'Amount' : 'Invoice total'}</td><td className="num">{inr(i.total)}</td></tr>
         {i.tds ? <tr><td>Less: TDS {i.base ? Math.round(i.tds / i.base * 1000) / 10 : 10}% to be deducted by TrustLab</td><td className="num">−{inr(i.tds)}</td></tr> : null}
         <tr className="tot"><td>Net payable</td><td className="num">{inr(i.net)}</td></tr>
       </tbody></Box></div>
@@ -90,13 +90,13 @@ export default function InvoiceViewDrawer({ d }) {
     if (i.status === 'Submitted') acts.push(<Btn primary key="v" sx={WRAP} onClick={() => invStep(i.id, 'Verified')}>Verify (Accounts Payable)</Btn>)
     if (i.status === 'Verified') acts.push(<Btn primary key="a" sx={WRAP} onClick={() => invStep(i.id, 'Approved')}>Approve for payment (CMD)</Btn>)
     if (['Submitted', 'Verified'].includes(i.status)) acts.push(<Btn danger key="r" onClick={() => setRej(true)}>Reject</Btn>)
-  } else if (i.status === 'Rejected') acts.push(<Btn primary key="c" sx={WRAP} onClick={() => newInvoice({ prop: i.propertyId, type: i.type, period: i.period })}>Raise corrected invoice</Btn>)
+  } else if (i.status === 'Rejected' && !i.voucher) acts.push(<Btn primary key="c" sx={WRAP} onClick={() => newInvoice({ prop: i.propertyId, type: i.type, period: i.period })}>Raise corrected invoice</Btn>)
   return (
     <DrawerLayout
-      title={`${i.type} · ${i.number}`}
+      title={`${i.voucher ? 'Rent payment' : i.type} · ${i.number}`}
       sub={<>{P?.name || ''} · {perLabel(i.period)} · <StatusChip label={st} /></>}
       footer={<>
-        <Btn onClick={() => dlInvoice(i.id)}>Download invoice</Btn>
+        <Btn onClick={() => dlInvoice(i.id)}>{i.voucher ? 'Download voucher' : 'Download invoice'}</Btn>
         {acts}
         {!o || i.status === 'Submitted' ? <ConfirmButton onConfirm={() => { closeDrawer(); remove('invoices', i.id) }} /> : null}
       </>}>

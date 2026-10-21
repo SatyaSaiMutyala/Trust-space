@@ -21,6 +21,8 @@ export default function OwnerFormDrawer({ d }) {
   const [O] = useState(() => d.id ? owner(d.id) : { kind: 'Individual', prefContact: 'WhatsApp', lang: 'English', acctType: 'Savings', noticeSame: true })
   const o = isOwner(); const a = O.addr || { line: O.address || '' }; const na = O.noticeAddr || {}; const em = O.emergency || {}; const rp = O.rep || {}
   const [same, setSame] = useState(O.noticeSame !== false)
+  const [party, setParty] = useState(O.party === 'Co-share' ? 'Co-share' : 'Owner')
+  const cs = party === 'Co-share'
   const [busy, setBusy] = useState(false)
   const onSubmit = async e => { e.preventDefault(); setBusy(true); try { await submitOwner(new FormData(e.currentTarget), d.id) } finally { setBusy(false) } }
   const tel = { type: 'tel', inputMode: 'tel' }
@@ -32,13 +34,14 @@ export default function OwnerFormDrawer({ d }) {
       <form id="f-own" onSubmit={onSubmit}>
         <FormGrid>
           <SectionTitle first>1 · Identity &amp; tax</SectionTitle>
+          <SelectInput id="ow-party" name="party" label="This person is" value={party} onChange={e => setParty(e.target.value)} disabled={o} options={[['Owner', 'Owner — on the lease agreement'], ['Co-share', 'Co-share — paid a share of the rent, not on the agreement']]} hint={cs ? 'Gets their share of the rent with TDS on their PAN. No invoice (a payment voucher is generated), no GST, no deposit by default.' : 'Signs the agreement, invoices their share, GST as registered.'} full />
           <TextInput id="ow-name" name="name" label="Name as per PAN" defaultValue={O.name} required readOnly={o} full />
           <SelectInput id="ow-kind" name="kind" label="Type" defaultValue={O.kind} disabled={o} options={['Individual', 'HUF', 'Company', 'LLP', 'Firm', 'Trust']} />
           <TextInput id="ow-pre" name="invPrefix" label="Invoice prefix" defaultValue={O.invPrefix} maxLength={5} placeholder="SRK" hint="Used for invoices generated in the portal" />
           <TextInput id="ow-pan" name="pan" label="PAN" defaultValue={O.pan} maxLength={10} upper placeholder="ABCDE1234F" />
-          <TextInput id="ow-gst" name="gstin" label="GSTIN" defaultValue={O.gstin} maxLength={15} upper hint="Leave blank if unregistered (TrustLab pays GST under RCM)" />
+          {cs ? null : <TextInput id="ow-gst" name="gstin" label="GSTIN" defaultValue={O.gstin} maxLength={15} upper hint="Leave blank if unregistered (TrustLab pays GST under RCM)" />}
           <FileSlot id="ow-panf" name="panFile" f={O.panFile} label="PAN card copy" />
-          <FileSlot id="ow-gstf" name="gstFile" f={O.gstFile} label="GST certificate (if registered)" />
+          {cs ? null : <FileSlot id="ow-gstf" name="gstFile" f={O.gstFile} label="GST certificate (if registered)" />}
 
           <SectionTitle>2 · Contact</SectionTitle>
           <TextInput id="ow-ph" name="phone" label="Mobile (primary)" defaultValue={O.phone} {...tel} required placeholder="+91 98480 11223" />

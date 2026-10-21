@@ -7,7 +7,7 @@ import TableRow from '@mui/material/TableRow'
 import TableCell from '@mui/material/TableCell'
 import { S, isOwner, owner, useStore, openDrawer } from '../../store/store'
 import { openInsp, newInsp, startExit, depAdjOpen } from '../../store/actions'
-import { lockEnd, isMulti, depositOwners, ownerShare, noticeLessee, noticeLessor } from '../../domain/lease'
+import { lockEnd, lockEndLessor, lockInLessee, lockInLessor, isMulti, depositOwners, ownerShare, noticeLessee, noticeLessor } from '../../domain/lease'
 import { useLeaseDeposit } from '../leases/useLeaseDeposit'
 import { useOpening } from '../opening/useOpening'
 import { inspOf, inspOpen } from '../../domain/inspection'
@@ -30,7 +30,7 @@ export default function ExitPanel({ L }) {
     const le = lockEnd(L)
     return (
       <Panel>
-        <p className="muted">No exit started for this lease. Earliest exit without penalty: {fmtD(le && le > TODAY ? le : TODAY)} (lock-in) with {noticeLessee(L)} months’ notice from the tenant{noticeLessor(L) !== noticeLessee(L) ? ` (${noticeLessor(L)} months if the owner serves notice)` : ''}.</p>
+        <p className="muted">No exit started for this lease. Earliest exit without penalty for the tenant: {fmtD(le && le > TODAY ? le : TODAY)} (lock-in {lockInLessee(L)} mo) with {noticeLessee(L)} months’ notice{lockInLessor(L) !== lockInLessee(L) || noticeLessor(L) !== noticeLessee(L) ? `; for the owner: ${fmtD(lockEndLessor(L) && lockEndLessor(L) > TODAY ? lockEndLessor(L) : TODAY)} (lock-in ${lockInLessor(L)} mo) with ${noticeLessor(L)} months’ notice` : ''}.</p>
         {o ? null : <Btn primary onClick={() => startExit(L.id)}>Serve notice</Btn>}
       </Panel>
     )

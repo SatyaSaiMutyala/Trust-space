@@ -1,16 +1,31 @@
 /* Lease actions and the lease form submit — ported from the prototype (ACT.renewLease/activateLease/schedMode/schedCsv/depAgree/depDecline/depCancel,
    readOwnerRows, ownerSums, leaseFromForm, SUBMIT.lease, SUBMIT.depAdj). */
-import { S, UI, prop, owner, save, toast, emit, openDrawer, actor, side } from '../../store/store'
+import { S, UI, prop, owner, save, toast, emit, openDrawer, closeDrawer, actor, side } from '../../store/store'
 import { newInsp, settleWithDeposit } from '../../store/actions'
-import { addDays, addMonths, num, inr, perLabel, perAdd, newId, nowISO, TODAY } from '../../domain/utils'
-import { rentFor, leaseOwners, depositOwners, isMulti, splitAmt } from '../../domain/lease'
+import { addDays, addMonths, num, inr, perLabel, perAdd, newId, nowISO, TODAY, fmtD } from '../../domain/utils'
+import { rentFor, leaseOwners, depositOwners, isMulti, splitAmt, isCoShareOwner } from '../../domain/lease'
 import { callApi } from '../../app/store'
 import { inspOf } from '../../domain/inspection'
-import { offerDownload } from '../../services/files'
+import { offerDownload, uploadFiles } from '../../services/files'
 
 export function renewLease(id) {
   const L = S.leases.find(l => l.id === id); const start = addDays(L.end, 1)
   openDrawer({ kind: 'lease', renewFrom: Object.assign({}, L, { id: undefined, exit: undefined, docs: [], start, end: addMonths(start, 60), rent: Math.round(rentFor(L, L.end.slice(0, 7)) * 1.05), status: 'Draft', ref: 'TDPL-FAC-LSE-' + String(S.leases.length + 1).padStart(3, '0'), depositPaid: true, clauses: (L.clauses || '') + '\nRenewal of ' + L.ref + '.' }) })
+}
+
+/** Extend a lease (same agreement, addendum): new end date, optionally a revised rent from the day after the old end,
+ *  the addendum reference and file. Recorded in L.extensions; invoices already raised are untouched. */
+export async function submitExtension(id, fd) {
+  const L = S.leases.find(l => l.id === id); if (!L) return
+  const end = fd.get('end'); const rentRaw = (fd.get('rent') || '').trim(); const rent = rentRaw ? num(rentRaw) : null; const ref = (fd.get('ref') || '').trim()
+  if (!end || end <= L.end) { toast(`The new end date must be after the current end, ${fmtD(L.end)}.`, 'warning'); return }
+  if (rentRaw && !(rent > 0)) { toast('Enter the revised monthly rent, or leave it blank to keep the current schedule.', 'warning'); return }
+  const fl = fd.get('file'); const up = fl && fl.size ? await uploadFiles([fl], 1) : []
+  const file = up[0] ? { ...up[0], name: ref ? `${ref} — ${up[0].name}` : up[0].name } : null
+  const ext = { id: newId(), at: nowISO(), by: actor(), fromEnd: L.end, toEnd: end, rent, rentFrom: addDays(L.end, 1), ref, file }
+  const next = { ...L, end, extensions: [...(L.extensions || []), ext], docs: file ? [...(L.docs || []), file] : L.docs || [] }
+  await save('leases', next)
+  closeDrawer()
 }
 
 export async function activateLease(id) {
@@ -59,7 +74,7 @@ export function readOwnerRows(f) {
   const rows = readOwnerAmounts(f); if (!rows.length) return rows
   const T = formTotals(f); const rentP = sharesOf(rows, 'rent', T.rent)
   const P = { rent: rentP }; ['maint', 'dep', 'adv'].forEach(k => { P[k] = sharesOf(rows, k, T[k], rentP) })
-  return rows.map((o, i) => ({ ownerId: o.ownerId, rent: P.rent[i], maint: P.maint[i], dep: P.dep[i], adv: P.adv[i], gst: o.gst }))
+  return rows.map((o, i) => (isCoShareOwner(owner(o.ownerId)) ? { ownerId: o.ownerId, rent: P.rent[i], maint: P.maint[i], dep: P.dep[i], adv: P.adv[i], gst: 'None', role: 'coShare' } : { ownerId: o.ownerId, rent: P.rent[i], maint: P.maint[i], dep: P.dep[i], adv: P.adv[i], gst: o.gst }))
 }
 
 /** ₹ amounts for each owner from % shares (existing lease → form). */
@@ -78,7 +93,7 @@ export function ownerSums(f) {
 /** Read the lease form into a lease record (prototype leaseFromForm). */
 export function leaseFromForm(f, base) {
   const fd = new FormData(f); const P = prop(fd.get('propertyId'))
-  return Object.assign({}, base, { ref: fd.get('ref'), propertyId: fd.get('propertyId'), ownerId: base.ownerId || P?.ownerId, start: fd.get('start'), end: fd.get('end'), lockIn: num(fd.get('lockIn')), notice: num(fd.get('notice')), noticeLessor: num(fd.get('noticeLessor')), fitout: num(fd.get('fitout')), status: fd.get('status'), rent: num(fd.get('rent')), payTiming: fd.get('payTiming'), dueDay: Math.min(28, num(fd.get('dueDay')) || 5), escPct: num(fd.get('escPct')), escEvery: num(fd.get('escEvery')), escType: fd.get('escType'), escFrom: fd.get('escFrom'), deposit: num(fd.get('deposit')), depositPaid: !!fd.get('depositPaid'), advanceRent: num(fd.get('advanceRent')), advanceMonths: num(fd.get('advanceMonths')), brokerage: num(fd.get('brokerage')), maintType: fd.get('maintType'), maint: num(fd.get('maint')), maintEsc: !!fd.get('maintEsc'), elec: fd.get('elec'), gstMode: fd.get('gstMode'), tds: !!fd.get('tds'), tdsOnMaint: !!fd.get('tdsOnMaint'), registered: !!fd.get('registered'), stamp: num(fd.get('stamp')), clauses: fd.get('clauses') }, (() => { const rows = readOwnerRows(f); if (rows.length > 1) return { owners: rows, ownerId: rows[0].ownerId || base.ownerId, tdsPerOwner: !!fd.get('tdsPerOwner') }; return { owners: undefined, ownerId: (rows[0] && rows[0].ownerId) || base.ownerId || P?.ownerId, tdsPerOwner: undefined } })())
+  return Object.assign({}, base, { ref: fd.get('ref'), propertyId: fd.get('propertyId'), ownerId: base.ownerId || P?.ownerId, start: fd.get('start'), end: fd.get('end'), lockIn: num(fd.get('lockIn')), lockInLessor: num(fd.get('lockInLessor')), notice: num(fd.get('notice')), noticeLessor: num(fd.get('noticeLessor')), fitout: num(fd.get('fitout')), status: fd.get('status'), rent: num(fd.get('rent')), payTiming: fd.get('payTiming'), dueDay: Math.min(28, num(fd.get('dueDay')) || 5), escPct: fd.get('escType') === 'Amount' ? 0 : num(fd.get('escPct')), escAdd: fd.get('escType') === 'Amount' ? num(fd.get('escAdd')) : 0, escEvery: num(fd.get('escEvery')), escType: fd.get('escType'), escFrom: fd.get('escFrom'), deposit: num(fd.get('deposit')), depositPaid: !!fd.get('depositPaid'), depositUtr: (fd.get('depositUtr') || '').trim().toUpperCase(), depositChannel: fd.get('depositChannel') || '', depositBank: (fd.get('depositBank') || '').trim(), advanceRent: num(fd.get('advanceRent')), advanceMonths: num(fd.get('advanceMonths')), brokerage: num(fd.get('brokerage')), maintType: fd.get('maintType'), maint: num(fd.get('maint')), maintEsc: !!fd.get('maintEsc'), elec: fd.get('elec'), gstMode: fd.get('gstMode'), tds: !!fd.get('tds'), tdsOnMaint: !!fd.get('tdsOnMaint'), registered: !!fd.get('registered'), stamp: num(fd.get('stamp')), clauses: fd.get('clauses') }, (() => { const rows = readOwnerRows(f); if (rows.length > 1) return { owners: rows, ownerId: rows[0].ownerId || base.ownerId, tdsPerOwner: !!fd.get('tdsPerOwner') }; return { owners: undefined, ownerId: (rows[0] && rows[0].ownerId) || base.ownerId || P?.ownerId, tdsPerOwner: undefined } })())
 }
 
 /** SUBMIT.lease */

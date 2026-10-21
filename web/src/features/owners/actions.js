@@ -26,7 +26,7 @@ export async function submitOwner(fd, id) {
   const bankKeys = { acctHolder: g('acctHolder'), bankName: g('bankName'), bankBranch: g('bankBranch'), acctNo: acct, ifsc, acctType: g('acctType') || old.acctType, upi: g('upi') }
   const bankChanged = ['acctHolder', 'acctNo', 'ifsc', 'bankName'].some(k => (old[k] || '') !== (bankKeys[k] || '')) && !!old.acctNo
   const O = Object.assign({}, old, {
-    name: isOwner() ? old.name : g('name'), kind: fd.get('kind') || old.kind, invPrefix: g('invPrefix'), pan, gstin,
+    name: isOwner() ? old.name : g('name'), kind: fd.get('kind') || old.kind, party: isOwner() ? old.party : (fd.get('party') === 'Co-share' ? 'Co-share' : 'Owner'), invPrefix: g('invPrefix'), pan, gstin: (isOwner() ? old.party : fd.get('party')) === 'Co-share' ? '' : gstin,
     phone: g('phone'), phone2: g('phone2'), whatsapp: g('whatsapp'), email: g('email'), email2: g('email2'), prefContact: g('prefContact'), lang: g('lang'), callHours: g('callHours'),
     addr: { line: g('addrLine'), city: g('addrCity'), state: g('addrState'), pin: g('addrPin') }, noticeSame: !!fd.get('noticeSame'),
     noticeAddr: { line: g('nLine'), city: g('nCity'), state: g('nState'), pin: g('nPin'), attn: g('nAttn') }, noticeEmail: g('noticeEmail'),

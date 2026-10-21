@@ -1,6 +1,7 @@
 /* Owner portal home (prototype viewOHome). */
 import { S, role, owner, inScope, scopeProps, prop, openProp, useStore } from '../../store/store'
 import { newTicket, newInvoice, openInsp } from '../../store/actions'
+import { meIsCoShare } from '../../domain/lease'
 import { inr, fy, fmtD, perLabel, TODAY, CUR } from '../../domain/utils'
 import { leaseOf, leaseState, rentFor, invState, depAdjs, isMulti, ownerShare, OB_DATE } from '../../domain/lease'
 import { useOpening } from '../opening/useOpening'
@@ -26,7 +27,7 @@ export default function OwnerHomePage() {
   return (
     <>
       <PageHead title={`Welcome, ${O?.name || 'owner'}`} sub="Your properties leased to TrustLab Diagnostics or its franchise partners — rent status, repairs and messages in one place."
-        actions={<><Btn onClick={() => newTicket()}>Report an issue</Btn><Btn primary onClick={() => newInvoice()}>Generate invoice</Btn></>} />
+        actions={<><Btn onClick={() => newTicket()}>Report an issue</Btn>{meIsCoShare() ? null : <Btn primary onClick={() => newInvoice()}>Generate invoice</Btn>}</>} />
       <SampleBanner />
       {leases.filter(L => depAdjs(L, r.ownerId, true).some(a => a.status === 'Proposed')).map(L => {
         const ps = depAdjs(L, r.ownerId, true).filter(a => a.status === 'Proposed')

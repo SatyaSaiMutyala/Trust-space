@@ -274,7 +274,7 @@ export async function planImport(buffer) {
     if (v.email && !EMAIL.test(v.email)) errors.email = 'Email does not look right'
     if (v.invPrefix && v.invPrefix.length > 5) errors.invPrefix = 'Invoice prefix is up to 5 letters'
     const rec = {
-      name: v.name, kind: v.kind, pan: v.pan, gstin: v.gstin, phone: v.phone, whatsapp: v.phone, email: v.email, prefContact: 'WhatsApp', lang: 'English',
+      name: v.name, kind: v.kind, party: v.party || 'Owner', pan: v.pan, gstin: v.party === 'Co-share' ? '' : v.gstin, phone: v.phone, whatsapp: v.phone, email: v.email, prefContact: 'WhatsApp', lang: 'English',
       addr: { line: v.addrLine, city: v.addrCity, state: v.addrState, pin: v.addrPin }, address: [v.addrLine, v.addrCity, v.addrState, v.addrPin].filter(Boolean).join(', '), noticeSame: true,
       acctHolder: v.acctHolder || v.name, bankName: v.bankName, bankBranch: v.bankBranch, acctNo: v.acctNo, ifsc: v.ifsc, acctType: v.acctType, invPrefix: v.invPrefix,
       bankVerified: false, panStatus: v.pan ? 'Not verified' : '',
@@ -326,14 +326,31 @@ export async function planImport(buffer) {
     if (v.start && v.end && v.end <= v.start) errors.end = 'Lease end must be after the lease start'
     if (v.rent !== '' && v.rent <= 0) errors.rent = 'Monthly rent must be more than 0'
     if (v.dueDay !== '' && (v.dueDay < 1 || v.dueDay > 28)) errors.dueDay = 'Due day must be between 1 and 28'
+    // co-shares: "PAN:percent, PAN:percent" → extra split rows (role coShare, no GST, no deposit or advance); the owner keeps the rest
+    const cs = []
+    if (v.coShares) {
+      for (const part of String(v.coShares).split(/[,;\n]+/).map(s => s.trim()).filter(Boolean)) {
+        const m = part.match(/^(.+?)\s*[:=]\s*([\d.]+)\s*%?$/)
+        if (!m) { errors.coShares = `Co-shares must be written as PAN:percent, e.g. ABCPK1234F:20 — “${part}” is not`; break }
+        const hit = findOwner(m[1], dbOwners, owners); const bad = refNote('Co-share', m[1], hit, 'Owners')
+        if (bad) { errors.coShares = bad; break }
+        const pct = Number(m[2]); if (!(pct > 0 && pct <= 100)) { errors.coShares = `Co-share percent for “${m[1]}” must be between 0 and 100`; break }
+        if (O && ((hit.id && hit.id === O.id) || (hit.sheet && O.sheet && hit.sheet === O.sheet))) { errors.coShares = 'The owner cannot also be a co-share of their own rent'; break }
+        cs.push({ ref: m[1], hit, pct })
+      }
+      const total = cs.reduce((a, c) => a + c.pct, 0)
+      if (!errors.coShares && total >= 100) errors.coShares = `Co-share percents add up to ${total}% — the owner must keep some of the rent`
+    }
+    r.coShares = cs
     // GST default follows the owner's registration
     let gstMode = v.gstMode
     if (!gstMode) { const gstin = O?.id ? dbOwners.find(o => o._id === O.id)?.gstin : O?.sheet ? O.sheet.values.gstin : ''; gstMode = gstin ? 'Forward' : 'RCM' }
     r.rec = {
       ref: v.ref, propertyId: P?.id || '', ownerId: O?.id || '', status: v.status, start: v.start, end: v.end, rent: v.rent, payTiming: v.payTiming, dueDay: v.dueDay,
-      deposit: v.deposit, depositPaid: !!v.depositPaid, lockIn: v.lockIn, notice: v.notice, noticeLessor: v.noticeLessor, fitout: v.fitout,
-      escPct: v.escPct, escEvery: v.escEvery, escType: v.escType, escFrom: v.escFrom, gstMode, tds: !!v.tds, tdsOnMaint: false,
+      deposit: v.deposit, depositPaid: !!v.depositPaid, depositUtr: v.depositUtr, depositChannel: v.depositChannel, depositBank: v.depositBank, lockIn: v.lockIn, lockInLessor: cells.lockInLessor === '' || cells.lockInLessor === undefined ? v.lockIn : v.lockInLessor, notice: v.notice, noticeLessor: v.noticeLessor, fitout: v.fitout,
+      escPct: v.escAdd > 0 ? 0 : v.escPct, escAdd: v.escAdd, escEvery: v.escEvery, escType: v.escAdd > 0 ? 'Amount' : v.escType, escFrom: v.escFrom, gstMode, tds: !!v.tds, tdsOnMaint: false,
       maintType: v.maintType, maint: v.maint, maintEsc: false, elec: v.elec, registered: !!v.registered, advanceRent: 0, advanceMonths: 0, brokerage: 0, stamp: 0, clauses: '', docs: [],
+      owners: cs.length ? [{ ownerId: O?.id || '', rent: 100 - cs.reduce((a, c) => a + c.pct, 0), maint: 100 - cs.reduce((a, c) => a + c.pct, 0), dep: 100, adv: 100, gst: '' }, ...cs.map(c => ({ ownerId: c.hit.id || '', rent: c.pct, maint: c.pct, dep: 0, adv: 0, gst: 'None', role: 'coShare' }))] : [],
     }
     const fe = fieldErrors(byPath.leases, { ...r.rec, propertyId: P ? 'x' : '', ownerId: O ? 'x' : '' }) // refs are checked above with better messages
     for (const [k, m] of Object.entries(fe)) if (!errors[k]) errors[k] = m
@@ -397,7 +414,10 @@ export const importController = {
     for (const r of plan.leases.rows) if (r.action === 'create') {
       const propertyId = idOf(r.property), ownerId = idOf(r.owner)
       if (!propertyId || !ownerId) { r.action = 'error'; r.note = 'Its property or owner could not be added'; plan.leases.create--; plan.leases.error++; continue }
-      r.newId = newId(); await models.leases.create({ _id: r.newId, ...stamp({ ...r.rec, propertyId, ownerId }) }); done.leases++
+      const csIds = (r.coShares || []).map(c => idOf(c.hit))
+      if (csIds.some(id => !id)) { r.action = 'error'; r.note = 'A co-share could not be added'; plan.leases.create--; plan.leases.error++; continue }
+      const owners = r.rec.owners.length ? r.rec.owners.map((o, i) => (i === 0 ? { ...o, ownerId } : { ...o, ownerId: csIds[i - 1] })) : []
+      r.newId = newId(); await models.leases.create({ _id: r.newId, ...stamp({ ...r.rec, propertyId, ownerId, owners }) }); done.leases++
     }
     const parts = SHEET_ORDER.filter(k => done[k]).map(k => count(done[k], SHEETS[k].singular, SHEETS[k].plural))
     return created(res, `Added ${parts.join(', ')}.${plan.total.skip ? ` ${count(plan.total.skip, 'row was', 'rows were')} already in the system.` : ''}${plan.total.error ? ` ${count(plan.total.error, 'row', 'rows')} with errors left out.` : ''}`, { added: done, ...toClient(plan) })

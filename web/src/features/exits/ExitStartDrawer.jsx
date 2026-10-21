@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { S, prop, closeDrawer, useStore } from '../../store/store'
-import { lockEnd, noticeOf, noticeLessee, noticeLessor } from '../../domain/lease'
+import { lockEndOf, lockInOf, noticeOf, noticeLessee, noticeLessor } from '../../domain/lease'
 import { TODAY, addMonths, fmtD } from '../../domain/utils'
 import { Btn, Banner, Empty } from '../../components/ui/Layout'
 import { FormGrid, TextInput, SelectInput, CheckField } from '../../components/form/Fields'
@@ -14,7 +14,6 @@ export default function ExitStartDrawer({ d }) {
   const [by, setBy] = useState('TrustLab') // who serves notice decides the notice period
   const L = S.leases.find(l => l.id === d.id)
   if (!L) return <DrawerLayout title="Serve notice of termination"><Empty>Removed.</Empty></DrawerLayout>
-  const le = lockEnd(L)
   const onSubmit = async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
     try { await submitExitStart(L.id, new FormData(e.currentTarget)) } finally { setBusy(false) }
@@ -22,7 +21,7 @@ export default function ExitStartDrawer({ d }) {
   return (
     <DrawerLayout title="Serve notice of termination" sub={`${prop(L.propertyId)?.name} · ${L.ref} · notice ${noticeLessee(L)} months by the tenant, ${noticeLessor(L)} by the owner`}
       footer={<><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-ex" disabled={busy}>Serve notice</Btn></>}>
-      {le && le > TODAY ? <Banner>Lock-in runs until <b>{fmtD(le)}</b>. Exiting earlier may make the remaining lock-in rent payable — check clause terms.</Banner> : null}
+      {lockEndOf(L, by) && lockEndOf(L, by) > TODAY ? <Banner>The {by === 'Owner' ? 'owner’s' : 'tenant’s'} lock-in ({lockInOf(L, by)} months) runs until <b>{fmtD(lockEndOf(L, by))}</b>. Ending the lease earlier may make the remaining lock-in rent payable — check clause terms.</Banner> : null}
       <form id="f-ex" onSubmit={onSubmit}>
         <FormGrid>
           <TextInput id="es-d" name="noticeDate" label="Notice date" type="date" defaultValue={TODAY} required />

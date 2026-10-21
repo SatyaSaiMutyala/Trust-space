@@ -37,12 +37,12 @@ export default function OwnersBlock({ L, heading = true }) {
               const O = owner(x.ownerId); const sh = x.share; const off = x.active === false
               return (
                 <TableRow key={x.ownerId} className={me === x.ownerId ? 'youRow' : undefined} sx={off ? { '& td': { color: 'var(--muted)' } } : undefined}>
-                  <TableCell><b>{O?.name || '—'}</b>{me === x.ownerId ? <> <StatusChip label="You" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
+                  <TableCell><b>{O?.name || '—'}</b>{x.role === 'coShare' ? <> <StatusChip label="Co-share" k="info" /></> : null}{me === x.ownerId ? <> <StatusChip label="You" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
                   <TableCell className="num">{inr(Math.round((+L.rent || 0) * sh.rent / 100))}<div className="small muted">{pctLabel(sh.rent)}</div></TableCell>
                   <TableCell className="num">{inr(Math.round((+L.maint || 0) * sh.maint / 100))}<div className="small muted">{pctLabel(sh.maint)}</div></TableCell>
                   <TableCell className="num">{inr(x.deposit)}<div className="small muted">{pctLabel(sh.dep)}{(() => { const o = dep?.owners.find(w => w.ownerId === x.ownerId); return o && o.adjusted ? ` · held ${inr(o.held)}` : '' })()}</div></TableCell>
                   <TableCell className="num">{x.adv ? inr(x.adv) : '—'}<div className="small muted">{pctLabel(sh.adv)}</div></TableCell>
-                  <TableCell className="small">{G[x.mode] || x.mode}</TableCell>
+                  <TableCell className="small">{x.role === 'coShare' ? 'No GST (co-share)' : G[x.mode] || x.mode}</TableCell>
                   <TableCell className="small">{x.tdsOn ? (!panValid(O) ? <span style={{ color: 'var(--bad)' }}>{tdsRate(x.ownerId, CUR + '-01')}% — no valid PAN</span> : certFor(O, CUR + '-01') ? `${tdsRate(x.ownerId, CUR + '-01')}% (certificate)` : `${tdsRate(x.ownerId, CUR + '-01')}%`) : 'Below threshold'}</TableCell>
                   <TableCell className="num">{off ? '—' : inr(Math.round(rentFor(L, CUR) * sh.rent / 100))}</TableCell>
                   <TableCell className="small" sx={{ whiteSpace: 'nowrap' }}>{O ? <>{O.bankName || ''} {maskAcct(O.acctNo)} <BankChip O={O} /></> : ''}</TableCell>
@@ -56,7 +56,7 @@ export default function OwnersBlock({ L, heading = true }) {
       </div>
       {canChange ? <div className="filters" style={{ marginTop: 8 }}><Btn sm onClick={() => ownerChangeOpen(L.id, 'add')}>+ Add owner</Btn><span className="small muted">An owner who leaves is deactivated from this month and keeps their earlier invoices and ledger; adding or reactivating one asks for the new split.</span></div> : null}
       {(L.ownerChanges || []).length ? <div style={{ marginTop: 10 }}><div className="eyebrow" style={{ marginBottom: 4 }}>Owner changes</div><div className="list">{L.ownerChanges.slice().reverse().map((c, i) => <div key={i} className="li"><span className="when">{perLabel(c.from)}</span><div className="grow"><div>{c.text}</div><div className="small muted">Split: {c.split}{c.note ? ` · ${c.note}` : ''} · {c.by}</div></div></div>)}</div></div> : null}
-      <p className="small muted" style={{ margin: '6px 0 0' }}>Each owner raises a separate invoice for their share and is paid to their own account. {tdsPerOwner(L) ? 'TDS is tested on each co-owner’s share of rent (co-owners with defined shares are separate payees) — confirm with your tax adviser.' : 'TDS is tested on the total rent.'}</p>
+      <p className="small muted" style={{ margin: '6px 0 0' }}>Each owner raises a separate invoice for their share and is paid to their own account.{(sc.owners || []).some(x => x.role === 'coShare') ? ' A co-share is paid their share with TDS on their PAN but is not on the agreement: a rent payment voucher is generated for them each month instead of an invoice, with no GST.' : ''} {tdsPerOwner(L) ? 'TDS is tested on each co-owner’s share of rent (co-owners with defined shares are separate payees) — confirm with your tax adviser.' : 'TDS is tested on the total rent.'}</p>
     </div>
   )
 }

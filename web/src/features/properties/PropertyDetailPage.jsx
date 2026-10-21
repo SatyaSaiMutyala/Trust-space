@@ -4,6 +4,7 @@ import Tab from '@mui/material/Tab'
 import Box from '@mui/material/Box'
 import { useStore, S, UI, isOwner, role, prop, owner, inScope, go, zoom, openConv, emit } from '../../store/store'
 import { editProperty, newLease, newTicket, newInvoice } from '../../store/actions'
+import { meIsCoShare } from '../../domain/lease'
 import { fmtD, pctLabel, daysTo, inr, CUR } from '../../domain/utils'
 import { leaseOf, frontOf, occStatus, repairStatus, maskAcct, noticeAddrOf, bankState, isMulti, leaseOwners, leaseState, rentFor } from '../../domain/lease'
 import { useRentStatus } from '../shared/useLedgerReports'
@@ -176,7 +177,7 @@ export default function PropertyDetailPage() {
           {ll ? <Stat label="Lease"><StatusChip label={ll.v} k={ll.k} /><span className="small muted">ends {fmtD(ll.end)}</span></Stat> : null}
         </Box>}
         actions={o
-          ? <><Btn onClick={() => newTicket(P.id)}>Report an issue</Btn><Btn primary onClick={() => newInvoice({ prop: P.id })}>Raise invoice</Btn></>
+          ? <><Btn onClick={() => newTicket(P.id)}>Report an issue</Btn>{meIsCoShare() ? null : <Btn primary onClick={() => newInvoice({ prop: P.id })}>Raise invoice</Btn>}</>
           : <><Btn onClick={() => newTicket(P.id)}>New ticket</Btn><Btn onClick={() => newInvoice({ prop: P.id })}>Record invoice</Btn></>}
       />
       <SampleBanner />

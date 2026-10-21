@@ -26,6 +26,7 @@ import TdsReturnDrawer from './tds/TdsReturnDrawer'
 import Tds16Drawer from './tds/Tds16Drawer'
 import TdsCertDrawer from './tds/TdsCertDrawer'
 import ImportDrawer from './import/ImportDrawer'
+import ExtendDrawer from './leases/ExtendDrawer'
 
 export const DRAWERS = {
   property: PropertyFormDrawer, lease: LeaseFormDrawer, leaseView: LeaseViewDrawer,
@@ -36,5 +37,5 @@ export const DRAWERS = {
   req: ReqDrawer, site: SiteDrawer, partner: PartnerDrawer, partners: PartnersDrawer,
   rentMonth: RentMonthDrawer, depAdj: DepAdjDrawer, ownerChange: OwnerChangeDrawer, opening: OpeningDrawer, obPay: ObPayDrawer,
   tdsMonth: TdsMonthDrawer, tdsChallan: TdsChallanDrawer, tdsReturn: TdsReturnDrawer, tds16: Tds16Drawer, tdsCert: TdsCertDrawer,
-  import: ImportDrawer,
+  import: ImportDrawer, extend: ExtendDrawer,
 }

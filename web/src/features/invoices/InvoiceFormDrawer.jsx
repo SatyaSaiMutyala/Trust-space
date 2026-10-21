@@ -78,7 +78,7 @@ export default function InvoiceFormDrawer({ d }) {
 
   return (
     <DrawerLayout
-      title={d.id ? `Edit invoice ${d.number}` : o ? (mode === 'upload' ? 'Upload invoice' : 'Generate invoice') : 'Record owner invoice'}
+      title={d.id ? `Edit ${O?.party === 'Co-share' ? 'rent payment' : 'invoice'} ${d.number}` : o ? (mode === 'upload' ? 'Upload invoice' : 'Generate invoice') : O?.party === 'Co-share' ? 'Record co-share rent payment' : 'Record owner invoice'}
       sub={d.id ? 'Amounts, GST and TDS are recalculated from the lease when you save. The workflow status is kept.' : o ? 'Addressed to TrustLab Diagnostics Private Limited. TDS and GST follow your lease.' : 'Enter an invoice received from the owner, or raise one on their behalf.'}
       footer={props.length ? <><Btn onClick={closeDrawer}>Cancel</Btn><Btn primary type="submit" form="f-inv" disabled={busy}>{d.id ? 'Save changes' : 'Submit invoice'}</Btn></> : null}>
       {props.length ? (
@@ -87,7 +87,7 @@ export default function InvoiceFormDrawer({ d }) {
             <SelectInput id="iv-mode" name="mode" label="How" defaultValue={mode} options={[['generate', 'Generate in TruSpace'], ['upload', 'Upload my own invoice']]} />
             <SelectInput id="iv-prop" name="propertyId" label="Property" defaultValue={pid} options={props.map(x => [x.id, `${x.name} (${x.code})`])} />
             {!o && isMulti(L)
-              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L, period).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${pctLabel(x.rent)}`])} hint="Each co-owner raises their own invoice for their share" />
+              ? <SelectInput id="iv-own" name="ownerId" label="Invoice from (co-owner)" full defaultValue={oid} options={leaseOwners(L, period).map(x => [x.ownerId, `${owner(x.ownerId)?.name || '—'} · rent ${pctLabel(x.rent)}${x.role === 'coShare' ? ' · co-share (payment voucher, no GST)' : ''}`])} hint="Each co-owner raises their own invoice for their share; a co-share gets a payment voucher instead" />
               : o && isMulti(L) ? <Cell full><Banner>You own {pctLabel(ownerShare(L, oid, 'rent') * 100)} of the rent and {pctLabel(ownerShare(L, oid, 'maint') * 100)} of maintenance. Invoice your share only.</Banner></Cell> : null}
             <SelectInput id="iv-type" name="type" label="Invoice for" defaultValue={type} options={INV_TYPES} />
             <TextInput id="iv-per" name="period" label="Billing month" type="month" defaultValue={period} required />

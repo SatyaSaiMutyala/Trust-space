@@ -63,10 +63,10 @@ export default function OwnersPage() {
               const rent = ls.filter(l => !['Draft', 'Terminated'].includes(leaseState(l)) && leaseOf(l.propertyId) === l).reduce((s, l) => s + rentFor(l, CUR) * ownerShare(l, o.id, 'rent'), 0)
               return (
                 <TableRow key={o.id}>
-                  <TableCell sx={{ minWidth: 120 }}><b>{o.name}</b><div className="small muted">{o.kind}</div></TableCell>
+                  <TableCell sx={{ minWidth: 120 }}><b>{o.name}</b><div className="small muted">{o.kind}{o.party === 'Co-share' ? <> · <StatusChip label="Co-share" k="info" /></> : null}</div></TableCell>
                   <TableCell className="small"><span style={NW}>{o.phone}</span>{o.whatsapp && o.whatsapp !== o.phone ? <><br /><span style={NW}>WA {o.whatsapp}</span></> : null}<br /><Email v={o.email} /></TableCell>
                   <TableCell className="small" sx={{ minWidth: 120 }}>{o.emergency?.phone ? <>{o.emergency.name || ''}{o.emergency.rel ? ' (' + o.emergency.rel + ')' : ''}<br /><span style={NW}>{o.emergency.phone}</span></> : <span className="muted">Not set</span>}</TableCell>
-                  <TableCell className="mono small">{o.pan || '—'}<br />{o.gstin || 'GST unregistered'}</TableCell>
+                  <TableCell className="mono small">{o.pan || '—'}<br />{o.party === 'Co-share' ? 'No GST (co-share)' : o.gstin || 'GST unregistered'}</TableCell>
                   <TableCell className="small">{o.bankName || o.bank || ''} <span className="mono" style={NW}>{maskAcct(o.acctNo)}</span><br /><BankChip O={o} /></TableCell>
                   <TableCell className="small">{ps.length ? ps.map((p, i) => { const Lp = leaseOf(p.id); return <span key={p.id}>{i ? <br /> : null}{p.name}{Lp && isMulti(Lp) ? <> <span className="muted">({pctLabel(ownerShare(Lp, o.id, 'rent') * 100)})</span></> : null}</span> }) : '—'}</TableCell>
                   <TableCell className="num">{inr(rent)}</TableCell>

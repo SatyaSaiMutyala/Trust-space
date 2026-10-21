@@ -25,6 +25,7 @@ export const openSite = id => openDrawer({ kind: 'site', id })
 /** Rent for one month of a co-owned lease, owner by owner. */
 export const rentMonth = (lease, period) => openDrawer({ kind: 'rentMonth', lease, period })
 /** Settle rent months from the security deposit; preset = [{ period, ownerId }] to pre-tick. */
+export const extendOpen = id => openDrawer({ kind: 'extend', id }) // extend a lease: new end date, optional revised rent, addendum
 export const depAdjOpen = (lease, preset) => openDrawer({ kind: 'depAdj', lease, preset: preset || null })
 /** Deactivate / add / reactivate a co-owner on a lease (mode: 'deactivate' | 'add' | 'reactivate'). */
 export const ownerChangeOpen = (lease, mode, ownerId) => openDrawer({ kind: 'ownerChange', lease, mode, ownerId: ownerId || null })

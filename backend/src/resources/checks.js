@@ -30,6 +30,11 @@ async function ownerNames(models, ids) {
   const rows = await models.owners.find({ _id: { $in: ids } }, { name: 1 }).lean()
   return Object.fromEntries(rows.map(o => [o._id, o.name]))
 }
+/** ids of the owners whose record says Co-share (the split row's role is set from this on save, see derive.js). */
+async function coShareIds(models, ids) {
+  const rows = await models.owners.find({ _id: { $in: ids }, party: 'Co-share' }, { _id: 1 }).lean()
+  return new Set(rows.map(o => o._id))
+}
 
 /* ---------- properties: co-owners with their share of the rent ---------- */
 /** `owners` = [{ ownerId, share }] (%). The first owner is the main contact and is mirrored into `ownerId`; shares must total 100. */
@@ -69,9 +74,12 @@ async function checkLease(L, { models }) {
       const missing = ids.filter(id => id && !names[id])
       if (missing.length) problems.push(`owner “${missing[0]}” does not exist`)
       for (const o of L.owners) {
+        if (o.role && !['owner', 'coShare'].includes(o.role)) problems.push(`role for ${who(o.ownerId)} must be owner or coShare`)
         if (o.gst && !['Forward', 'RCM', 'None'].includes(o.gst)) problems.push(`GST status for ${who(o.ownerId)} must be Forward, RCM or None`)
         for (const [k, label] of SHARES) if (o[k] !== undefined && o[k] !== '' && (!isNum(o[k]) || n(o[k]) < 0 || n(o[k]) > 100)) problems.push(`${label} share for ${who(o.ownerId)} must be between 0 and 100`)
       }
+      const cs = await coShareIds(models, ids.filter(Boolean))
+      if (L.owners.length && L.owners.every(o => o.role === 'coShare' || cs.has(o.ownerId))) problems.push('at least one owner on the agreement is needed — co-shares cannot be the only payees')
       if (L.owners.length > 1) {
         const needed = { rent: true, maint: n(L.maint) > 0, dep: n(L.deposit) > 0, adv: n(L.advanceRent) > 0 }
         for (const [k, label] of SHARES) {
@@ -98,6 +106,20 @@ async function checkLease(L, { models }) {
     }
   }
   if (L.ownerChanges !== undefined && L.ownerChanges !== null && !Array.isArray(L.ownerChanges)) errors.ownerChanges = 'Owner changes must be a list'
+
+  if (L.extensions !== undefined && L.extensions !== null) {
+    if (!Array.isArray(L.extensions)) errors.extensions = 'Extensions must be a list'
+    else {
+      for (const e of L.extensions) {
+        if (!e || typeof e !== 'object' || !DATE.test(e.fromEnd || '') || !DATE.test(e.toEnd || '')) { errors.extensions = 'Each extension needs the old and the new end date'; break }
+        if (e.toEnd <= e.fromEnd) { errors.extensions = `An extension must end after the old end date (${e.fromEnd})`; break }
+        if (e.rent !== undefined && e.rent !== null && e.rent !== '' && (!isNum(e.rent) || n(e.rent) < 0)) { errors.extensions = 'The revised rent of an extension must be ₹0 or more'; break }
+        if (e.rentFrom !== undefined && e.rentFrom !== null && e.rentFrom !== '' && !DATE.test(e.rentFrom)) { errors.extensions = 'The date the revised rent applies from must be a date'; break }
+      }
+      const lastEnd = L.extensions.length ? L.extensions.map(e => e.toEnd).sort().pop() : null
+      if (!errors.extensions && lastEnd && L.end && L.end < lastEnd) errors.end = `The lease end (${L.end}) is before its latest extension (${lastEnd})`
+    }
+  }
 
   if (L.depAdj !== undefined && L.depAdj !== null) {
     if (!Array.isArray(L.depAdj)) errors.depAdj = 'Deposit adjustments must be a list'

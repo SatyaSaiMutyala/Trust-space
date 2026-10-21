@@ -28,10 +28,31 @@ const cur = ctx => ctx.today.slice(0, 7)
 export const rentStartOf = L => addDays(L.start, +L.fitout || 0)
 export const escAnchor = L => L.escFrom === 'Rent commencement' ? rentStartOf(L) : L.start
 /* Escalation applies from the start of the month in which each anniversary falls, so a lease year (e.g. Oct–Sep) has one rate. */
-export function escSteps(L, dateStr) { if (!L.escEvery || !L.escPct) return 0; const a = escAnchor(L).slice(0, 7) + '-01'; let n = 0; while (n < 200 && addMonths(a, L.escEvery * (n + 1)) <= dateStr) n++; return n }
-export function escAmt(L, base, dateStr) { const n = escSteps(L, dateStr); base = +base || 0; return Math.round(L.escType === 'Simple' ? base * (1 + n * (L.escPct || 0) / 100) : base * Math.pow(1 + (L.escPct || 0) / 100, n)) }
-export function rentFor(L, period) { if (!L) return 0; const d = period + '-01'; return escAmt(L, L.rent, d < L.start ? L.start : d) }
-export function nextEsc(L, today) { if (!L.escEvery || !L.escPct) return null; const a = escAnchor(L).slice(0, 7) + '-01'; let n = 1; while (n < 200 && addMonths(a, L.escEvery * n) <= today) n++; const d = addMonths(a, L.escEvery * n); return d <= L.end ? d : null }
+/* Escalation: every `escEvery` months the rent goes up by `escPct` % (escType Compound = on the last rent, Simple = on
+   the base) or, with escType 'Amount', by a fixed `escAdd` rupees. */
+export const escOn = L => !!(L && +L.escEvery > 0 && (L.escType === 'Amount' ? +L.escAdd > 0 : +L.escPct > 0))
+/** "5% every 12 months" / "₹3,000 every 12 months" / "" when there is none. */
+export const escLabel = L => (escOn(L) ? `${L.escType === 'Amount' ? inr(L.escAdd) : `${+L.escPct}%`} every ${+L.escEvery} months` : '')
+const escStepsFrom = (L, anchor, dateStr) => { if (!escOn(L)) return 0; const a = anchor.slice(0, 7) + '-01'; let n = 0; while (n < 200 && addMonths(a, L.escEvery * (n + 1)) <= dateStr) n++; return n }
+const applyEsc = (L, base, n) => Math.round(L.escType === 'Amount' ? base + n * (+L.escAdd || 0) : L.escType === 'Simple' ? base * (1 + n * (L.escPct || 0) / 100) : base * Math.pow(1 + (L.escPct || 0) / 100, n))
+export function escSteps(L, dateStr) { return escStepsFrom(L, escAnchor(L), dateStr) }
+export function escAmt(L, base, dateStr) { return applyEsc(L, +base || 0, escSteps(L, dateStr)) }
+/* Extensions: `L.extensions` = [{ id, at, by, fromEnd, toEnd, rent, rentFrom, ref, file }]. One with a revised `rent` is a
+   rent step: from `rentFrom` (the day after the old end) the rent is that figure, and escalations count from there. */
+export const rentSteps = L => (L && Array.isArray(L.extensions) ? L.extensions.filter(e => e && e.rentFrom && +e.rent > 0).slice().sort((a, b) => a.rentFrom.localeCompare(b.rentFrom)) : [])
+/** The base rent in force on a date and the date its escalations count from. */
+export function rentBaseAt(L, dateStr) { const s = rentSteps(L).filter(e => e.rentFrom <= dateStr).pop(); return s ? { base: +s.rent, anchor: s.rentFrom, step: s } : { base: +L.rent || 0, anchor: escAnchor(L), step: null } }
+/** Monthly rent on a date: the base in force then, escalated. */
+export function rentAt(L, dateStr) { const { base, anchor } = rentBaseAt(L, dateStr); return applyEsc(L, base, escStepsFrom(L, anchor, dateStr)) }
+export function rentFor(L, period) { if (!L) return 0; const d = period + '-01'; return rentAt(L, d < L.start ? L.start : d) }
+/** The next date the rent changes after today: an escalation, or an extension's revised rent, whichever is first. */
+export function nextEsc(L, today) {
+  const step = rentSteps(L).find(e => e.rentFrom > today)
+  let esc = null
+  if (escOn(L)) { const a = rentBaseAt(L, today).anchor.slice(0, 7) + '-01'; let n = 1; while (n < 200 && addMonths(a, L.escEvery * n) <= today) n++; esc = addMonths(a, L.escEvery * n) }
+  const d = step && (!esc || step.rentFrom < esc) ? step.rentFrom : esc
+  return d && d <= L.end ? d : null
+}
 
 /* ---------- co-owners: each with a % share of rent, maintenance, deposit and advance, and their own GST status ---------- */
 /* `L.owners` is the split in force now. When a co-owner is deactivated, added or reactivated, the split that applied
@@ -41,11 +62,19 @@ const curOwners = L => (L && Array.isArray(L.owners) && L.owners.length ? L.owne
 const history = L => (L && Array.isArray(L.ownerHistory) ? L.ownerHistory.filter(h => h && h.until && Array.isArray(h.owners) && h.owners.length).slice().sort((a, b) => a.until.localeCompare(b.until)) : [])
 /** Owners with their % shares — the current split, or the split in force in month p ('YYYY-MM') when given. */
 export function leaseOwners(L, p) { if (p) { const h = history(L).find(x => x.until >= p); if (h) return h.owners } return curOwners(L) }
+/* A co-share (`role: 'coShare'` on the split row, from an owner record with party 'Co-share') is paid their share of the
+   rent and maintenance with TDS on their own PAN, but is not party to the agreement: no invoice (a payment voucher is
+   generated instead), no GST, and by default no share of the deposit or advance. */
+export const isCoShare = o => !!o && o.role === 'coShare'
+/** The owners who signed the agreement (the split without co-shares). */
+export const leaseParties = (L, p) => leaseOwners(L, p).filter(o => !isCoShare(o))
+/** The co-shares paid from the rent but not on the agreement. */
+export const leaseCoShares = (L, p) => leaseOwners(L, p).filter(isCoShare)
 /** The owners who received the security deposit and advance rent: the split at the start of the lease. */
 export const depositOwners = L => leaseOwners(L, L && L.start ? L.start.slice(0, 7) : undefined)
 export const isMulti = L => curOwners(L).length > 1 || history(L).some(h => h.owners.length > 1)
 export const ownerShare = (L, ownerId, k, p) => { const o = leaseOwners(L, p).find(x => x.ownerId === ownerId); return o ? (+o[k] || 0) / 100 : 0 }
-export const ownerGstMode = (L, ownerId, p) => { if (!L || L.gstMode === 'None') return 'None'; const o = leaseOwners(L, p).find(x => x.ownerId === ownerId); return (o && o.gst) || L.gstMode || 'None' }
+export const ownerGstMode = (L, ownerId, p) => { if (!L || L.gstMode === 'None') return 'None'; const o = leaseOwners(L, p).find(x => x.ownerId === ownerId); if (isCoShare(o)) return 'None'; return (o && o.gst) || L.gstMode || 'None' }
 /** Everyone who has ever been an owner on the lease, in order of first appearance:
     [{ ownerId, active, share (current, or the last one they had), since: 'YYYY-MM', until: 'YYYY-MM' | null }] */
 export function allLeaseOwners(L) {
@@ -54,7 +83,7 @@ export function allLeaseOwners(L) {
   const out = []
   splits.forEach(sp => sp.owners.forEach(o => {
     let x = out.find(y => y.ownerId === o.ownerId)
-    if (!x) { x = { ownerId: o.ownerId, active: false, share: o, since: sp.from, until: null }; out.push(x) }
+    if (!x) { x = { ownerId: o.ownerId, role: isCoShare(o) ? 'coShare' : 'owner', active: false, share: o, since: sp.from, until: null }; out.push(x) }
     x.share = o; x.until = sp.until; x.active = sp.until === null
   }))
   return out
@@ -101,7 +130,7 @@ export const clearSchedCache = id => (id === undefined ? SCHED.clear() : SCHED.d
 /* Month-by-month rent for the whole term: pro-rata first/last month, rent-free period, escalation, advance-rent adjustment, maintenance, GST/RCM, TDS and due dates (advance or arrears). */
 export function schedule(L, ctx) {
   const end = L.exit?.effective && L.exit.effective < L.end ? L.exit.effective : L.end
-  const key = JSON.stringify([L.start, end, L.rent, L.escPct, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.owners || null, L.ownerHistory || null, L.tdsPerOwner, tdsKey(L, ctx)])
+  const key = JSON.stringify([L.start, end, L.rent, L.escPct, L.escAdd, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.extensions || null, L.owners || null, L.ownerHistory || null, L.tdsPerOwner, tdsKey(L, ctx)])
   const c = SCHED.get(L.id || '_'); if (c && c.key === key) return c.v
   const rows = []; const out = { rows, years: [], tot: {}, end }
   if (!L.start || !end || end < L.start || !(+L.rent >= 0)) { return out }
@@ -112,7 +141,7 @@ export function schedule(L, ctx) {
     const ms = p + '-01', me = addDays(perAdd(p, 1) + '-01', -1), D = +me.slice(8)
     const oS = L.start > ms ? L.start : ms, oE = end < me ? end : me; const occ = dayCount(oS, oE)
     const cS = rs > oS ? rs : oS; const ch = cS > oE ? 0 : dayCount(cS, oE)
-    const rate = escAmt(L, L.rent, ch ? cS : oS)
+    const rate = rentAt(L, ch ? cS : oS)
     const rent = Math.round(rate * ch / D)
     const mRate = L.maintType === 'Fixed monthly' ? (L.maintEsc ? escAmt(L, L.maint, ch ? cS : oS) : (+L.maint || 0)) : 0
     const maint = Math.round(mRate * occ / D)
@@ -123,7 +152,7 @@ export function schedule(L, ctx) {
       const oRate = Math.round(rate * (+o.rent || 0) / 100); const tdsOn = L.tds && (tdsPerOwner(L) ? oRate > 50000 : rate > 50000)
       const tr = tdsOn ? tdsRate(o.ownerId, p + '-01', ctx) / 100 : 0
       const g2 = mode === 'Forward' ? Math.round(tx * 0.18) : 0, rc = mode === 'RCM' ? Math.round(tx * 0.18) : 0, t = tdsOn ? Math.round((rr + (L.tdsOnMaint ? mp[i] : 0)) * tr) : 0
-      return { ownerId: o.ownerId, rate: oRate, rent: rp[i], adj: a, maint: mp[i], gst: g2, rcm: rc, tds: t, net: tx + g2 - t, mode, tdsOn, tdsRate: tr * 100, rentNet: rr + (mode === 'Forward' ? Math.round(rr * 0.18) : 0) - (tdsOn ? Math.round(rr * tr) : 0) }
+      return { ownerId: o.ownerId, role: isCoShare(o) ? 'coShare' : 'owner', rate: oRate, rent: rp[i], adj: a, maint: mp[i], gst: g2, rcm: rc, tds: t, net: tx + g2 - t, mode, tdsOn, tdsRate: tr * 100, rentNet: rr + (mode === 'Forward' ? Math.round(rr * 0.18) : 0) - (tdsOn ? Math.round(rr * tr) : 0) }
     })
     const adjUsed = split.reduce((a2, x) => a2 + x.adj, 0); advLeft += adj - adjUsed; adj = adjUsed
     const gst = split.reduce((a2, x) => a2 + x.gst, 0), rcm = split.reduce((a2, x) => a2 + x.rcm, 0), tds = split.reduce((a2, x) => a2 + x.tds, 0)
@@ -155,7 +184,7 @@ export function schedule(L, ctx) {
     const o = ao.share; const di = dos.findIndex(x => x.ownerId === ao.ownerId); const dep = di < 0 ? 0 : dp[di], av = di < 0 ? 0 : avp[di]
     const m = ownerGstMode(L, ao.ownerId, ao.active ? undefined : ao.until); const oRate = (+L.rent || 0) * (+o.rent || 0) / 100; const tdsOn = L.tds && (tdsPerOwner(L) ? oRate > 50000 : +L.rent > 50000)
     const sum = k => rows.reduce((a2, r) => a2 + (r.split.find(x => x.ownerId === ao.ownerId)?.[k] || 0), 0)
-    return { ownerId: ao.ownerId, active: ao.active, since: ao.since, until: ao.until, share: o, mode: m, tdsOn, rent: sum('rent'), adj: sum('adj'), maint: sum('maint'), gst: sum('gst'), rcm: sum('rcm'), tds: sum('tds'), net: sum('net'), deposit: dep, adv: av, advGst: m === 'Forward' ? Math.round(av * 0.18) : 0, advTds: tdsOn ? Math.round(av * tdsRate(ao.ownerId, L.start, ctx) / 100) : 0 }
+    return { ownerId: ao.ownerId, role: ao.role, active: ao.active, since: ao.since, until: ao.until, share: o, mode: m, tdsOn, rent: sum('rent'), adj: sum('adj'), maint: sum('maint'), gst: sum('gst'), rcm: sum('rcm'), tds: sum('tds'), net: sum('net'), deposit: dep, adv: av, advGst: m === 'Forward' ? Math.round(av * 0.18) : 0, advTds: tdsOn ? Math.round(av * tdsRate(ao.ownerId, L.start, ctx) / 100) : 0 }
   })
   out.upfront = { deposit: +L.deposit || 0, adv, advGst: out.owners.reduce((a2, x) => a2 + x.advGst, 0), advTds: out.owners.reduce((a2, x) => a2 + x.advTds, 0), brokerage: +L.brokerage || 0, stamp: +L.stamp || 0 }
   out.unadjusted = advLeft
@@ -163,7 +192,17 @@ export function schedule(L, ctx) {
   return out
 }
 export const schedRow = (L, p, ctx) => schedule(L, ctx).rows.find(r => r.p === p)
-export const lockEnd = L => L.lockIn ? addMonths(L.start, L.lockIn) : null
+/* Lock-in: the months from the start during which a party may not end the lease. `lockIn` binds the lessee (tenant);
+   `lockInLessor` the owner, falling back to the lessee's on older leases that had one figure. */
+export const lockInLessee = L => +L.lockIn || 0
+export const lockInLessor = L => (L.lockInLessor === undefined || L.lockInLessor === null || L.lockInLessor === '' ? lockInLessee(L) : +L.lockInLessor || 0)
+/** Months of lock-in binding the party that wants to leave: by = 'Owner' (lessor) or anything else (lessee). */
+export const lockInOf = (L, by) => (by === 'Owner' ? lockInLessor(L) : lockInLessee(L))
+/** When the lessee's lock-in ends (null if none). */
+export const lockEnd = L => lockInLessee(L) ? addMonths(L.start, lockInLessee(L)) : null
+/** When the lessor's lock-in ends (null if none). */
+export const lockEndLessor = L => lockInLessor(L) ? addMonths(L.start, lockInLessor(L)) : null
+export const lockEndOf = (L, by) => (by === 'Owner' ? lockEndLessor(L) : lockEnd(L))
 /* Notice periods: the lessee (tenant) and the lessor (owner) may have to give different notice. `notice` is the
    lessee's; `noticeLessor` the owner's, falling back to the lessee's on older leases that had one figure. */
 export const noticeLessee = L => +L.notice || 0

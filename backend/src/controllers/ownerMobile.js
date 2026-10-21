@@ -27,6 +27,7 @@ export async function invoiceDefaults(req, res) {
   if (!L) throw badRequest('This property has no lease yet, so no invoice can be raised against it.')
   const oid = req.user.role === 'owner' ? req.user.ownerId : (req.query.ownerId || L.ownerId)
   const O = R.owners.find(o => o.id === oid)
+  if (O && O.party === 'Co-share') throw new ApiError(403, 'As a co-share you do not raise invoices. Your share of the rent is generated as a payment each month and paid to your bank.', { code: 'co_share' })
   if (!leaseOwners(L, per).some(o => o.ownerId === oid)) throw new ApiError(403, `You are not an owner on this lease for ${perLabel(per)}.`, { code: 'forbidden' })
   const row = schedRow(L, per, R.ctx); const x = row?.split?.find(s => s.ownerId === oid)
   const base = type === 'Rent' ? (x ? x.rent - x.adj : Math.round(rentFor(L, per) * ownerShare(L, oid, 'rent', per))) : type === 'Maintenance' ? (x ? x.maint : Math.round((+L.maint || 0) * ownerShare(L, oid, 'maint', per))) : 0

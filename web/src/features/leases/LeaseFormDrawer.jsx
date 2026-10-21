@@ -24,7 +24,7 @@ function timingHint(pt, day) {
 }
 
 function initialLease(d) {
-  return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, notice: 3, noticeLessor: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: '', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
+  return d.id ? S.leases.find(l => l.id === d.id) : Object.assign({ start: TODAY, end: addDays(addMonths(TODAY, 60), -1), lockIn: 24, lockInLessor: 24, notice: 3, noticeLessor: 3, escPct: 5, escEvery: 12, escType: 'Compound', escFrom: 'Lease start', dueDay: 5, payTiming: '', gstMode: 'Forward', tds: true, maintType: 'Fixed monthly', elec: 'Actuals (sub-meter)', status: 'Draft', fitout: 30, deposit: 0, advanceRent: 0, advanceMonths: 0, ref: (isFranchisee() ? 'FR-LSE-' : 'TDPL-FAC-LSE-') + String(S.leases.length + 1).padStart(3, '0'), propertyId: d.prop || '' }, d.renewFrom || {})
 }
 
 /** Owner rows for a lease that has none yet: the property's owners with their % shares (one row at 100% otherwise). */
@@ -33,6 +33,8 @@ function ownersFromProperty(pid, fallbackOwnerId) {
   if (os) return os.map(o => ({ ownerId: o.ownerId, rent: +o.share || 0, maint: +o.share || 0, dep: +o.share || 0, adv: +o.share || 0, gst: '' }))
   return [{ ownerId: fallbackOwnerId || P?.ownerId || '', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }]
 }
+
+const DEP_CHANNELS = ['NEFT', 'RTGS', 'IMPS', 'UPI', 'Cheque', 'Demand draft', 'Cash', 'Other']
 
 export default function LeaseFormDrawer({ d }) {
   useStore()
@@ -48,6 +50,7 @@ export default function LeaseFormDrawer({ d }) {
     if (owners.length > 1 && !(L && L.owners && L.owners.length)) pctRef.current = owners.map(o => +o.rent || 0)
     return amountsFromShares(owners, L ? { rent: +L.rent || 0, maint: +L.maint || 0, dep: +L.deposit || 0, adv: +L.advanceRent || 0 } : {}).map(o => ({ key: ++SEQ, o }))
   })
+  const [escType, setEscType] = useState(L.escType || 'Compound')
   const [same] = useState(() => !(L && L.owners && L.owners.length) || L.owners.every(o => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
   const lastTotals = useRef(null) // totals the owners' amounts were last split from — to rescale them when a total changes
 
@@ -114,6 +117,7 @@ export default function LeaseFormDrawer({ d }) {
   }
   const onChange = e => {
     const f = formRef.current; const t = e.target
+    if (t.id === 'ls-et') setEscType(t.value)
     if (t.name === 'o-id') { const O = owner(t.value); const g = fld(t.closest('.orow'), 'gst'); if (O && orows().length > 1) g.value = O.gstin ? 'Forward' : 'RCM' }
     if (t.id === 'ls-prop') {
       const rs = orows(); const P = prop(t.value)
@@ -156,7 +160,8 @@ export default function LeaseFormDrawer({ d }) {
           <TextInput id="ls-term" name="termMonths" label="Term (months)" type="number" min="1" defaultValue={term} hint="Sets the end date" />
           <TextInput id="ls-en" name="end" label="Lease end date" type="date" defaultValue={L.end} required />
           <TextInput id="ls-ff" name="fitout" label="Rent-free period (days)" type="number" min="0" defaultValue={L.fitout || 0} hint={<>Rent starts <b id="ls-rs">{fmtD(rentStartOf(x || L))}</b></>} />
-          <TextInput id="ls-li" name="lockIn" label="Lock-in (months)" type="number" min="0" defaultValue={L.lockIn} />
+          <TextInput id="ls-li" name="lockIn" label="Lock-in for lessee — tenant (months)" type="number" min="0" defaultValue={L.lockIn} hint="The tenant cannot exit before this" />
+          <TextInput id="ls-lil" name="lockInLessor" label="Lock-in for lessor — owner (months)" type="number" min="0" defaultValue={L.lockInLessor ?? L.lockIn} hint="The owner cannot end the lease before this" />
           <TextInput id="ls-no" name="notice" label="Notice by lessee — tenant (months)" type="number" min="0" defaultValue={L.notice} hint="To end or not renew the lease" />
           <TextInput id="ls-nol" name="noticeLessor" label="Notice by lessor — owner (months)" type="number" min="0" defaultValue={L.noticeLessor ?? L.notice} hint="Often longer than the tenant’s" />
 
@@ -164,15 +169,19 @@ export default function LeaseFormDrawer({ d }) {
           <TextInput id="ls-rent" name="rent" label="Monthly rent (₹, excl. GST)" type="number" min="0" defaultValue={L.rent} required />
           <SelectInput id="ls-pt" name="payTiming" label="Is rent paid in advance or in arrears?" required options={[['', 'Select — required'], ['Advance', 'In advance — billed & paid in the same month'], ['Arrears', 'In arrears — liability at month-end, billed next month']]} defaultValue={L.payTiming || ''} hint={timingHint(x ? x.payTiming : L.payTiming, x ? x.dueDay : L.dueDay)} />
           <TextInput id="ls-due" name="dueDay" label="Due by (day of month)" type="number" min="1" max="28" defaultValue={L.dueDay} hint="Advance: of the same month · Arrears: of the following month" />
-          <TextInput id="ls-esc" name="escPct" label="Escalation %" type="number" min="0" step="0.5" defaultValue={L.escPct} />
+          <SelectInput id="ls-et" name="escType" label="Escalation is" options={[['Compound', 'A % compounded on the last rent'], ['Simple', 'A % of the original base rent'], ['Amount', 'A fixed ₹ amount added each time']]} defaultValue={L.escType || 'Compound'} hint={escType === 'Amount' ? 'Fill in the ₹ increase; the % is ignored' : 'Fill in the %; the ₹ increase is ignored'} />
+          <TextInput id="ls-esc" name="escPct" label="Escalation %" type="number" min="0" step="0.5" defaultValue={L.escPct} disabled={escType === 'Amount'} />
+          <TextInput id="ls-esca" name="escAdd" label="Increase each time (₹ per month)" type="number" min="0" step="100" defaultValue={L.escAdd || ''} disabled={escType !== 'Amount'} hint="e.g. 3000 = rent goes up by ₹3,000/month every time" />
           <TextInput id="ls-ee" name="escEvery" label="Escalate every (months)" type="number" min="0" defaultValue={L.escEvery} hint="12 = yearly · 36 = once every 3 years" />
-          <SelectInput id="ls-et" name="escType" label="Escalation is" options={[['Compound', 'Compounded on last rent'], ['Simple', 'Simple — on original base rent']]} defaultValue={L.escType || 'Compound'} />
           <SelectInput id="ls-ef" name="escFrom" label="Escalation counted from" options={['Lease start', 'Rent commencement']} defaultValue={L.escFrom || 'Lease start'} />
 
           <SectionTitle>4 · Deposit &amp; advance</SectionTitle>
           <TextInput id="ls-dep" name="deposit" label="Security deposit (₹, refundable)" type="number" min="0" defaultValue={L.deposit} hint={<span id="ls-depm">{x && x.rent ? `= ${(x.deposit / x.rent).toFixed(1)} months’ rent` : ''}</span>} />
           <TextInput id="ls-depx" label="…or as months of rent" type="number" min="0" step="0.5" placeholder="e.g. 6" />
           <CheckField id="ls-dp" name="depositPaid" label="Security deposit paid to owner" defaultChecked={L.depositPaid} />
+          <TextInput id="ls-dutr" name="depositUtr" label="Transaction ID (UTR / cheque no.)" defaultValue={L.depositUtr} placeholder="e.g. HDFCN4410028811" upper hint="Of the deposit payment" />
+          <SelectInput id="ls-dch" name="depositChannel" label="Payment channel" options={DEP_CHANNELS} defaultValue={L.depositChannel || ''} placeholder="— choose —" />
+          <TextInput id="ls-dbk" name="depositBank" label="Bank name" defaultValue={L.depositBank} placeholder="e.g. HDFC Bank" hint="Bank the deposit was paid from" />
           <TextInput id="ls-adv" name="advanceRent" label="Advance rent paid at signing (₹)" type="number" min="0" defaultValue={L.advanceRent || 0} hint="Adjusted against monthly rent" />
           <TextInput id="ls-advm" name="advanceMonths" label="Adjust advance over (months)" type="number" min="0" defaultValue={L.advanceMonths || 0} hint="0 = adjust in full against the first rent months" />
           <TextInput id="ls-brk" name="brokerage" label="Brokerage (₹, one-time)" type="number" min="0" defaultValue={L.brokerage || 0} />

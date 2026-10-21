@@ -17,6 +17,7 @@ import { ListToolbar, ListFilter, Pager } from '../../components/list/ListContro
 import RentRoll from '../shared/RentRoll'
 import LedgerKpis from '../ledgers/LedgerKpis'
 import InvoiceTable from './InvoiceTable'
+import { meIsCoShare } from '../../domain/lease'
 import ComboFilter from './ComboFilter'
 import { exportCsv } from './actions'
 
@@ -40,10 +41,10 @@ export default function InvoicesPage() {
     <>
       <PageHead
         title={o ? 'Invoices & payments' : 'Rent & invoices'}
-        sub={o ? 'Raise rent, electricity and maintenance invoices to TrustLab, or upload your own. Track verification and payment here.' : 'Owner invoices move from Submitted → Verified by Accounts Payable → Approved by CMD → Paid. TDS and RCM are calculated from each lease.'}
+        sub={o ? (meIsCoShare() ? 'Your share of the rent is generated as a payment each month, with TDS on your PAN. Track approval and payment here.' : 'Raise rent, electricity and maintenance invoices to TrustLab, or upload your own. Track verification and payment here.') : 'Owner invoices move from Submitted → Verified by Accounts Payable → Approved by CMD → Paid. TDS and RCM are calculated from each lease.'}
         actions={<>
           <Btn onClick={exportCsv}>Download statement (CSV)</Btn>
-          {o ? <><Btn onClick={() => newInvoice({ mode: 'upload' })}>Upload invoice</Btn><Btn primary onClick={() => newInvoice()}>Generate invoice</Btn></> : <><Btn onClick={generateRent} title="Rent invoices are generated on the 1st of every month; this creates any that are still missing for this month">Generate this month’s rent</Btn><Btn primary onClick={() => newInvoice()}>Record owner invoice</Btn></>}
+          {o ? (meIsCoShare() ? null : <><Btn onClick={() => newInvoice({ mode: 'upload' })}>Upload invoice</Btn><Btn primary onClick={() => newInvoice()}>Generate invoice</Btn></>) : <><Btn onClick={generateRent} title="Rent invoices are generated on the 1st of every month; this creates any that are still missing for this month">Generate this month’s rent</Btn><Btn primary onClick={() => newInvoice()}>Record owner invoice</Btn></>}
         </>}
       />
       <SampleBanner />

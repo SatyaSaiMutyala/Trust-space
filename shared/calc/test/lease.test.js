@@ -106,3 +106,40 @@ test('co-owner changes: the split in force each month comes from ownerHistory; d
   assert.equal(depositOwners(L).length, 2); assert.equal(leaseOwners(L).length, 1); assert.equal(isMulti(L), true)
   clearSchedCache()
 })
+
+test('co-share: paid their rent share with TDS, no GST, no deposit by default, not a party to the agreement', async () => {
+  const { isCoShare, leaseParties, leaseCoShares, ownerGstMode } = await import('../lease.js')
+  const L = { ...lease('l1'), id: 'l1x', gstMode: 'Forward', owners: [{ ownerId: 'o1', rent: 80, maint: 80, dep: 100, adv: 100, gst: '' }, { ownerId: 'o2', rent: 20, maint: 20, dep: 0, adv: 0, gst: 'Forward', role: 'coShare' }] }
+  assert.deepEqual(leaseParties(L).map(o => o.ownerId), ['o1']); assert.deepEqual(leaseCoShares(L).map(o => o.ownerId), ['o2'])
+  assert.equal(ownerGstMode(L, 'o1', '2026-10'), 'Forward'); assert.equal(ownerGstMode(L, 'o2', '2026-10'), 'None', 'a co-share never has GST, whatever the row says')
+  const row = schedule(L, ctx()).rows.find(r => r.p === '2026-10'); const cs = row.split.find(s => s.ownerId === 'o2'); const ow = row.split.find(s => s.ownerId === 'o1')
+  assert.equal(cs.role, 'coShare'); assert.equal(ow.role, 'owner')
+  assert.equal(cs.rent, Math.round(row.rent * 0.2)); assert.equal(cs.gst, 0); assert.equal(cs.rcm, 0); assert.ok(cs.tds > 0, 'TDS on the co-share’s own PAN'); assert.equal(cs.mode, 'None')
+  assert.ok(ow.gst > 0, 'the owner keeps forward GST on their share')
+  assert.equal(depositOwners(L).find(o => o.ownerId === 'o2').dep, 0)
+  assert.equal(allLeaseOwners(L).find(x => x.ownerId === 'o2').role, 'coShare')
+  assert.equal(calc(L, 'Rent', 10000, '2026-10', undefined, 'o2', ctx()).gst, 0)
+  assert.ok(isCoShare({ role: 'coShare' }) && !isCoShare({}) && !isCoShare(null))
+})
+
+test('extension with a revised rent: old rent to the old end, the new base from the extension, escalations counted from there', async () => {
+  const { rentAt, rentBaseAt, nextEsc: ne } = await import('../lease.js')
+  const L0 = lease('l1') // Apr 2023 – Mar 2032, 3,20,000, 15% every 36 months compound
+  const L = { ...L0, id: 'l1ext', end: '2035-03-31', extensions: [{ id: 'x1', at: '2032-01-10T00:00:00Z', by: 'Ravi', fromEnd: '2032-03-31', toEnd: '2035-03-31', rent: 380000, rentFrom: '2032-04-01', ref: 'Addendum 1' }] }
+  assert.equal(rentFor(L, '2032-03'), rentFor(L0, '2032-03'), 'unchanged before the extension')
+  assert.equal(rentFor(L, '2032-04'), 380000, 'the revised rent from the extension')
+  assert.equal(rentFor(L, '2035-03'), 380000, 'no escalation yet: 36 months from Apr 2032 is Apr 2035')
+  assert.deepEqual(rentBaseAt(L, '2033-01-01'), { base: 380000, anchor: '2032-04-01', step: L.extensions[0] })
+  assert.equal(ne(L, '2031-12-01'), '2032-04-01', 'the next rent change is the extension step, before the next escalation')
+  const S = schedule(L, ctx()); assert.equal(S.rows.find(r => r.p === '2032-04').rent, 380000); assert.equal(S.rows[S.rows.length - 1].p, '2035-03')
+  const noRent = { ...L, id: 'l1ext2', extensions: [{ ...L.extensions[0], rent: null }] }
+  assert.equal(rentFor(noRent, '2032-04'), rentFor(L0, '2032-04'), 'without a revised rent the existing schedule simply continues')
+})
+
+test('escalation by a fixed amount: ₹3,000 more per month every 12 months', () => {
+  const L = { id: 'amt', start: '2026-04-01', end: '2031-03-31', rent: 20000, escType: 'Amount', escAdd: 3000, escEvery: 12, escPct: 0, fitout: 0, payTiming: 'Advance', dueDay: 5, gstMode: 'None', tds: false, maintType: 'None', ownerId: 'o1' }
+  assert.equal(rentFor(L, '2026-04'), 20000); assert.equal(rentFor(L, '2027-03'), 20000)
+  assert.equal(rentFor(L, '2027-04'), 23000); assert.equal(rentFor(L, '2028-04'), 26000); assert.equal(rentFor(L, '2031-03'), 32000)
+  const S = schedule(L, ctx()); assert.equal(S.rows.find(r => r.p === '2029-06').rent, 29000)
+  assert.equal(rentFor({ ...L, escAdd: 0 }, '2028-04'), 20000, 'no amount = no escalation')
+})

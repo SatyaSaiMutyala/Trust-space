@@ -83,7 +83,7 @@ export function InvoicesScreen() {
   const today = todayISO();
   return (
     <ListPage title="Rent & invoices" placeholder="Search number, month or type" list={list} action={<AddButton to="ToApprove" title="Approve" />}
-      renderRow={(x, i, nav, div) => { const st = invState(x, today); return <ListRow key={x.id} title={owners.name(x.ownerId) || x.number} sub={`${props.name(x.propertyId)} · ${perLabel(x.period)} ${x.type.toLowerCase()} · ${x.number}`} right={<><AppText variant="monoMd">{inr(x.net)}</AppText><Chip label={st === 'Verified' ? 'To approve' : st} tone={st === 'Paid' ? 'teal' : st === 'Overdue' || st === 'Rejected' ? 'coral' : st === 'Verified' ? 'amber' : 'blue'} size="sm" /></>} onPress={() => nav.navigate(st === 'Verified' ? 'ToApprove' : 'ToApprove', { id: x.id })} divider={div} />; }} />
+      renderRow={(x, i, nav, div) => { const st = invState(x, today); return <ListRow key={x.id} title={owners.name(x.ownerId) || x.number} sub={`${props.name(x.propertyId)} · ${perLabel(x.period)} ${x.voucher ? 'rent payment' : x.type.toLowerCase()} · ${x.number}`} right={<><AppText variant="monoMd">{inr(x.net)}</AppText><Chip label={st === 'Verified' ? 'To approve' : st} tone={st === 'Paid' ? 'teal' : st === 'Overdue' || st === 'Rejected' ? 'coral' : st === 'Verified' ? 'amber' : 'blue'} size="sm" /></>} onPress={() => nav.navigate(st === 'Verified' ? 'ToApprove' : 'ToApprove', { id: x.id })} divider={div} />; }} />
   );
 }
 

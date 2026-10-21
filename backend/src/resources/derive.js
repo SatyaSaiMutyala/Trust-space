@@ -16,19 +16,33 @@ const sameInputs = (a, b) => INPUTS.every(k => String(a[k] ?? '') === String(b[k
 export async function deriveInvoice(rec, existing, { models }) {
   if (!rec.leaseId || !rec.ownerId) return rec
   // inputs unchanged: keep the stored amounts (server-computed, or as recorded before this rule existed) — never the ones the client sent
-  if (existing && sameInputs(rec, existing)) return { ...rec, base: existing.base, gst: existing.gst, rcm: existing.rcm, tds: existing.tds, tdsRate: existing.tdsRate, total: existing.total, net: existing.net, computedBy: existing.computedBy }
+  if (existing && sameInputs(rec, existing)) return { ...rec, voucher: !!existing.voucher, base: existing.base, gst: existing.gst, rcm: existing.rcm, tds: existing.tds, tdsRate: existing.tdsRate, total: existing.total, net: existing.net, computedBy: existing.computedBy }
   const [L, O] = await Promise.all([models.leases.findById(rec.leaseId).lean(), models.owners.findById(rec.ownerId).lean()])
   if (!L) return rec
   const lease = { ...L, id: L._id }; const owner = O ? { ...O, id: O._id } : undefined
   const ctx = makeCtx({ today: new Date().toISOString().slice(0, 10), ownerOf: () => owner })
-  const gstOn = gstFlag(rec) && !!owner?.gstin // GST can only be charged by a registered owner
+  const voucher = owner?.party === 'Co-share' // a co-share raises no invoice: this record is their rent payment voucher, never with GST
+  const gstOn = gstFlag(rec) && !!owner?.gstin && !voucher // GST can only be charged by a registered owner
   const c = calc(lease, rec.type, rec.base, rec.period, gstOn, rec.ownerId, ctx)
-  return { ...rec, base: c.base, gst: c.gst, rcm: c.rcm, tds: c.tds, tdsRate: c.tdsRate, total: c.total, net: c.net, computedBy: 'server' }
+  return { ...rec, voucher, base: c.base, gst: voucher ? 0 : c.gst, rcm: voucher ? 0 : c.rcm, tds: c.tds, tdsRate: c.tdsRate, total: c.base + (voucher ? 0 : c.gst), net: c.base + (voucher ? 0 : c.gst) - c.tds, computedBy: 'server' }
 }
 
 /** Deposit adjustments on a lease: the TDS of a new or changed adjustment is what the rent invoice (or, without one, the
  *  schedule) says for that month and owner — the agreed amount itself is the owner's and TrustLab's to set. */
+/** Split rows follow the owner records: an owner with party 'Co-share' is role coShare with no GST, everyone else role owner.
+ *  Applied to the current split and to the history, so the client can never store a co-share with GST. */
+async function normaliseSplit(rec, models) {
+  const lists = [rec.owners, ...((Array.isArray(rec.ownerHistory) ? rec.ownerHistory : []).map(h => h && h.owners))].filter(Array.isArray)
+  const ids = [...new Set(lists.flat().map(o => o && o.ownerId).filter(Boolean))]
+  if (!ids.length) return rec
+  const owners = await models.owners.find({ _id: { $in: ids } }, { party: 1 }).lean()
+  const coShare = new Set(owners.filter(o => o.party === 'Co-share').map(o => o._id))
+  const fix = o => (o && o.ownerId ? (coShare.has(o.ownerId) ? { ...o, role: 'coShare', gst: 'None' } : (o.role === 'coShare' ? { ...o, role: 'owner' } : o)) : o)
+  return { ...rec, ...(Array.isArray(rec.owners) ? { owners: rec.owners.map(fix) } : {}), ...(Array.isArray(rec.ownerHistory) ? { ownerHistory: rec.ownerHistory.map(h => (h && Array.isArray(h.owners) ? { ...h, owners: h.owners.map(fix) } : h)) } : {}) }
+}
+
 export async function deriveLease(rec, existing, { models }) {
+  rec = await normaliseSplit(rec, models)
   if (rec.exit && Array.isArray(rec.exit.deductions) && rec.exit.stage >= 4) rec = { ...rec, exit: { ...rec.exit, refund: depHeld(rec) - rec.exit.deductions.reduce((s, d) => s + (+d.amount || 0), 0) } }
   if (!Array.isArray(rec.depAdj) || !rec.depAdj.length) return rec
   const before = new Map(((existing && existing.depAdj) || []).map(a => [a.id, a]))

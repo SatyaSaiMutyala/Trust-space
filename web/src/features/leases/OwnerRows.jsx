@@ -30,7 +30,7 @@ export default function OwnerRows({ rows, same, sums, onAdd, onDel }) {
           <TableBody id="ls-owners">
             {rows.map(({ key, o }) => (
               <TableRow key={key} className="orow" data-key={key}>
-                <TableCell><SelectInput grid={false} name="o-id" aria-label="Owner" placeholder="— choose owner —" options={S.owners.map(x => [x.id, x.name + (x.pan ? ' · ' + x.pan : '')])} defaultValue={o.ownerId || ''} sx={SEL_SX} /></TableCell>
+                <TableCell><SelectInput grid={false} name="o-id" aria-label="Owner" placeholder="— choose owner —" options={S.owners.map(x => [x.id, x.name + (x.pan ? ' · ' + x.pan : '') + (x.party === 'Co-share' ? ' · co-share' : '')])} defaultValue={o.ownerId || ''} sx={SEL_SX} /></TableCell>
                 {KS.map(k => <TableCell key={k}><TextInput grid={false} type="number" name={`o-${k}`} min="0" step="1" defaultValue={o[k] ?? ''} htmlInput={{ 'aria-label': `${LABEL[k]} amount (₹)` }} sx={NUM_SX} /></TableCell>)}
                 <TableCell><SelectInput grid={false} name="o-gst" aria-label="GST" options={G} defaultValue={o.gst || ''} sx={SEL_SX} /></TableCell>
                 <TableCell><Btn sm ghost onClick={() => onDel(key)} aria-label="Remove owner">✕</Btn></TableCell>
@@ -38,7 +38,7 @@ export default function OwnerRows({ rows, same, sums, onAdd, onDel }) {
             ))}
           </TableBody>
           <TableFooter><TableRow>
-            <TableCell><Btn sm onClick={onAdd}>＋ Add co-owner</Btn></TableCell>
+            <TableCell><Btn sm onClick={onAdd}>＋ Add co-owner / co-share</Btn></TableCell>
             {KS.map(k => <TableCell key={k} className="num small" id={`ls-sum-${k}`} sx={{ color: `${sums[k]?.color || 'var(--muted)'} !important` }}>{sums[k]?.text || ''}</TableCell>)}
             <TableCell colSpan={2} />
           </TableRow></TableFooter>
@@ -48,7 +48,7 @@ export default function OwnerRows({ rows, same, sums, onAdd, onDel }) {
         <CheckField grid={false} id="ls-same" label="Same split for every charge" defaultChecked={same} />
         <CheckField grid={false} id="ls-tpo" name="tdsPerOwner" label="Test TDS threshold on each co-owner’s share" defaultChecked />
       </div>
-      <p className="hint small muted" style={{ margin: '4px 0 0' }}>Each owner invoices and is paid separately. Enter each owner’s amount; the lease’s monthly rent, maintenance, security deposit and advance rent (sections 3–5) are filled in as the sum of these, and escalations are shared in the same proportion. Add co-owners in Owners first if they are not listed.</p>
+      <p className="hint small muted" style={{ margin: '4px 0 0' }}>Each owner invoices and is paid separately. Enter each owner’s amount; the lease’s monthly rent, maintenance, security deposit and advance rent (sections 3–5) are filled in as the sum of these, and escalations are shared in the same proportion. Add co-owners in Owners first if they are not listed. A co-share (marked in the list) is paid their share with TDS on their PAN but is not on the agreement: no invoice, no GST — enter 0 for their deposit and advance unless agreed otherwise.</p>
     </>
   )
 }

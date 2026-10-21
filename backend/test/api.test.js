@@ -573,6 +573,60 @@ test('leases: co-owner shares, deposit adjustments and opening balances are vali
   assert.equal(cert.status, 400); assert.equal(cert.body.message, 'Certificate TDS rate must be between 0% and 10%.')
 })
 
+test('lease extension: validated, changes the schedule from the extension date, and tells the owners', async () => {
+  const L = (await call('GET', '/leases/l1')).body.data
+  const put = body => call('PUT', '/leases/l1', { ...L, ...body })
+  let r = await put({ extensions: [{ id: 'x', fromEnd: L.end, toEnd: '2030-01-01', rent: 380000, rentFrom: '2032-04-01' }] })
+  assert.equal(r.status, 400); assert.match(r.body.message, /must end after the old end date/)
+  r = await put({ extensions: [{ id: 'x', fromEnd: L.end, toEnd: '2035-03-31', rent: -1, rentFrom: '2032-04-01' }] })
+  assert.equal(r.status, 400); assert.match(r.body.message, /revised rent of an extension must be/)
+  r = await put({ extensions: [{ id: 'x', fromEnd: L.end, toEnd: '2035-03-31', rent: 380000, rentFrom: '2032-04-01' }] })
+  assert.equal(r.status, 400); assert.match(r.body.message, /lease end \(2032-03-31\) is before its latest extension/)
+  const { sent } = await import('../src/services/push.js'); sent.length = 0
+  r = await put({ end: '2035-03-31', extensions: [{ id: 'x', at: new Date().toISOString(), by: 'Admin', fromEnd: L.end, toEnd: '2035-03-31', rent: 380000, rentFrom: '2032-04-01', ref: 'Addendum 1' }] })
+  assert.equal(r.status, 200, r.body.message)
+  const sch = (await call('GET', '/leases/l1/schedule')).body.data
+  assert.equal(sch.rows.find(x => x.p === '2032-03').rent, 423200, 'the last month of the old term keeps the old escalated rent')
+  assert.equal(sch.rows.find(x => x.p === '2032-04').rent, 380000); assert.equal(sch.rows[sch.rows.length - 1].p, '2035-03')
+  await new Promise(res => setTimeout(res, 150))
+  const n = sent.find(x => x.title === 'Lease extended'); assert.ok(n, 'owners are told'); assert.match(n.body, /now until 31 Mar 2035 · rent ₹3,80,000 from 01 Apr 2032 · Addendum 1/); assert.deepEqual(n.userIds, ['u-o1'])
+  await call('PUT', '/leases/l1', L)
+})
+
+test('co-shares: paid a rent share with TDS on their PAN, no GST, a payment voucher instead of an invoice, not on the agreement', async () => {
+  const cs = await call('POST', '/owners', { id: 'o-cs', name: 'Padma Kondapalli', kind: 'Individual', party: 'Co-share', pan: 'COSPK5555L', gstin: '36COSPK5555L1Z1', phone: '+91 90000 55555', email: 'padma@example.com', bankName: 'SBI', acctNo: '31000000001', ifsc: 'SBIN0000001' })
+  assert.equal(cs.status, 201, cs.body.message)
+  const L = (await call('GET', '/leases/l1')).body.data
+  const put = body => call('PUT', '/leases/l1', { ...L, ...body })
+  const only = await put({ owners: [{ ownerId: 'o-cs', rent: 100, maint: 100, dep: 100, adv: 100, gst: '' }] })
+  assert.equal(only.status, 400); assert.match(only.body.message, /co-shares cannot be the only payees/)
+  const badRole = await put({ owners: [{ ownerId: 'o1', rent: 80, maint: 80, dep: 100, adv: 100, gst: '' }, { ownerId: 'o-cs', rent: 20, maint: 20, dep: 0, adv: 0, gst: 'Forward', role: 'partner' }] })
+  assert.equal(badRole.status, 400); assert.match(badRole.body.message, /Role for Padma Kondapalli must be owner or coShare/)
+  // the client sent GST and no role: the server sets role coShare and GST None from the owner record
+  const ok = await put({ owners: [{ ownerId: 'o1', rent: 80, maint: 80, dep: 100, adv: 100, gst: '' }, { ownerId: 'o-cs', rent: 20, maint: 20, dep: 0, adv: 0, gst: 'Forward' }] })
+  assert.equal(ok.status, 200, ok.body.message)
+  assert.deepEqual(ok.body.data.owners.map(o => [o.ownerId, o.role, o.gst]), [['o1', undefined, ''], ['o-cs', 'coShare', 'None']])
+  const sch = (await call('GET', '/leases/l1/schedule')).body.data
+  const row = sch.rows.find(r => r.p === '2026-12'); const x = row.split.find(s => s.ownerId === 'o-cs'); const y = row.split.find(s => s.ownerId === 'o1')
+  assert.equal(x.role, 'coShare'); assert.equal(x.gst, 0); assert.ok(x.tds > 0); assert.equal(Math.round(x.rent / (x.rent + y.rent) * 100), 20)
+  assert.ok(y.gst > 0, 'the owner on the agreement keeps GST on their share')
+  assert.equal(sch.owners.find(o => o.ownerId === 'o-cs').role, 'coShare')
+  // monthly generation: a payment voucher for the co-share, an invoice for the owner
+  const gen = await call('POST', '/invoices/generate', { period: '2026-12' })
+  const made = gen.body.data.created.filter(m => m.leaseRef === L.ref)
+  assert.equal(made.length, 2)
+  const inv = (await call('GET', '/invoices?leaseId=l1&period=2026-12&limit=50')).body.data
+  const v = inv.find(i => i.ownerId === 'o-cs'), o = inv.find(i => i.ownerId === 'o1')
+  assert.equal(v.voucher, true); assert.equal(v.gst, 0); assert.equal(v.rcm, 0); assert.ok(v.tds > 0); assert.equal(v.net, v.base - v.tds); assert.match(v.number, /^PAY\/26-27\/\d{3}$/); assert.match(v.desc, /^Rent share for Dec 2026/)
+  assert.ok(!o.voucher && o.gst > 0)
+  // a hand-recorded one for the co-share is a voucher too, whatever GST the client sends
+  const hand = await call('PUT', '/invoices/iv-cs', { number: 'X/1', propertyId: 'p1', leaseId: 'l1', ownerId: 'o-cs', type: 'Maintenance', period: '2027-01', date: '2027-01-05', base: 7600, gst: 1368 })
+  assert.equal(hand.status, 201, hand.body.message); assert.equal(hand.body.data.voucher, true); assert.equal(hand.body.data.gst, 0); assert.equal(hand.body.data.total, 7600)
+  for (const id of gen.body.data.created.map(m => m.id).concat([hand.body.data.id])) { await call('DELETE', '/invoices/' + id); await call('DELETE', '/trash/invoices/' + id) }
+  await call('PUT', '/leases/l1', L)
+  await call('DELETE', '/owners/o-cs'); await call('DELETE', '/trash/owners/o-cs')
+})
+
 test('invoice amounts are computed by the server from the lease and owner, whatever the client sends', async () => {
   const inv = { number: 'TEST/26-27/901', propertyId: 'p2', leaseId: 'l2', ownerId: 'o2', type: 'Rent', period: '2026-11', date: '2026-11-01', dueDate: '2026-11-07', base: 231525, gst: 1, rcm: 99, tds: 1, total: 1, net: 1, status: 'Submitted', source: 'Generated' }
   // 10% TDS with a valid PAN; GST 18% because the owner is registered and the form ticked GST
@@ -1064,4 +1118,20 @@ test('import commit: creates in order with cross-sheet links, skips existing, le
   assert.equal(r.status, 415)
   r = await postSheet('/import/preview', new Blob(['hello'], { type: XLSX }))
   assert.equal(r.status, 400); assert.match(r.body.message, /could not be read as an Excel workbook/)
+  // co-shares on a lease from the Owners sheet of the same file
+  const csFile = await sheetFile(add => {
+    add('Owners', ['Owner name', 'Owner or co-share', 'PAN', 'GSTIN', 'Mobile', 'Email', 'Address'], [['Share Holder', 'Co-share', 'SHRPH1111A', '36SHRPH1111A1Z1', '+91 90000 00009', 'share@example.com', 'x']])
+    add('Leases', ['Lease reference', 'Property', 'Owner', 'Lease start', 'Lease end', 'Monthly rent (₹)', 'Rent paid', 'Co-shares'], [
+      ['VZG-LSE-010', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'SHRPH1111A:25'],
+      ['VZG-LSE-011', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'SHRPH1111A:100'],
+      ['VZG-LSE-012', 'VZG-MG-01', 'NEWPO1111A', '2026-05-01', '2031-04-30', 50000, 'Advance', 'NOBODY9999Z:10'],
+    ])
+  })
+  const pv = await postSheet('/import/preview', csFile)
+  assert.deepEqual(pv.body.data.leases.rows.map(x => x.action), ['create', 'error', 'error'])
+  assert.match(pv.body.data.leases.rows[1].note, /the owner must keep some of the rent/); assert.match(pv.body.data.leases.rows[2].note, /Co-share “NOBODY9999Z” is not in the system/)
+  const rc = await postSheet('/import', csFile); assert.equal(rc.status, 201, rc.body.message)
+  const csO = (await call('GET', '/owners?search=SHRPH1111A')).body.data[0]; assert.equal(csO.party, 'Co-share'); assert.equal(csO.gstin, '')
+  const csL = (await call('GET', '/leases?search=VZG-LSE-010')).body.data[0]
+  assert.deepEqual(csL.owners.map(x => [x.ownerId === csO.id ? 'cs' : 'owner', x.rent, x.dep, x.gst, x.role]), [['owner', 75, 100, '', undefined], ['cs', 25, 0, 'None', 'coShare']])
 })

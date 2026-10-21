@@ -16,7 +16,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import DrawerLayout from '../../components/app/DrawerLayout'
 import { useStore, S, prop, owner, closeDrawer } from '../../store/store'
 import { CUR, perAdd, perLabel, pctLabel } from '../../domain/utils'
-import { leaseOwners, allLeaseOwners } from '../../domain/lease'
+import { leaseOwners, allLeaseOwners, isCoShareOwner } from '../../domain/lease'
 import { Btn, Banner, Empty } from '../../components/ui/Layout'
 import { StatusChip } from '../../components/ui/Status'
 import { TextInput, SelectInput } from '../../components/form/Fields'
@@ -65,7 +65,7 @@ export default function OwnerChangeDrawer({ d }) {
   const onSubmit = async e => {
     e.preventDefault(); if (busy) return; setBusy(true)
     try {
-      const owners = active.map(x => ({ ownerId: x.ownerId, rent: pct(vals[x.ownerId].rent), maint: pct(vals[x.ownerId].maint), dep: pct(vals[x.ownerId].rent), adv: pct(vals[x.ownerId].rent), gst: vals[x.ownerId].gst || '' }))
+      const owners = active.map(x => (isCoShareOwner(owner(x.ownerId)) ? { ownerId: x.ownerId, rent: pct(vals[x.ownerId].rent), maint: pct(vals[x.ownerId].maint), dep: 0, adv: 0, gst: 'None', role: 'coShare' } : { ownerId: x.ownerId, rent: pct(vals[x.ownerId].rent), maint: pct(vals[x.ownerId].maint), dep: pct(vals[x.ownerId].rent), adv: pct(vals[x.ownerId].rent), gst: vals[x.ownerId].gst || '' }))
       await submitOwnerChange(L.id, { mode, ownerId: mode === 'deactivate' ? d.ownerId : newId, owners, from: when === 'next' || invoicedThisMonth ? perAdd(CUR, 1) : CUR, note: note.trim() })
     } finally { setBusy(false) }
   }
@@ -76,7 +76,7 @@ export default function OwnerChangeDrawer({ d }) {
       <form id="f-oc" onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
         {mode === 'deactivate' && current.length <= 1 ? <Banner tone="bad">This is the only active owner. Add the new owner first, then deactivate this one.</Banner> : null}
         {mode === 'deactivate' ? <p className="small muted" style={{ margin: 0 }}><b>{who?.name}</b> stops receiving rent from {monthLabel}. Their earlier invoices, ledger and TDS stay as they are; they keep read access to their records.</p> : null}
-        {mode === 'add' ? <SelectInput id="oc-new" name="newOwner" label="Owner to add" value={newId} onChange={e => setNewId(e.target.value)} options={[['', '— choose —'], ...candidates.map(o => [o.id, o.name + (o.pan ? ' · ' + o.pan : '')])]} hint="Add the person in Owners first if they are not listed" full /> : null}
+        {mode === 'add' ? <SelectInput id="oc-new" name="newOwner" label="Owner to add" value={newId} onChange={e => setNewId(e.target.value)} options={[['', '— choose —'], ...candidates.map(o => [o.id, o.name + (o.pan ? ' · ' + o.pan : '') + (isCoShareOwner(o) ? ' · co-share' : '')])]} hint="Add the person in Owners first if they are not listed. A co-share is paid a share of the rent but is not on the agreement" full /> : null}
         {mode === 'reactivate' ? <SelectInput id="oc-re" name="reOwner" label="Owner to reactivate" value={newId} onChange={e => setNewId(e.target.value)} options={former.map(x => [x.ownerId, `${owner(x.ownerId)?.name || x.ownerId} · left after ${perLabel(x.until)}`])} full /> : null}
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Payment split from {monthLabel}</div>
@@ -86,10 +86,10 @@ export default function OwnerChangeDrawer({ d }) {
               <TableBody>
                 {active.map(x => { const O = owner(x.ownerId); const was = current.find(c => c.ownerId === x.ownerId); return (
                   <TableRow key={x.ownerId}>
-                    <TableCell><b>{O?.name || x.ownerId}</b>{!was ? <> <StatusChip label="New" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
+                    <TableCell><b>{O?.name || x.ownerId}</b>{isCoShareOwner(O) ? <> <StatusChip label="Co-share" k="info" /></> : null}{!was ? <> <StatusChip label="New" k="info" /></> : null}<div className="code">{O?.pan || ''}</div></TableCell>
                     <TableCell className="num"><TextInput grid={false} type="number" min="0" max="100" step="0.01" value={vals[x.ownerId]?.rent ?? ''} onChange={e => set(x.ownerId, 'rent', e.target.value)} sx={NUM_SX} htmlInput={{ 'aria-label': 'Rent %' }} /></TableCell>
                     <TableCell className="num"><TextInput grid={false} type="number" min="0" max="100" step="0.01" value={vals[x.ownerId]?.maint ?? ''} onChange={e => set(x.ownerId, 'maint', e.target.value)} disabled={same} sx={NUM_SX} htmlInput={{ 'aria-label': 'Maintenance %' }} /></TableCell>
-                    <TableCell><SelectInput grid={false} value={vals[x.ownerId]?.gst ?? ''} onChange={e => set(x.ownerId, 'gst', e.target.value)} options={G} sx={{ minWidth: 190, '& select': { py: '7px' } }} aria-label="GST status" /></TableCell>
+                    <TableCell>{isCoShareOwner(O) ? <span className="small muted">No GST (co-share)</span> : <SelectInput grid={false} value={vals[x.ownerId]?.gst ?? ''} onChange={e => set(x.ownerId, 'gst', e.target.value)} options={G} sx={{ minWidth: 190, '& select': { py: '7px' } }} aria-label="GST status" />}</TableCell>
                     <TableCell className="small muted">{was ? `${pctLabel(was.rent)} rent` : '—'}</TableCell>
                   </TableRow>) })}
                 {mode === 'deactivate' && who ? <TableRow><TableCell className="muted"><s>{who.name}</s> <StatusChip label="Deactivated" k="idle" /></TableCell><TableCell className="num muted">0%</TableCell><TableCell className="num muted">0%</TableCell><TableCell /><TableCell className="small muted">{pctLabel(current.find(c => c.ownerId === d.ownerId)?.rent)} rent</TableCell></TableRow> : null}
