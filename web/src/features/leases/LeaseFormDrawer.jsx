@@ -12,6 +12,8 @@ import { SchedTotals, ScheduleTable, TimingNote } from './LeaseDetail'
 import RentByYear from './RentByYear'
 import { leaseFromForm, submitLease, ownerSums, readOwnerAmounts, formTotals, amountsFromShares, totalFieldOf, SHARE_KEYS } from './actions'
 import OwnerRows from './OwnerRows'
+import RentStepRows from './RentStepRows'
+import { resolvedRentSteps } from '../../domain/lease'
 
 let SEQ = 0 // keys for co-owner rows
 
@@ -51,6 +53,7 @@ export default function LeaseFormDrawer({ d }) {
     return amountsFromShares(owners, L ? { rent: +L.rent || 0, maint: +L.maint || 0, dep: +L.deposit || 0, adv: +L.advanceRent || 0 } : {}).map(o => ({ key: ++SEQ, o }))
   })
   const [escType, setEscType] = useState(L.escType || 'Compound')
+  const [steps, setSteps] = useState(() => (Array.isArray(L.rentSteps) ? L.rentSteps : []).map(s => ({ key: ++SEQ, s })))
   const [same] = useState(() => !(L && L.owners && L.owners.length) || L.owners.every(o => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
   const lastTotals = useRef(null) // totals the owners' amounts were last split from — to rescale them when a total changes
 
@@ -60,7 +63,7 @@ export default function LeaseFormDrawer({ d }) {
     setPv({ x, sc }); setSums(ownerSums(f))
     if (!lastTotals.current) lastTotals.current = formTotals(f)
   }
-  useEffect(upd, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(upd, [rows, steps]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!L) return <DrawerLayout title="Lease">Not found</DrawerLayout>
   const term = Math.round(dayCount(L.start, L.end) / 30.44)
 
@@ -174,6 +177,9 @@ export default function LeaseFormDrawer({ d }) {
           <TextInput id="ls-esca" name="escAdd" label="Increase each time (₹ per month)" type="number" min="0" step="100" defaultValue={L.escAdd || ''} disabled={escType !== 'Amount'} hint="e.g. 3000 = rent goes up by ₹3,000/month every time" />
           <TextInput id="ls-ee" name="escEvery" label="Escalate every (months)" type="number" min="0" defaultValue={L.escEvery} hint="12 = yearly · 36 = once every 3 years" />
           <SelectInput id="ls-ef" name="escFrom" label="Escalation counted from" options={['Lease start', 'Rent commencement']} defaultValue={L.escFrom || 'Lease start'} />
+          <Cell full><FieldBox id="ls-steps" label="Rent changes as per the agreement (irregular patterns)" full>
+            <RentStepRows rows={steps} resolved={x ? resolvedRentSteps(x) : []} hasRule={!!(x && x.escEvery && (x.escType === 'Amount' ? x.escAdd > 0 : x.escPct > 0))} onAdd={() => setSteps(r => r.concat([{ key: ++SEQ, s: { id: `rs${Date.now().toString(36)}${r.length}`, from: '', kind: 'pct', value: '' } }]))} onDel={key => setSteps(r => r.filter(z => z.key !== key))} />
+          </FieldBox></Cell>
 
           <SectionTitle>4 · Deposit &amp; advance</SectionTitle>
           <TextInput id="ls-dep" name="deposit" label="Security deposit (₹, refundable)" type="number" min="0" defaultValue={L.deposit} hint={<span id="ls-depm">{x && x.rent ? `= ${(x.deposit / x.rent).toFixed(1)} months’ rent` : ''}</span>} />

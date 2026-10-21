@@ -129,7 +129,7 @@ test('extension with a revised rent: old rent to the old end, the new base from 
   assert.equal(rentFor(L, '2032-03'), rentFor(L0, '2032-03'), 'unchanged before the extension')
   assert.equal(rentFor(L, '2032-04'), 380000, 'the revised rent from the extension')
   assert.equal(rentFor(L, '2035-03'), 380000, 'no escalation yet: 36 months from Apr 2032 is Apr 2035')
-  assert.deepEqual(rentBaseAt(L, '2033-01-01'), { base: 380000, anchor: '2032-04-01', step: L.extensions[0] })
+  const b = rentBaseAt(L, '2033-01-01'); assert.equal(b.base, 380000); assert.equal(b.anchor, '2032-04-01'); assert.equal(b.step.id, 'x1'); assert.equal(b.step.extension, true)
   assert.equal(ne(L, '2031-12-01'), '2032-04-01', 'the next rent change is the extension step, before the next escalation')
   const S = schedule(L, ctx()); assert.equal(S.rows.find(r => r.p === '2032-04').rent, 380000); assert.equal(S.rows[S.rows.length - 1].p, '2035-03')
   const noRent = { ...L, id: 'l1ext2', extensions: [{ ...L.extensions[0], rent: null }] }
@@ -142,4 +142,23 @@ test('escalation by a fixed amount: ₹3,000 more per month every 12 months', ()
   assert.equal(rentFor(L, '2027-04'), 23000); assert.equal(rentFor(L, '2028-04'), 26000); assert.equal(rentFor(L, '2031-03'), 32000)
   const S = schedule(L, ctx()); assert.equal(S.rows.find(r => r.p === '2029-06').rent, 29000)
   assert.equal(rentFor({ ...L, escAdd: 0 }, '2028-04'), 20000, 'no amount = no escalation')
+})
+
+test('rent changes as per the agreement: the rule runs in between, a change replaces it on its date and the rule continues from there', async () => {
+  const { hasRentSteps, resolvedRentSteps, escOn, escLabel, nextEsc: ne } = await import('../lease.js')
+  const rule = { id: 'steps', start: '2026-04-01', end: '2035-03-31', rent: 20000, escType: 'Compound', escPct: 15, escEvery: 12, escFrom: 'Lease start', fitout: 0, payTiming: 'Advance', dueDay: 5, gstMode: 'None', tds: false, maintType: 'None', ownerId: 'o1' }
+  const L = { ...rule, rentSteps: [{ id: 'a', from: '2029-04-01', kind: 'pct', value: 10 }, { id: 'b', from: '2030-04-01', kind: 'pct', value: 15 }, { id: 'c', from: '2031-04-01', kind: 'amt', value: 2000 }] }
+  assert.ok(hasRentSteps(L) && escOn(L)); assert.equal(escLabel(L), '15% every 12 months · 3 changes as per the agreement')
+  assert.equal(rentFor(L, '2027-04'), 23000, 'the rule before the first change'); assert.equal(rentFor(L, '2028-04'), 26450)
+  assert.deepEqual(resolvedRentSteps(L).map(s => [s.from, s.before, s.rent]), [['2029-04-01', 26450, 29095], ['2030-04-01', 29095, 33459], ['2031-04-01', 33459, 35459]])
+  assert.equal(rentFor(L, '2029-04'), 29095, 'the change replaces the rule on its date, no double increase'); assert.equal(rentFor(L, '2029-06'), 29095)
+  assert.equal(rentFor(L, '2032-04'), 40778, 'after the last change the rule continues from it'); assert.equal(rentFor(L, '2033-04'), 46895)
+  assert.equal(ne(L, '2029-05-01'), '2030-04-01'); assert.equal(ne(L, '2031-05-01'), '2032-04-01', 'next change is the rule after the last row')
+  const S = schedule(L, ctx()); assert.equal(S.rows.find(r => r.p === '2030-04').rent, 33459)
+  // rule off: the table alone, flat after the last change
+  const only = { ...L, id: 'only', escEvery: 0 }
+  assert.equal(escOn(only), false); assert.equal(rentFor(only, '2028-04'), 20000); assert.equal(rentFor(only, '2029-04'), 22000); assert.equal(rentFor(only, '2034-12'), 27300)
+  // an extension's revised rent slots into the same sequence
+  const E = { ...only, end: '2037-03-31', extensions: [{ id: 'x', fromEnd: '2035-03-31', toEnd: '2037-03-31', rent: 33000, rentFrom: '2035-04-01' }] }
+  assert.equal(rentFor(E, '2035-04'), 33000); assert.equal(resolvedRentSteps(E).length, 4)
 })

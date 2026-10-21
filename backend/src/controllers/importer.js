@@ -342,13 +342,22 @@ export async function planImport(buffer) {
       if (!errors.coShares && total >= 100) errors.coShares = `Co-share percents add up to ${total}% — the owner must keep some of the rent`
     }
     r.coShares = cs
+    // rent changes: "date:10%, date:+2000, date:27000"
+    const steps = []
+    if (v.rentSteps) {
+      for (const part of String(v.rentSteps).split(/[,;\n]+/).map(s => s.trim()).filter(Boolean)) {
+        const m = part.match(/^(\d{4}-\d{2}-\d{2})\s*[:=]\s*(\+?)\s*([\d.]+)\s*(%?)$/)
+        if (!m) { errors.rentSteps = `Rent changes must be written as date:increase, e.g. 2029-04-01:10% or 2030-04-01:+2000 or 2031-04-01:27000 — “${part}” is not`; break }
+        steps.push({ id: `rs${steps.length + 1}`, from: m[1], kind: m[4] ? 'pct' : m[2] ? 'amt' : 'rent', value: Number(m[3]) })
+      }
+    }
     // GST default follows the owner's registration
     let gstMode = v.gstMode
     if (!gstMode) { const gstin = O?.id ? dbOwners.find(o => o._id === O.id)?.gstin : O?.sheet ? O.sheet.values.gstin : ''; gstMode = gstin ? 'Forward' : 'RCM' }
     r.rec = {
       ref: v.ref, propertyId: P?.id || '', ownerId: O?.id || '', status: v.status, start: v.start, end: v.end, rent: v.rent, payTiming: v.payTiming, dueDay: v.dueDay,
       deposit: v.deposit, depositPaid: !!v.depositPaid, depositUtr: v.depositUtr, depositChannel: v.depositChannel, depositBank: v.depositBank, lockIn: v.lockIn, lockInLessor: cells.lockInLessor === '' || cells.lockInLessor === undefined ? v.lockIn : v.lockInLessor, notice: v.notice, noticeLessor: v.noticeLessor, fitout: v.fitout,
-      escPct: v.escAdd > 0 ? 0 : v.escPct, escAdd: v.escAdd, escEvery: v.escEvery, escType: v.escAdd > 0 ? 'Amount' : v.escType, escFrom: v.escFrom, gstMode, tds: !!v.tds, tdsOnMaint: false,
+      escPct: v.escAdd > 0 ? 0 : v.escPct, escAdd: v.escAdd, escEvery: v.escEvery, escType: v.escAdd > 0 ? 'Amount' : v.escType, escFrom: v.escFrom, rentSteps: steps, gstMode, tds: !!v.tds, tdsOnMaint: false,
       maintType: v.maintType, maint: v.maint, maintEsc: false, elec: v.elec, registered: !!v.registered, advanceRent: 0, advanceMonths: 0, brokerage: 0, stamp: 0, clauses: '', docs: [],
       owners: cs.length ? [{ ownerId: O?.id || '', rent: 100 - cs.reduce((a, c) => a + c.pct, 0), maint: 100 - cs.reduce((a, c) => a + c.pct, 0), dep: 100, adv: 100, gst: '' }, ...cs.map(c => ({ ownerId: c.hit.id || '', rent: c.pct, maint: c.pct, dep: 0, adv: 0, gst: 'None', role: 'coShare' }))] : [],
     }
