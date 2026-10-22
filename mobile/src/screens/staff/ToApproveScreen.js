@@ -60,7 +60,7 @@ export default function ToApproveScreen() {
       <Button title={i < list.length - 1 ? 'Next invoice' : 'Done'} variant="primary" onPress={next} />
     </View>
   ) : state === 'Verified' ? (
-    <SwipeToApprove onApprove={approve} onReject={() => setReject(true)} style={styles.flex} />
+    <SwipeToApprove key={inv.id} onApprove={approve} onReject={() => setReject(true)} busy={patchState.isLoading} style={styles.flex} />
   ) : (
     <View style={styles.doneRow}><AppText variant="body" color="muted" style={styles.flex}>{state === 'Submitted' ? 'Not verified yet. Accounts verify it on the web first.' : `This ${inv.voucher ? 'payment' : 'invoice'} is ${state.toLowerCase()}.`}</AppText><Button title={i < list.length - 1 ? 'Next' : 'Done'} variant="secondary" onPress={next} /></View>
   );

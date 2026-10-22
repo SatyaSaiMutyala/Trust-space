@@ -1,13 +1,16 @@
 /* Text field with label, optional right label link (Forgot password?), eye toggle for passwords, error state.
    `select` renders a tap-to-pick field with a chevron. `prefix` shows ₹ etc. */
-import React, { useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { colors, fonts, ms, s, vs } from '../theme';
 import AppText from './AppText';
 import Icon from './Icon';
+import { KeyboardScope } from './useKeyboardOverlap';
 
 export default function Input({ label, rightLabel, onRightLabel, value, onChangeText, placeholder, secure, error, hint, multiline, select, onPress, prefix, right, keyboardType, style, inputStyle, autoCapitalize = 'none', compact, editable = true }) {
   const [focus, setFocus] = useState(false);
+  const ref = useRef(null);
+  const { reveal } = useContext(KeyboardScope); // keep the field visible above the keyboard
   const [show, setShow] = useState(false);
   const border = error ? colors.coral : focus ? colors.teal : colors.line;
   const field = (
@@ -17,8 +20,8 @@ export default function Input({ label, rightLabel, onRightLabel, value, onChange
         {select ? (
           <AppText variant="body" style={[styles.text, styles.selectText, !value && { color: colors.muted }]}>{value || placeholder}</AppText>
         ) : (
-          <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} secureTextEntry={secure && !show}
-            onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize} editable={editable}
+          <TextInput ref={ref} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} secureTextEntry={secure && !show}
+            onFocus={() => { setFocus(true); reveal(ref); }} onBlur={() => setFocus(false)} multiline={multiline} keyboardType={keyboardType} autoCapitalize={autoCapitalize} editable={editable}
             style={[styles.input, styles.text, multiline && styles.multiInput, inputStyle]} accessibilityLabel={label} />
         )}
         {secure ? (

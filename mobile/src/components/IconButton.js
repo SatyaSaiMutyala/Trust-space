@@ -7,11 +7,11 @@ import Icon from './Icon';
 
 const FG = { plain: colors.ink, light: colors.ink, sunk: colors.ink, dark: colors.white, teal: colors.white, mist: colors.teal, coral: colors.white };
 
-export default function IconButton({ name, onPress, variant = 'plain', size = 40, iconSize = 20, color, style, accessibilityLabel }) {
+export default function IconButton({ name, onPress, variant = 'plain', size = 40, iconSize = 20, color, style, accessibilityLabel, disabled = false }) {
   const fg = color || FG[variant];
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel || name} onPress={onPress} hitSlop={8}
-      style={({ pressed }) => [styles.base, { width: ms(size), height: ms(size), borderRadius: ms(size) / 2 }, styles[variant], pressed && styles.pressed, style]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel || name} onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
+      style={({ pressed }) => [styles.base, { width: ms(size), height: ms(size), borderRadius: ms(size) / 2 }, styles[variant], pressed && styles.pressed, disabled && styles.disabled, style]}>
       <Icon name={name} size={iconSize} color={fg} />
     </Pressable>
   );
@@ -27,4 +27,5 @@ const styles = StyleSheet.create({
   mist: { backgroundColor: colors.tealTint },
   coral: { backgroundColor: colors.coral },
   pressed: { opacity: 0.8 },
+  disabled: { opacity: 0.45 },
 });

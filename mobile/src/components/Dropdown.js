@@ -1,15 +1,18 @@
 /* Select field whose options open inline, directly under the field (no sheet). options: strings or { label, value }.
    `searchable` adds a filter box for long lists (banks, states). Closes on pick or on tapping the field again. */
-import React, { useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { colors, fonts, ms, s, vs } from '../theme';
 import AppText from './AppText';
 import Icon from './Icon';
 import Input from './Input';
+import { KeyboardScope } from './useKeyboardOverlap';
 
 export default function Dropdown({ label, value, options, onSelect, placeholder = 'Pick one', searchable, error, hint, style, maxHeight = 220 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const panel = useRef(null);
+  const { reveal } = useContext(KeyboardScope);
   const all = options.map(o => (typeof o === 'string' ? { label: o, value: o } : o));
   const items = all.filter(o => !q || o.label.toLowerCase().includes(q.toLowerCase()));
   const current = all.find(o => o.value === value);
@@ -17,11 +20,11 @@ export default function Dropdown({ label, value, options, onSelect, placeholder 
     <View style={style}>
       <Input label={label} select value={current ? current.label : ''} placeholder={placeholder} onPress={() => { setOpen(v => !v); setQ(''); }} error={error} hint={open ? undefined : hint} right={<Icon name={open ? 'chevron-up' : 'chevron-down'} size={22} color={colors.muted} />} />
       {open ? (
-        <View style={styles.panel}>
+        <View ref={panel} style={styles.panel}>
           {searchable ? (
             <View style={styles.search}>
               <Icon name="search" size={18} color={colors.muted} />
-              <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={colors.muted} style={styles.searchInput} autoFocus />
+              <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={colors.muted} style={styles.searchInput} autoFocus onFocus={() => reveal(panel)} />
             </View>
           ) : null}
           <ScrollView style={{ maxHeight: vs(maxHeight) }} nestedScrollEnabled keyboardShouldPersistTaps="handled">

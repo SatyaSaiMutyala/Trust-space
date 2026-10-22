@@ -1,14 +1,17 @@
 /* One-time code entry: six boxes driven by one hidden input, so paste and autofill work. */
-import React, { useRef, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { colors, fonts, ms, s, vs } from '../theme';
+import { KeyboardScope } from './useKeyboardOverlap';
 
 export default function OtpInput({ value = '', onChange, length = 6, error, style }) {
   const ref = useRef(null);
+  const boxRef = useRef(null); // the visible boxes — what gets scrolled above the keyboard
+  const { reveal } = useContext(KeyboardScope);
   const [focus, setFocus] = useState(false);
   const digits = value.replace(/\D/g, '').slice(0, length);
   return (
-    <Pressable onPress={() => ref.current && ref.current.focus()} style={[styles.row, style]} accessibilityLabel="One-time code">
+    <Pressable ref={boxRef} onPress={() => ref.current && ref.current.focus()} style={[styles.row, style]} accessibilityLabel="One-time code">
       {Array.from({ length }).map((_, i) => {
         const active = focus && i === Math.min(digits.length, length - 1);
         return (
@@ -18,7 +21,7 @@ export default function OtpInput({ value = '', onChange, length = 6, error, styl
         );
       })}
       <TextInput ref={ref} value={digits} onChangeText={t => onChange && onChange(t.replace(/\D/g, '').slice(0, length))} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="sms-otp" maxLength={length}
-        onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} style={styles.hidden} caretHidden />
+        onFocus={() => { setFocus(true); reveal(boxRef); }} onBlur={() => setFocus(false)} style={styles.hidden} caretHidden />
     </Pressable>
   );
 }

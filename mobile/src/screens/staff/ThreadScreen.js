@@ -150,7 +150,7 @@ export default function ThreadScreen() {
     )}>
       {isLoading ? <View style={styles.list}><Skeleton h={60} r={20} /><Skeleton h={60} r={20} style={styles.skelRight} /><Skeleton h={100} r={20} /></View>
         : error && !d ? <View style={styles.list}><ErrorState title="Couldn't load this conversation" body={errorMessage(error)} action="Try again" onAction={refetch} /></View>
-          : <FlatList ref={listRef} data={rows} inverted keyExtractor={r => r.key} renderItem={render} contentContainerStyle={styles.list} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled"
+          : <FlatList ref={listRef} data={rows} inverted keyExtractor={r => r.key} renderItem={render} contentContainerStyle={styles.list} keyboardDismissMode="none" keyboardShouldPersistTaps="handled"
               ListEmptyComponent={<View style={styles.emptyFlip}><AppText variant="body" color="muted" center>No messages yet. Start the conversation below.</AppText></View>} />}
       <PhotoPickerSheet {...pickerProps} />
       <PickerSheet open={kindOpen} onClose={() => setKindOpen(false)} title="Send as" options={KINDS} value={kind} onSelect={setKind} />
