@@ -38,7 +38,7 @@ const stepUpBase = (L, base) => (L.stepKind === 'pct' ? base * (1 + (+L.stepValu
 /** What the step-up does to the base, in words: "+₹3,000", "+10%", "₹23,000". */
 export const stepUpLabel = L => (L.stepKind === 'pct' ? `+${+L.stepValue || 0}%` : L.stepKind === 'new' ? inr(L.stepValue) : `+${inr(L.stepValue)}`)
 /** "5% every 12 months" / "₹3,000 every 12 months" / "" when there is none. */
-export const escLabel = L => [escOn(L) ? (L.escType === 'StepUp' ? `base revised at escalation ${Math.max(1, +L.stepAt || 1)} (${stepUpLabel(L)}), then ${+L.escPct || 0}% every ${+L.escEvery} months` : `${L.escType === 'Amount' ? inr(L.escAdd) : `${+L.escPct}%`} every ${+L.escEvery} months`) : '', hasRentSteps(L) ? `${explicitSteps(L).length} change${explicitSteps(L).length === 1 ? '' : 's'} as per the agreement` : ''].filter(Boolean).join(' · ')
+export const escLabel = L => [escOn(L) ? (L.escType === 'StepUp' ? `base revised at escalation ${Math.max(1, +L.stepAt || 1)} (${stepUpLabel(L)}), then ${+L.escPct || 0}% every ${+L.escEvery} months` : `${L.escType === 'Amount' ? inr(L.escAdd) : `${+L.escPct}%`} every ${+L.escEvery} months`) : '',].filter(Boolean).join(' · ')
 const escStepsFrom = (L, anchor, dateStr) => { if (!escOn(L)) return 0; const a = anchor.slice(0, 7) + '-01'; let n = 0; while (n < 200 && addMonths(a, L.escEvery * (n + 1)) <= dateStr) n++; return n }
 /** Rent after n escalations on `base`. `post` = the base is already a revised one (after a rent change or extension),
  *  so a step-up lease just applies its "thereafter" % from there. */
@@ -58,51 +58,28 @@ export function escAmt(L, base, dateStr) { return applyEsc(L, +base || 0, escSte
 /* Extensions: `L.extensions` = [{ id, at, by, fromEnd, toEnd, rent, rentFrom, ref, file }]. One with a revised `rent` is a
    rent step: from `rentFrom` (the day after the old end) the rent is that figure, and escalations count from there. */
 export const rentSteps = L => (L && Array.isArray(L.extensions) ? L.extensions.filter(e => e && e.rentFrom && +e.rent > 0).slice().sort((a, b) => a.rentFrom.localeCompare(b.rentFrom)) : [])
-/* Rent changes as written in the agreement (irregular patterns: 10% after 3 years, then 15% each year…):
-   `L.rentSteps` = [{ id, from: 'YYYY-MM-DD', kind: 'pct' | 'amt' | 'rent', value, every?, until? }]. The regular
-   escalation rule stays on: a change replaces the rule on its date (applied on the rent in force just before it) and the
-   rule's clock restarts from that date. A change with `every` (months) repeats until `until` (or the lease end), and the
-   rule is off inside that window; after it the rule takes over again from the last rent. Extensions' revised rents work
-   the same way. With the rule off (escEvery 0) the table alone applies. */
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const explicitSteps = L => (L && Array.isArray(L.rentSteps) ? L.rentSteps.filter(s => s && DATE_RE.test(s.from || '') && +s.value > 0).slice().sort((a, b) => a.from.localeCompare(b.from)) : [])
-export const hasRentSteps = L => explicitSteps(L).length > 0
-/** Every rent change in date order with the rent just before it and the rent it leads to: the agreement's steps and
- *  extensions' revised rents, with the regular rule running in between. */
+/** Every rent change in date order (extensions' revised rents) with the rent just before it and the rent it leads to. */
 export function resolvedRentSteps(L) {
-  const own = explicitSteps(L).map(s => ({ id: s.id, from: s.from, kind: ['pct', 'amt', 'rent'].includes(s.kind) ? s.kind : 'rent', value: +s.value, every: s.kind !== 'rent' && +s.every > 0 ? Math.round(+s.every) : 0, until: DATE_RE.test(s.until || '') ? s.until : '' }))
-  const ext = rentSteps(L).map(e => ({ id: e.id, from: e.rentFrom, kind: 'rent', value: +e.rent, extension: true }))
-  const endOf = [L.end, ...rentSteps(L).map(e => e.toEnd)].filter(Boolean).sort().pop() || ''
-  // a repeating change: one entry per occurrence, up to its `until`, the next change, or the end of the lease
-  const expanded = own.flatMap((s, i) => {
-    if (!s.every) return [s]
-    const stop = [s.until, own[i + 1]?.from && addDays(own[i + 1].from, -1), ...ext.map(e => e.from).filter(d => d > s.from).map(d => addDays(d, -1))].filter(Boolean).sort()[0] || endOf
-    const out = []; let d = s.from, n = 0
-    while (d && (!stop || d <= stop) && n < 400) { out.push({ ...s, id: n ? `${s.id}@${n}` : s.id, from: d, repeat: n > 0, stop }); n++; d = addMonths(s.from, s.every * n) }
-    return out
-  })
-  const all = [...expanded, ...ext].sort((a, b) => a.from.localeCompare(b.from))
-  let base = +L.rent || 0, anchor = escAnchor(L), window = '', post = false // window = last date the rule is paused for a repeating change
+  const all = rentSteps(L).map(e => ({ id: e.id, from: e.rentFrom, kind: 'rent', value: +e.rent, extension: true }))
+  let base = +L.rent || 0, anchor = escAnchor(L), post = false
   return all.map(s => {
-    const paused = window && s.from <= window
-    const before = paused ? base : applyEsc(L, base, escStepsFrom(L, anchor, addDays(s.from, -1)), post) // the rule, up to the day before the change (not inside a repeat window)
+    const before = applyEsc(L, base, escStepsFrom(L, anchor, addDays(s.from, -1)), post) // the rule, up to the day before the change
     post = true
-    const rent = s.kind === 'pct' ? Math.round(before * (1 + s.value / 100)) : s.kind === 'amt' ? Math.round(before + s.value) : Math.round(s.value)
-    base = rent; anchor = s.from; window = s.every ? s.stop : ''
-    return { ...s, before, rent, pauseUntil: s.every ? s.stop : '' }
+    const rent = Math.round(s.value)
+    base = rent; anchor = s.from
+    return { ...s, before, rent }
   })
 }
 /** The base rent in force on a date and the date its escalations count from (the last change on or before it, else the lease's). */
 export function rentBaseAt(L, dateStr) { const s = resolvedRentSteps(L).filter(x => x.from <= dateStr).pop(); return s ? { base: s.rent, anchor: s.from, step: s } : { base: +L.rent || 0, anchor: escAnchor(L), step: null } }
-/** Monthly rent on a date: the base in force then, escalated by the rule from the last change (not inside a repeating change's window). */
-export function rentAt(L, dateStr) { const { base, anchor, step } = rentBaseAt(L, dateStr); if (step && step.pauseUntil && dateStr <= step.pauseUntil) return base; return applyEsc(L, base, escStepsFrom(L, anchor, dateStr), !!step) }
+/** Monthly rent on a date: the base in force then, escalated by the rule from the last change. */
+export function rentAt(L, dateStr) { const { base, anchor, step } = rentBaseAt(L, dateStr); return applyEsc(L, base, escStepsFrom(L, anchor, dateStr), !!step) }
 export function rentFor(L, period) { if (!L) return 0; const d = period + '-01'; return rentAt(L, d < L.start ? L.start : d) }
 /** The next date the rent changes after today: an escalation, or an extension's revised rent, whichever is first. */
 export function nextEsc(L, today) {
   const step = resolvedRentSteps(L).find(s => s.from > today)
   let esc = null
-  const cur = rentBaseAt(L, today)
-  if (escOn(L) && !(cur.step && cur.step.pauseUntil && today <= cur.step.pauseUntil)) { const a = cur.anchor.slice(0, 7) + '-01'; let n = 1; while (n < 200 && addMonths(a, L.escEvery * n) <= today) n++; esc = addMonths(a, L.escEvery * n) }
+  if (escOn(L)) { const a = rentBaseAt(L, today).anchor.slice(0, 7) + '-01'; let n = 1; while (n < 200 && addMonths(a, L.escEvery * n) <= today) n++; esc = addMonths(a, L.escEvery * n) }
   const d = step && (!esc || step.from < esc) ? step.from : esc
   return d && d <= L.end ? d : null
 }
@@ -183,7 +160,7 @@ export const clearSchedCache = id => (id === undefined ? SCHED.clear() : SCHED.d
 /* Month-by-month rent for the whole term: pro-rata first/last month, rent-free period, escalation, advance-rent adjustment, maintenance, GST/RCM, TDS and due dates (advance or arrears). */
 export function schedule(L, ctx) {
   const end = L.exit?.effective && L.exit.effective < L.end ? L.exit.effective : L.end
-  const key = JSON.stringify([L.start, end, L.rent, L.rentSteps || null, L.escPct, L.escAdd, L.stepKind, L.stepValue, L.stepAt, L.stepOn, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.extensions || null, L.owners || null, L.ownerHistory || null, L.tdsPerOwner, tdsKey(L, ctx)])
+  const key = JSON.stringify([L.start, end, L.rent, L.escPct, L.escAdd, L.stepKind, L.stepValue, L.stepAt, L.stepOn, L.escEvery, L.escType, L.escFrom, L.fitout, L.maint, L.maintType, L.maintEsc, L.advanceRent, L.advanceMonths, L.payTiming, L.dueDay, L.gstMode, L.tds, L.tdsOnMaint, L.extensions || null, L.owners || null, L.ownerHistory || null, L.tdsPerOwner, tdsKey(L, ctx)])
   const c = SCHED.get(L.id || '_'); if (c && c.key === key) return c.v
   const rows = []; const out = { rows, years: [], tot: {}, end }
   if (!L.start || !end || end < L.start || !(+L.rent >= 0)) { return out }

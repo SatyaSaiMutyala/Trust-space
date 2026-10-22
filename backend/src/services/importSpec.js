@@ -93,7 +93,6 @@ export const SHEETS = {
       { key: 'stepValue', label: 'Step-up value', kind: 'number', width: 14, note: 'StepUp only: the ₹ added, the %, or the new rent, as per “Step-up as”.' },
       { key: 'stepAt', label: 'Step-up at escalation no.', kind: 'number', def: 1, width: 20, note: 'StepUp only: 1 = the first escalation. The rent stays at the base until then.' },
       { key: 'stepOn', label: 'Then % applied on', list: 'stepOn', width: 22, note: 'StepUp only: after the step-up, the escalation % is on the last rent (compounded) or of the revised base (simple).' },
-      { key: 'rentSteps', label: 'Rent changes', width: 40, note: 'Increases that differ from the escalation rule (the rule still runs in between and continues after). Each change as date:increase, separated by commas — 2029-04-01:10% (percent), 2030-04-01:+2000 (₹ added), 2031-04-01:27000 (new rent). To repeat, add /months and optionally a stop date: 2030-04-01:10%/12 to 2035-03-31.' },
       { key: 'gstMode', label: 'GST on rent', list: 'gstMode', width: 12, note: 'Blank = Forward when the owner has a GSTIN, otherwise RCM.' },
       { key: 'tds', label: 'TDS', kind: 'bool', list: 'yesNo', def: 'Yes', width: 8 },
       { key: 'maintType', label: 'Maintenance', list: 'maintType', def: 'Fixed monthly', width: 16 },

@@ -107,24 +107,6 @@ async function checkLease(L, { models }) {
   }
   if (L.ownerChanges !== undefined && L.ownerChanges !== null && !Array.isArray(L.ownerChanges)) errors.ownerChanges = 'Owner changes must be a list'
 
-  if (L.rentSteps !== undefined && L.rentSteps !== null) {
-    if (!Array.isArray(L.rentSteps)) errors.rentSteps = 'Rent changes must be a list'
-    else {
-      const seen = new Set()
-      for (const s of L.rentSteps) {
-        if (!s || typeof s !== 'object' || !DATE.test(s.from || '')) { errors.rentSteps = 'Each rent change needs the date it applies from'; break }
-        if (L.start && s.from <= L.start) { errors.rentSteps = `A rent change (${s.from}) must be after the lease start`; break }
-        if (L.end && s.from > L.end) { errors.rentSteps = `A rent change (${s.from}) is after the lease end`; break }
-        if (!['pct', 'amt', 'rent'].includes(s.kind)) { errors.rentSteps = 'Each rent change must be a % increase, a ₹ increase or a new rent'; break }
-        if (!isNum(s.value) || n(s.value) <= 0) { errors.rentSteps = `The rent change on ${s.from} needs a value above 0`; break }
-        if (s.every !== undefined && s.every !== null && s.every !== '' && (!isNum(s.every) || n(s.every) < 0 || n(s.every) > 120)) { errors.rentSteps = `“Repeat every” on ${s.from} must be a number of months (0–120)`; break }
-        if (s.until !== undefined && s.until !== null && s.until !== '' && (!DATE.test(s.until) || s.until <= s.from)) { errors.rentSteps = `“Until” on the rent change of ${s.from} must be a date after it`; break }
-        if (seen.has(s.from)) { errors.rentSteps = `Two rent changes on ${s.from}`; break }
-        seen.add(s.from)
-      }
-    }
-  }
-
   if (L.extensions !== undefined && L.extensions !== null) {
     if (!Array.isArray(L.extensions)) errors.extensions = 'Extensions must be a list'
     else {
