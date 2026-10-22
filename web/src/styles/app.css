@@ -17,7 +17,6 @@
 *{box-sizing:border-box}
 html,body,#root{height:100%}
 html,body{overscroll-behavior:none} /* no rubber-band bounce of the whole page when scrolling past the top or bottom */
-.thread,.convs,.sched,.tbl-wrap,.MuiDrawer-paper,.dbody{overscroll-behavior:contain} /* reaching the end of an inner list must not throw the page around */
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
 img{max-width:100%}
 h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
