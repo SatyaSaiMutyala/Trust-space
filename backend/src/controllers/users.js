@@ -6,6 +6,7 @@
  *   PATCH  /api/users/:id                 { name?, email?, phone?, role?, ownerId?, partnerId?, status? }
  *   DELETE /api/users/:id
  *   POST   /api/users/:id/unlock          clears a failed-sign-in lock
+ *   PATCH  /api/users/:id                 any of the fields above; `password` sets a new one and signs the user out everywhere
  *   POST   /api/users/:id/reset-password  sets a new temporary password and signs the user out everywhere
  * Without a password, a temporary one is generated and returned once.
  */
@@ -108,24 +109,26 @@ export const usersController = {
     const u = await User.findById(req.params.id).lean()
     if (!u) throw missing(req.params.id)
     const changes = clean(req.body)
-    if (!Object.keys(changes).length) throw badRequest('Nothing to update — send the account fields to change.')
+    const password = typeof req.body?.password === 'string' && req.body.password ? req.body.password : ''
+    if (password) { const p = passwordProblem(password); if (p) throw badRequest(p, { password: p }) }
+    if (!Object.keys(changes).length && !password) throw badRequest('Nothing to update — send the account fields to change.')
     guard(req.user, u.role, changes.role)
     if (u._id === req.user._id && (changes.role && changes.role !== u.role || changes.status === 'disabled')) throw badRequest('You cannot change your own role or disable your own account.')
     const rec = { ...u, ...changes }
     if (rec.role !== 'owner') rec.ownerId = undefined
     if (rec.role !== 'franchisee') rec.partnerId = undefined
     await validate(rec, u._id)
-    const set = { name: rec.name, email: rec.email, phone: rec.phone, phoneDigits: digitsOf(rec.phone) || undefined, role: rec.role, ownerId: rec.ownerId, partnerId: rec.partnerId, status: rec.status, updatedAt: new Date() }
+    const set = { name: rec.name, email: rec.email, phone: rec.phone, phoneDigits: digitsOf(rec.phone) || undefined, role: rec.role, ownerId: rec.ownerId, partnerId: rec.partnerId, status: rec.status, updatedAt: new Date(), ...(password ? { passwordHash: await hashPassword(password), passwordChangedAt: new Date(), failedLogins: 0 } : {}) }
     const unset = Object.fromEntries(Object.entries(set).filter(([, v]) => v === undefined || v === '').map(([k]) => [k, 1]))
     for (const k of Object.keys(unset)) delete set[k]
     await User.updateOne({ _id: u._id }, { $set: set, ...(Object.keys(unset).length ? { $unset: unset } : {}) })
-    if (set.status === 'disabled' || (changes.role && changes.role !== u.role)) await Session.deleteMany({ userId: u._id })
+    if (set.status === 'disabled' || (changes.role && changes.role !== u.role) || (password && u._id !== req.user._id)) await Session.deleteMany({ userId: u._id })
     const fresh = await User.findById(u._id).lean()
     const approved = u.status === 'pending' && set.status === 'active'
     if (approved) notify.signupApproved(fresh)
     if (set.status === 'disabled') await removeUserTokens(u._id)
     if (approved && fresh.email) await sendMail({ to: fresh.email, ...templates.signupApproved({ name: fresh.name, email: fresh.email, loginUrl: env.clientUrl }) })
-    return ok(res, `Account “${fresh.name}” updated.${approved ? ' They can sign in now and have been emailed.' : ''}${set.status === 'disabled' && u.status !== 'disabled' ? ' They have been signed out and can no longer sign in.' : ''}`, publicUser(fresh))
+    return ok(res, `Account “${fresh.name}” updated.${approved ? ' They can sign in now and have been emailed.' : ''}${set.status === 'disabled' && u.status !== 'disabled' ? ' They have been signed out and can no longer sign in.' : password ? (u._id === req.user._id ? ' Your password is changed.' : ' Their password is changed and they have been signed out everywhere; share it securely.') : ''}`, publicUser(fresh))
   },
 
   async remove(req, res) {

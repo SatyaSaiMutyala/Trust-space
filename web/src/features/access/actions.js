@@ -3,7 +3,7 @@
  * API's own message. Each action resolves the response body, or null when the API refused (error already shown).
  */
 import { callApi } from '../../app/store'
-import { toast } from '../../store/store'
+import { toast, openDrawer, closeDrawer } from '../../store/store'
 
 export const ROLE_LABEL = { admin: 'Administrator', staff: 'TrustLab staff', owner: 'Owner', franchisee: 'Franchise partner' }
 export const ROLE_CHIP = { admin: 'ok', staff: 'ok', owner: 'info', franchisee: 'warn' }
@@ -34,6 +34,20 @@ export function createAccount(fd, onError) {
   return run('createUser', body, onError)
 }
 
+/** Open the edit drawer for an account (the row as listed on Portal access). */
+export const editAccount = u => openDrawer({ kind: 'user', user: u })
+/** PATCH /api/users/:id from the edit drawer. A blank password keeps the current one. */
+export async function updateAccount(u, fd, onError) {
+  const role = fd.get('role') || u.role
+  const body = { id: u.id, name: (fd.get('name') || '').trim(), email: (fd.get('email') || '').trim(), phone: (fd.get('phone') || '').trim(), role }
+  if (role === 'owner') body.ownerId = fd.get('ownerId') || ''
+  if (role === 'franchisee') body.partnerId = fd.get('partnerId') || ''
+  const pw = fd.get('password')
+  if (pw) body.password = pw
+  const res = await run('updateUser', body, onError)
+  if (res) closeDrawer()
+  return res
+}
 export const setAccountStatus = (u, status) => run('updateUser', { id: u.id, status })
 /** Approve a pending owner sign-up (they are emailed) or decline it (the account is removed; the owner record stays). */
 export const approveSignup = u => run('updateUser', { id: u.id, status: 'active' })

@@ -17,7 +17,7 @@ import { FormGrid, Cell, TextInput, SelectInput } from '../../components/form/Fi
 import { TableSkeleton, Refreshing } from '../../components/ui/Skeletons'
 import { useServerList } from '../../components/list/useServerList'
 import { ListToolbar, ListFilter, Pager } from '../../components/list/ListControls'
-import { ROLE_LABEL, ROLE_CHIP, isStaffRole, createAccount, setAccountStatus, unlockAccount, resetAccountPassword, deleteAccount, approveSignup, declineSignup } from './actions'
+import { ROLE_LABEL, ROLE_CHIP, isStaffRole, createAccount, setAccountStatus, unlockAccount, resetAccountPassword, deleteAccount, approveSignup, declineSignup, editAccount } from './actions'
 import { api } from '../../app/api'
 import { maskAcct } from '../../domain/lease'
 
@@ -127,6 +127,7 @@ function RowActions({ u, me, isAdmin, onIssued }) {
   const go = fn => async () => { if (busy) return; setBusy(true); try { await fn() } finally { setBusy(false) } }
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: .75, justifyContent: 'flex-end', minWidth: 220 }}>
+      <Btn sm disabled={busy} onClick={() => editAccount(u)}>Edit</Btn>
       {self ? null : u.status === 'disabled' || u.status === 'pending'
         ? <Btn sm primary={u.status === 'pending'} disabled={busy} onClick={go(() => setAccountStatus(u, 'active'))}>{u.status === 'pending' ? 'Approve' : 'Enable'}</Btn>
         : <Btn sm disabled={busy} onClick={go(() => setAccountStatus(u, 'disabled'))}>Disable</Btn>}
