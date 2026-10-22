@@ -13,7 +13,7 @@ import { TODAY, daysTo, fmtD, by, fy, inr, nowISO } from './utils'
 export const calcCtx = () => C.makeCtx({ today: TODAY, invoices: S.invoices, me: isOwner() ? role().ownerId : null, ownerView: isOwner(), ownerOf: id => ALL.owners.find(o => o.id === id) || owner(id), ownerName: id => owner(id)?.name, propOf: prop })
 
 /* ---------- pure functions, re-exported unchanged ---------- */
-export const { rentStartOf, escAnchor, escSteps, escAmt, escOn, escLabel, stepUpLabel, rentFor, rentAt, rentBaseAt, rentSteps, resolvedRentSteps, leaseOwners, isCoShare, leaseParties, leaseCoShares, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, lockEndLessor, lockEndOf, lockInLessee, lockInLessor, lockInOf, noticeBy, noticeByLessor, noticeLessee, noticeLessor, noticeOf, depositOwners, allLeaseOwners } = C
+export const { rentStartOf, escAnchor, escSteps, escAmt, escOn, escLabel, rentFor, rentAt, rentBaseAt, rentSteps, hasRentSteps, resolvedRentSteps, leaseOwners, isCoShare, leaseParties, leaseCoShares, isMulti, ownerShare, ownerGstMode, tdsPerOwner, splitAmt, depAdjs, adjFor, depAdjusted, depHeld, TDS_BASE, TDS_NOPAN, panValid, certFor, OB_DATE, obItems, obOut, clearSchedCache, lockEnd, lockEndLessor, lockEndOf, lockInLessee, lockInLessor, lockInOf, noticeBy, noticeByLessor, noticeLessee, noticeLessor, noticeOf, depositOwners, allLeaseOwners } = C
 
 /* ---------- bound to today / the store ---------- */
 export const nextEsc = L => C.nextEsc(L, TODAY)

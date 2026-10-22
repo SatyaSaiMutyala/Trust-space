@@ -12,19 +12,25 @@ import { SchedTotals, ScheduleTable, TimingNote } from './LeaseDetail'
 import RentByYear from './RentByYear'
 import { leaseFromForm, submitLease, ownerSums, readOwnerAmounts, formTotals, amountsFromShares, totalFieldOf, SHARE_KEYS } from './actions'
 import OwnerRows from './OwnerRows'
-import { escOn, rentFor, escAnchor, stepUpLabel } from '../../domain/lease'
+import RentStepRows from './RentStepRows'
+import { escOn, rentFor, resolvedRentSteps } from '../../domain/lease'
+import { nextEsc as nextEscFrom } from '@calc/lease.js'
 
-/** The rule in words plus the first few escalations with their reason, like the rent-escalation mock-up. */
+/** The rule in words plus the first rent changes with their reason — from the rule and from the Rent changes table alike. */
 function escFormula(L) {
-  if (!escOn(L)) return 'No escalation: the rent stays at the base for the whole term.'
   const p = +L.escPct || 0, every = +L.escEvery || 12, e = every === 12 ? 'year' : `${every} months`
-  const rule = L.escType === 'Simple' ? `New rent = base × (1 + ${p}% × n) · adds ${inr(Math.round((+L.rent || 0) * p / 100))} every ${e}`
+  const steps = resolvedRentSteps(L)
+  const rule = !escOn(L) ? (steps.length ? 'No regular rule: the rent follows the Rent changes table.' : 'No escalation: the rent stays at the base for the whole term.')
+    : L.escType === 'Simple' ? `New rent = base × (1 + ${p}% × n) · adds ${inr(Math.round((+L.rent || 0) * p / 100))} every ${e}`
     : L.escType === 'Amount' ? `New rent = base + ${inr(L.escAdd)} × n · adds ${inr(L.escAdd)} every ${e}`
-    : L.escType === 'StepUp' ? `Escalation ${Math.max(1, +L.stepAt || 1)}: base revised (${stepUpLabel(L)}) · then +${p}% every ${e} ${L.stepOn === 'simple' ? 'of the revised base' : 'on the last rent'}`
     : `New rent = last rent × (1 + ${p}%) · the rupee increase grows every ${e}`
-  const a = escAnchor(L); const lines = []
-  for (let k = 0; k < 5 && lines.length < 5; k++) { const d = addMonths(a, every * k); if (d > L.end) break; const r = rentFor(L, d.slice(0, 7)); const prev = k ? rentFor(L, addMonths(a, every * (k - 1)).slice(0, 7)) : null; lines.push(`${perLabel(d.slice(0, 7))}: ${inr(r)}  (${k === 0 ? 'base rent' : r === prev ? 'no change' : `+${inr(r - prev)}`})`) }
-  return rule + '\n' + lines.join('\n') + (addMonths(a, every * 5) <= L.end ? '\n…' : '')
+  const lines = []; let d = L.start, prev = null
+  for (let i = 0; i < 7 && d && d <= L.end; i++) {
+    const r = rentFor(L, d.slice(0, 7)); const chg = steps.find(s => s.from === d)
+    lines.push(`${perLabel(d.slice(0, 7))}: ${inr(r)}  (${i === 0 ? 'base rent' : chg ? (chg.kind === 'pct' ? `+${chg.value}% as per agreement` : chg.kind === 'amt' ? `+${inr(chg.value)} as per agreement` : chg.extension ? 'extension' : 'new rent as per agreement') : r === prev ? 'no change' : `+${inr(r - prev)}`})`)
+    prev = r; d = nextEscFrom(L, d)
+  }
+  return rule + '\n' + lines.join('\n') + (d && d <= L.end ? '\n…' : '')
 }
 
 let SEQ = 0 // keys for co-owner rows
@@ -65,7 +71,7 @@ export default function LeaseFormDrawer({ d }) {
     return amountsFromShares(owners, L ? { rent: +L.rent || 0, maint: +L.maint || 0, dep: +L.deposit || 0, adv: +L.advanceRent || 0 } : {}).map(o => ({ key: ++SEQ, o }))
   })
   const [escType, setEscType] = useState(L.escType || 'Compound')
-  const [stepKind, setStepKind] = useState(L.stepKind || 'amt')
+  const [steps, setSteps] = useState(() => (Array.isArray(L.rentSteps) ? L.rentSteps : []).map(s => ({ key: ++SEQ, s })))
   const [same] = useState(() => !(L && L.owners && L.owners.length) || L.owners.every(o => ['maint', 'dep', 'adv'].every(k => +o[k] === +o.rent)))
   const lastTotals = useRef(null) // totals the owners' amounts were last split from — to rescale them when a total changes
 
@@ -75,7 +81,7 @@ export default function LeaseFormDrawer({ d }) {
     setPv({ x, sc }); setSums(ownerSums(f))
     if (!lastTotals.current) lastTotals.current = formTotals(f)
   }
-  useEffect(upd, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(upd, [rows, steps]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!L) return <DrawerLayout title="Lease">Not found</DrawerLayout>
   const term = Math.round(dayCount(L.start, L.end) / 30.44)
 
@@ -133,7 +139,6 @@ export default function LeaseFormDrawer({ d }) {
   const onChange = e => {
     const f = formRef.current; const t = e.target
     if (t.id === 'ls-et') setEscType(t.value)
-    if (t.id === 'ls-sk') setStepKind(t.value)
     if (t.name === 'o-id') { const O = owner(t.value); const g = fld(t.closest('.orow'), 'gst'); if (O && orows().length > 1) g.value = O.gstin ? 'Forward' : 'RCM' }
     if (t.id === 'ls-prop') {
       const rs = orows(); const P = prop(t.value)
@@ -185,19 +190,14 @@ export default function LeaseFormDrawer({ d }) {
           <TextInput id="ls-rent" name="rent" label="Monthly rent (₹, excl. GST)" type="number" min="0" defaultValue={L.rent} required />
           <SelectInput id="ls-pt" name="payTiming" label="Is rent paid in advance or in arrears?" required options={[['', 'Select — required'], ['Advance', 'In advance — billed & paid in the same month'], ['Arrears', 'In arrears — liability at month-end, billed next month']]} defaultValue={L.payTiming || ''} hint={timingHint(x ? x.payTiming : L.payTiming, x ? x.dueDay : L.dueDay)} />
           <TextInput id="ls-due" name="dueDay" label="Due by (day of month)" type="number" min="1" max="28" defaultValue={L.dueDay} hint="Advance: of the same month · Arrears: of the following month" />
-          <SelectInput id="ls-et" name="escType" label="How does the rent go up?" full options={[['Compound', 'A % compounded on the last rent — each increase is on the rent just before it'], ['Simple', 'A % of the original base rent — the same rupee increase each time'], ['Amount', 'A fixed ₹ amount added each time'], ['StepUp', 'A step-up in base, then % thereafter — one revision of the base rent, then a % on the revised rent']]} defaultValue={L.escType || 'Compound'} />
+          <SelectInput id="ls-et" name="escType" label="How does the rent go up?" full options={[['Compound', 'A % compounded on the last rent — each increase is on the rent just before it'], ['Simple', 'A % of the original base rent — the same rupee increase each time'], ['Amount', 'A fixed ₹ amount added each time']]} defaultValue={L.escType || 'Compound'} />
           <TextInput id="ls-ee" name="escEvery" label="Escalate every (months)" type="number" min="0" defaultValue={L.escEvery} hint="12 = yearly · 36 = once every 3 years" />
           <SelectInput id="ls-ef" name="escFrom" label="Escalation counted from" options={['Lease start', 'Rent commencement']} defaultValue={L.escFrom || 'Lease start'} />
-          {escType === 'StepUp' ? <>
-            <SelectInput id="ls-sk" name="stepKind" label="Base step-up as" options={[['amt', '₹ amount added'], ['pct', '% of the base'], ['new', 'New rent']]} defaultValue={L.stepKind || 'amt'} />
-            <TextInput id="ls-sv" name="stepValue" label={stepKind === 'pct' ? 'Step-up (%)' : stepKind === 'new' ? 'Revised base rent (₹)' : 'Step-up (₹ per month)'} type="number" min="0" defaultValue={L.stepValue || ''} />
-            <TextInput id="ls-sa" name="stepAt" label="Applied at escalation no." type="number" min="1" step="1" defaultValue={L.stepAt || 1} hint="1 = the first escalation; the rent stays at the base until then" />
-            <TextInput id="ls-esc" name="escPct" label="Then escalation %" type="number" min="0" step="0.5" defaultValue={L.escPct} />
-            <SelectInput id="ls-so" name="stepOn" label="% applied on" options={[['compound', 'Last rent (compounded)'], ['simple', 'Revised base (simple)']]} defaultValue={L.stepOn || 'compound'} />
-          </> : <>
             <TextInput id="ls-esc" name="escPct" label="Escalation %" type="number" min="0" step="0.5" defaultValue={L.escPct} disabled={escType === 'Amount'} hint={escType === 'Simple' ? 'Of the original base rent, every time' : escType === 'Amount' ? 'Not used for a fixed amount' : 'On the rent just before each increase'} />
             <TextInput id="ls-esca" name="escAdd" label="Increase each time (₹ per month)" type="number" min="0" step="100" defaultValue={L.escAdd || ''} disabled={escType !== 'Amount'} hint="e.g. 3000 = rent goes up by ₹3,000/month every time" />
-          </>}
+          <Cell full><FieldBox id="ls-steps" label="Rent changes as per the agreement (irregular patterns)" full>
+            <RentStepRows rows={steps} resolved={x ? resolvedRentSteps(x) : []} hasRule={!!(x && escOn(x))} onAdd={() => setSteps(r => r.concat([{ key: ++SEQ, s: { id: `rs${Date.now().toString(36)}${r.length}`, from: '', kind: 'pct', value: '', every: '', until: '' } }]))} onDel={key => setSteps(r => r.filter(z => z.key !== key))} />
+          </FieldBox></Cell>
           <Cell full><div className="formula small" style={{ whiteSpace: 'pre-line', fontFamily: 'var(--f-mono)', background: 'var(--sunk)', borderRadius: 6, padding: '8px 10px' }}>{escFormula(x || L)}</div></Cell>
 
           <SectionTitle>4 · Deposit &amp; advance</SectionTitle>
