@@ -176,3 +176,19 @@ test('a repeating rent change: 10% every 12 months from 2030 until Mar 2035 paus
   assert.deepEqual(resolvedRentSteps(M).map(s => [s.from, s.rent]), [['2030-04-01', 33459], ['2031-04-01', 36805], ['2032-04-01', 40486], ['2033-04-01', 50000]])
   assert.equal(rentFor(M, '2034-04'), 57500, 'after the one-off change the rule runs again')
 })
+
+test('step-up escalation: flat until escalation no. 3, base revised, then % thereafter (compounded or simple)', async () => {
+  const { escLabel } = await import('../lease.js')
+  const base = { id: 'su', start: '2026-04-01', end: '2035-03-31', rent: 20000, escType: 'StepUp', escEvery: 12, escFrom: 'Lease start', escPct: 15, stepKind: 'pct', stepValue: 10, stepAt: 3, stepOn: 'compound', fitout: 0, payTiming: 'Advance', dueDay: 5, gstMode: 'None', tds: false, maintType: 'None', ownerId: 'o1' }
+  assert.equal(rentFor(base, '2027-04'), 20000); assert.equal(rentFor(base, '2028-04'), 20000, 'flat until the step-up')
+  assert.equal(rentFor(base, '2029-04'), 22000, 'escalation 3: base revised +10%'); assert.equal(rentFor(base, '2030-04'), 25300); assert.equal(rentFor(base, '2031-04'), 29095, 'then 15% compounded')
+  assert.equal(escLabel(base), 'base revised at escalation 3 (+10%), then 15% every 12 months')
+  const simple = { ...base, id: 'su2', stepOn: 'simple', stepKind: 'amt', stepValue: 3000 }
+  assert.equal(rentFor(simple, '2029-04'), 23000); assert.equal(rentFor(simple, '2030-04'), 26450); assert.equal(rentFor(simple, '2031-04'), 29900, '15% of the revised base each time')
+  const newRent = { ...base, id: 'su3', stepKind: 'new', stepValue: 30000, stepAt: 1 }
+  assert.equal(rentFor(newRent, '2026-06'), 20000); assert.equal(rentFor(newRent, '2027-04'), 30000); assert.equal(rentFor(newRent, '2028-04'), 34500)
+  // after an extension's revised rent the "thereafter" % simply continues
+  const E = { ...base, id: 'su4', end: '2037-03-31', extensions: [{ id: 'x', fromEnd: '2035-03-31', toEnd: '2037-03-31', rent: 50000, rentFrom: '2035-04-01' }] }
+  assert.equal(rentFor(E, '2035-04'), 50000); assert.equal(rentFor(E, '2036-04'), 57500)
+  const S = schedule(base, ctx()); assert.equal(S.rows.find(r => r.p === '2030-04').rent, 25300)
+})

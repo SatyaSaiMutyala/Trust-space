@@ -357,7 +357,7 @@ export async function planImport(buffer) {
     r.rec = {
       ref: v.ref, propertyId: P?.id || '', ownerId: O?.id || '', status: v.status, start: v.start, end: v.end, rent: v.rent, payTiming: v.payTiming, dueDay: v.dueDay,
       deposit: v.deposit, depositPaid: !!v.depositPaid, depositUtr: v.depositUtr, depositChannel: v.depositChannel, depositBank: v.depositBank, lockIn: v.lockIn, lockInLessor: cells.lockInLessor === '' || cells.lockInLessor === undefined ? v.lockIn : v.lockInLessor, notice: v.notice, noticeLessor: v.noticeLessor, fitout: v.fitout,
-      escPct: v.escAdd > 0 ? 0 : v.escPct, escAdd: v.escAdd, escEvery: v.escEvery, escType: v.escAdd > 0 ? 'Amount' : v.escType, escFrom: v.escFrom, rentSteps: steps, gstMode, tds: !!v.tds, tdsOnMaint: false,
+      escPct: v.escAdd > 0 ? 0 : v.escPct, escAdd: v.escAdd, escEvery: v.escEvery, escType: v.escAdd > 0 ? 'Amount' : v.escType, escFrom: v.escFrom, stepKind: v.stepKind === '% of base' ? 'pct' : v.stepKind === 'New rent' ? 'new' : 'amt', stepValue: v.stepValue === '' ? 0 : v.stepValue, stepAt: v.stepAt, stepOn: v.stepOn === 'Revised base (simple)' ? 'simple' : 'compound', rentSteps: steps, gstMode, tds: !!v.tds, tdsOnMaint: false,
       maintType: v.maintType, maint: v.maint, maintEsc: false, elec: v.elec, registered: !!v.registered, advanceRent: 0, advanceMonths: 0, brokerage: 0, stamp: 0, clauses: '', docs: [],
       owners: cs.length ? [{ ownerId: O?.id || '', rent: 100 - cs.reduce((a, c) => a + c.pct, 0), maint: 100 - cs.reduce((a, c) => a + c.pct, 0), dep: 100, adv: 100, gst: '' }, ...cs.map(c => ({ ownerId: c.hit.id || '', rent: c.pct, maint: c.pct, dep: 0, adv: 0, gst: 'None', role: 'coShare' }))] : [],
     }

@@ -64,7 +64,7 @@ export const RESOURCES = [
     required: [['ref', 'Lease reference'], ['propertyId', 'Property'], ['start', 'Lease start date'], ['end', 'Lease end date'], ['rent', 'Monthly rent']],
     labels: { status: 'Agreement status' },
     enums: { status: ['Draft', 'Active'], gstMode: ['Forward', 'RCM', 'None'], payTiming: ['Advance', 'Arrears'] },
-    numbers: ['rent', 'deposit', 'escPct', 'escAdd', 'escEvery', 'lockIn', 'lockInLessor', 'notice', 'noticeLessor', 'fitout', 'maint', 'advanceRent', 'advanceMonths', 'brokerage', 'stamp', 'dueDay'],
+    numbers: ['rent', 'deposit', 'escPct', 'escAdd', 'stepValue', 'stepAt', 'escEvery', 'lockIn', 'lockInLessor', 'notice', 'noticeLessor', 'fitout', 'maint', 'advanceRent', 'advanceMonths', 'brokerage', 'stamp', 'dueDay'],
     refs: { propertyId: 'properties', ownerId: 'owners' },
     unique: [['ref']],
     indexes: ['ownerId', 'owners.ownerId'],
@@ -198,7 +198,7 @@ export const byPath = Object.fromEntries(RESOURCES.map(r => [r.path, r]))
 export const FIELD_LABELS = {
   status: 'Status', kind: 'Type', type: 'Type', stage: 'Stage', priority: 'Priority', role: 'Role', source: 'Source', from: 'Sender side',
   gstMode: 'GST on rent', payTiming: 'Rent payment timing', responsibility: 'Responsibility', model: 'Engagement',
-  area: 'Area (sq ft)', rent: 'Monthly rent', deposit: 'Security deposit', escPct: 'Escalation %', escAdd: 'Escalation amount (₹)', escEvery: 'Escalate every (months)',
+  area: 'Area (sq ft)', rent: 'Monthly rent', deposit: 'Security deposit', escPct: 'Escalation %', escAdd: 'Escalation amount (₹)', stepValue: 'Step-up value', stepAt: 'Step-up at escalation no.', escEvery: 'Escalate every (months)',
   lockIn: 'Lock-in for lessee (months)', lockInLessor: 'Lock-in for lessor (months)', notice: 'Notice by lessee (months)', noticeLessor: 'Notice by lessor (months)', fitout: 'Rent-free period (days)', maint: 'Maintenance',
   advanceRent: 'Advance rent', advanceMonths: 'Advance adjustment months', brokerage: 'Brokerage', stamp: 'Stamp duty', dueDay: 'Due day', depositUtr: 'Deposit transaction ID', depositChannel: 'Deposit payment channel', depositBank: 'Deposit bank',
   base: 'Amount', gst: 'GST', rcm: 'GST under RCM', tds: 'TDS', total: 'Invoice total', net: 'Net payable', paidAmount: 'Amount paid', tdsDeducted: 'TDS deducted',
