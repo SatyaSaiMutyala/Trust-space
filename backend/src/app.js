@@ -14,6 +14,7 @@ import assetRouter from './routes/assets.js'
 import invoicesRouter from './routes/invoices.js'
 import mobileRouter from './routes/mobile.js'
 import importRouter from './routes/import.js'
+import provisioningRouter from './routes/provisioning.js'
 import { notFoundRoute, errorHandler } from './middleware/errors.js'
 
 if (!env.auth.jwtSecret) throw new Error('JWT_SECRET must be set in production.')
@@ -29,6 +30,9 @@ app.use(cookieParser())
 // Public
 app.use('/api/health', healthRouter)
 app.use('/api/auth', authRouter)
+
+// PACE identity hub (server-to-server, guarded by X-Provisioning-Token)
+app.use('/api/provisioning', provisioningRouter)
 
 // Signed-in users only
 app.use('/api/users', usersRouter)

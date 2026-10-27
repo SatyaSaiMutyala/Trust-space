@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['admin', 'staff', 'owner', 'franchisee'], required: true },
   ownerId: String, // role = owner
   partnerId: String, // role = franchisee
+  matchUuid: { type: String, default: null }, // PACE cross-app person key (identity-hub provisioning)
   status: { type: String, enum: ['active', 'disabled', 'pending'], default: 'active' }, // pending = owner sign-up waiting for approval
   signup: mongoose.Schema.Types.Mixed, // what the owner told us at sign-up (property code / name, co-owners…)
   deletedAt: Date, // the person deleted their own account
@@ -27,6 +28,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } })
 userSchema.index({ phoneDigits: 1 }, { unique: true, partialFilterExpression: { phoneDigits: { $type: 'string' } } })
 userSchema.index({ role: 1 }); userSchema.index({ status: 1 }); userSchema.index({ ownerId: 1 }); userSchema.index({ partnerId: 1 })
+userSchema.index({ matchUuid: 1 }, { unique: true, partialFilterExpression: { matchUuid: { $type: 'string' } } })
 
 const sessionSchema = new mongoose.Schema({
   _id: { type: String, default: newId },
