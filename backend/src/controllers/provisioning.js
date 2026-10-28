@@ -46,7 +46,7 @@ export const provisioningController = {
   },
 
   rotateToken(req, res) {
-    const token = req.body?.token
+    const token = req.body?.new_token ?? req.body?.token // PACE sends `new_token`
     if (!token || String(token).trim().length < 16) throw badRequest('A new token of at least 16 characters is required.')
     writeToken(token)
     return ok(res, 'Provisioning token rotated.', { app: APP })
